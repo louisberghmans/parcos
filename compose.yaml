@@ -1,0 +1,27 @@
+services:
+  parcos:
+    image: "${PARCOS_IMAGE:-ghcr.io/louisberghmans/parcos:1.0.0}"
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "${PARCOS_PORT:-8080}:3000"
+    environment:
+      PARCOS_ADMIN_USERNAME: "${PARCOS_ADMIN_USERNAME:-admin}"
+      PARCOS_ADMIN_PASSWORD: "${PARCOS_ADMIN_PASSWORD:?Create a .env file and set PARCOS_ADMIN_PASSWORD}"
+      PARCOS_BASE_URL: "${PARCOS_BASE_URL:-}"
+      PARCOS_COOKIE_SECURE: "${PARCOS_COOKIE_SECURE:-false}"
+      PARCOS_TRUST_PROXY: "${PARCOS_TRUST_PROXY:-false}"
+    volumes:
+      - parcos-data:/data
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  parcos-data:
