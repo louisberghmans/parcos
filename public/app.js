@@ -83,6 +83,12 @@ function initials(name) {
   return String(name ?? "P").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
+function avatarContent(member) {
+  return member?.avatarUrl
+    ? `<img src="${escapeHtml(member.avatarUrl)}" alt="" loading="lazy">`
+    : escapeHtml(initials(member?.displayName));
+}
+
 function isCoordinator() {
   return ["coordinator", "admin"].includes(state.member?.role);
 }
@@ -256,7 +262,7 @@ function shell(content) {
   return `<div class="app-shell">
     <header class="topbar">
       <button class="brand-button" data-page="today"><span class="brand-mark small">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></button>
-      <button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${escapeHtml(initials(state.member.displayName))}</button>
+      <button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button>
     </header>
     <main class="main-content">${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
@@ -478,7 +484,7 @@ function bedCard(bed) {
 function renderProfile() {
   const registrations = state.events.filter((event) => event.registration && event.registration.status !== "cancelled" && new Date(event.endsAt) >= new Date());
   return `<section class="page profile-page">
-    <div class="profile-hero"><span class="profile-avatar">${escapeHtml(initials(state.member.displayName))}</span><h1>${escapeHtml(state.member.displayName)}</h1><p>${escapeHtml(roleLabels[state.member.role])} · @${escapeHtml(state.member.username)}</p></div>
+    <div class="profile-hero"><div class="profile-photo-control"><span class="profile-avatar">${avatarContent(state.member)}</span><label class="profile-photo-button file-button" aria-label="Modifier ma photo">&#9998;<input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div><h1>${escapeHtml(state.member.displayName)}</h1><p>${escapeHtml(roleLabels[state.member.role])} · @${escapeHtml(state.member.username)}</p><small>Appuyez sur le crayon pour ajouter ou changer votre photo.</small></div>
     <section class="panel"><div class="section-heading compact"><div><p class="eyebrow">À venir</p><h2>Mes inscriptions</h2></div><span class="count-pill">${registrations.length}</span></div>${registrations.length ? `<div class="profile-event-list">${registrations.map(compactEventCard).join("")}</div>` : '<p class="muted">Vous n’êtes inscrit à aucun événement à venir.</p>'}</section>
     <section class="panel"><div class="section-heading compact"><div><p class="eyebrow">Mon compte</p><h2>Mon profil</h2></div></div>
       <form id="profile-form" class="form-stack compact-form">
@@ -491,7 +497,7 @@ function renderProfile() {
       </form>
     </section>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
-    <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${escapeHtml(initials(member.displayName))}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabels[member.role])} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
+    <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabels[member.role])} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
 }
@@ -556,6 +562,7 @@ function bindShell() {
   }));
   document.querySelector("#create-event")?.addEventListener("click", () => renderEventForm());
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
+  document.querySelector("#profile-photo-input")?.addEventListener("change", uploadProfilePhoto);
   document.querySelector("#invite-create-form")?.addEventListener("submit", createInvite);
   document.querySelectorAll("[data-reset-member]").forEach((button) => button.addEventListener("click", () => createResetLink(Number(button.dataset.resetMember))));
   document.querySelector("#logout-button")?.addEventListener("click", logout);
@@ -685,7 +692,7 @@ function renderEventSheet() {
       ${event.accessibilityNote ? `<div class="event-note accessibility"><small>Accessibilité</small><p>${escapeHtml(event.accessibilityNote)}</p></div>` : ""}
       ${event.state === "published" ? `<div class="event-registration-actions">${activeRegistration ? `<button class="button secondary" id="edit-registration">${registration.status === "waitlisted" ? "Modifier ma demande" : `Inscrit · ${registration.partySize} personne${registration.partySize === 1 ? "" : "s"}`}</button><button class="button ghost" id="cancel-registration">Me désinscrire</button>` : '<button class="button primary" id="join-event">Je participe</button>'}<a class="button ghost" href="/api/events/${event.id}/calendar.ics" download>Ajouter au calendrier</a></div>` : ""}
       <button class="button ghost share-event-button" id="share-event">Partager le rendez-vous</button>
-      ${isCoordinator() ? `<div class="coordinator-event-tools"><button class="button secondary" id="edit-event">Modifier l’événement</button></div><div class="detail-section attendee-list"><h3>Inscriptions (${registrations.length})</h3>${registrations.length ? registrations.map((entry) => `<div class="attendee-row"><span class="avatar-button">${escapeHtml(initials(entry.memberName))}</span><span><strong>${escapeHtml(entry.memberName)}</strong><small>${entry.partySize} personne${entry.partySize === 1 ? "" : "s"} · ${entry.status === "waitlisted" ? "liste d’attente" : "inscrit"}</small></span></div>`).join("") : '<p class="muted">Aucune inscription pour le moment.</p>'}</div>` : ""}
+      ${isCoordinator() ? `<div class="coordinator-event-tools"><button class="button secondary" id="edit-event">Modifier l’événement</button></div><div class="detail-section attendee-list"><h3>Inscriptions (${registrations.length})</h3>${registrations.length ? registrations.map((entry) => `<div class="attendee-row"><span class="avatar-button">${avatarContent({ displayName: entry.memberName, avatarUrl: entry.avatarUrl })}</span><span><strong>${escapeHtml(entry.memberName)}</strong><small>${entry.partySize} personne${entry.partySize === 1 ? "" : "s"} · ${entry.status === "waitlisted" ? "liste d’attente" : "inscrit"}</small></span></div>`).join("") : '<p class="muted">Aucune inscription pour le moment.</p>'}</div>` : ""}
     </div></section></div>`;
   bindModal();
   document.querySelector("#join-event")?.addEventListener("click", joinEventQuick);
@@ -890,16 +897,34 @@ async function saveBed(event) {
   }
 }
 
-async function compressPhoto(file) {
+async function compressPhoto(file, max = 1600, quality = 0.82) {
   if (file.size > 15 * 1024 * 1024) throw new Error("La photo d’origine est trop volumineuse.");
   const bitmap = await createImageBitmap(file);
-  const max = 1600;
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.82);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+async function uploadProfilePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const label = event.target.closest("label");
+  label.classList.add("working");
+  try {
+    const dataUrl = await compressPhoto(file, 800, 0.8);
+    const result = await api("/api/profile/avatar", { method: "POST", body: JSON.stringify({ dataUrl }) });
+    state.member = result.member;
+    if (isCoordinator()) await loadMembers();
+    renderApp();
+    showToast("Photo de profil enregistrée.");
+  } catch (error) {
+    label.classList.remove("working");
+    showToast(error.message);
+  }
 }
 
 async function uploadBedPhoto(event) {

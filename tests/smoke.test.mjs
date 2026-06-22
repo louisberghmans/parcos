@@ -167,6 +167,29 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(privatePhoto.status, 200);
   assert.equal(privatePhoto.headers.get("cache-control"), "private, no-store");
 
+  const avatar = await request(baseUrl, "/api/profile/avatar", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ dataUrl: `data:image/jpeg;base64,${png}` }),
+  });
+  assert.equal(avatar.response.status, 200);
+  assert.match(avatar.body.member.avatarUrl, /^\/media\/avatar-/);
+  const anonymousAvatar = await fetch(`${baseUrl}${avatar.body.member.avatarUrl}`);
+  assert.equal(anonymousAvatar.status, 401);
+  const privateAvatar = await fetch(`${baseUrl}${avatar.body.member.avatarUrl}`, { headers: { cookie: memberCookie } });
+  assert.equal(privateAvatar.status, 200);
+  assert.equal(privateAvatar.headers.get("content-type"), "image/jpeg");
+  assert.equal(privateAvatar.headers.get("cache-control"), "private, no-store");
+  const directory = await request(baseUrl, "/api/members", { headers: { cookie: adminCookie } });
+  assert.equal(directory.body.members.find((member) => member.id === redeem.body.member.id).avatarUrl, avatar.body.member.avatarUrl);
+
+  const fakeAvatar = await request(baseUrl, "/api/profile/avatar", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ dataUrl: `data:image/png;base64,${png}` }),
+  });
+  assert.equal(fakeAvatar.response.status, 400);
+
   const resetLink = await request(baseUrl, `/api/members/${redeem.body.member.id}/reset-link`, {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
@@ -186,9 +209,15 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(oldSession.response.status, 401);
 });
 
-test("fresh install requires one-time admin setup and protects the member directory", async (t) => {
+test("fresh install uses the forwarded public origin once and protects the member directory", async (t) => {
   const dataDir = mkdtempSync(join(tmpdir(), "parcos-setup-test-"));
-  const app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+  const app = createApp({
+    dataDir,
+    adminUsername: "admin",
+    adminPassword: "test-admin-password",
+    trustProxy: true,
+    baseUrl: "http://stale-lan-address.invalid:8180",
+  });
   await new Promise((resolve) => app.server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${app.server.address().port}`;
   t.after(() => {
@@ -217,6 +246,20 @@ test("fresh install requires one-time admin setup and protects the member direct
   assert.equal(setup.body.setupRequired, false);
   assert.equal(setup.body.parcName, "Parc des Tests");
 
+  const proxiedReset = await request(baseUrl, `/api/members/${login.body.member.id}/reset-link`, {
+    method: "POST",
+    headers: {
+      cookie: adminCookie,
+      "content-type": "application/json",
+      "x-csrf-token": login.body.csrfToken,
+      "x-forwarded-host": "parmentier.parcos.eu",
+      "x-forwarded-proto": "https",
+      "x-forwarded-port": "8443",
+    },
+    body: "{}",
+  });
+  assert.equal(new URL(proxiedReset.body.resetUrl).origin, "https://parmentier.parcos.eu:8443");
+
   const repeated = await request(baseUrl, "/api/setup", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
@@ -226,9 +269,16 @@ test("fresh install requires one-time admin setup and protects the member direct
 
   const invite = await request(baseUrl, "/api/invites", {
     method: "POST",
-    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    headers: {
+      cookie: adminCookie,
+      "content-type": "application/json",
+      "x-csrf-token": login.body.csrfToken,
+      "x-forwarded-host": "parmentier.parcos.eu",
+      "x-forwarded-proto": "https",
+    },
     body: JSON.stringify({ role: "member" }),
   });
+  assert.equal(new URL(invite.body.inviteUrl).origin, "https://parmentier.parcos.eu");
   const token = new URL(invite.body.inviteUrl).searchParams.get("invite");
   const redeem = await request(baseUrl, "/api/invites/redeem", {
     method: "POST",

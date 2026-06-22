@@ -15,10 +15,10 @@ seven days.
 ## Deployment baseline
 
 - Serve ParcOS through an HTTPS reverse proxy on untrusted networks.
-- Set `PARCOS_BASE_URL`, `PARCOS_COOKIE_SECURE=true`, and only set
-  `PARCOS_TRUST_PROXY=true` when requests come exclusively from that proxy.
+- Set `PARCOS_COOKIE_SECURE=true`, and only set `PARCOS_TRUST_PROXY=true` when
+  requests come exclusively from that proxy. Trusted proxy headers determine
+  the public origin used in generated links.
 - Use a unique administrator password of at least 12 characters.
 - Keep `/data` private, persistent, and backed up; it contains the SQLite
   database and member-uploaded photos.
 - Do not publish `.env`, database files, backups, or invitation/reset URLs.
-

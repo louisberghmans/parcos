@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.title="ParcOS" \
       org.opencontainers.image.description="Self-hosted operating app for community parks and gardens" \
       org.opencontainers.image.source="https://github.com/louisberghmans/parcos" \
       org.opencontainers.image.licenses="GPL-3.0-or-later" \
-      org.opencontainers.image.version="1.0.0"
+      org.opencontainers.image.version="1.0.1"
 
 WORKDIR /app
 ENV NODE_ENV=production \

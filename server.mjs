@@ -20,6 +20,7 @@ const SESSION_COOKIE = "parcos_session";
 const SESSION_DAYS = 30;
 const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const PHOTO_BYTES = 6 * 1024 * 1024;
+const AVATAR_BYTES = 2 * 1024 * 1024;
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -86,6 +87,7 @@ function memberJson(row) {
     role: row.role,
     preferredLocale: row.preferred_locale,
     bio: row.bio ?? "",
+    avatarUrl: row.avatar_path ? `/media/${row.avatar_path}` : null,
     createdAt: row.created_at,
   };
 }
@@ -234,6 +236,7 @@ function createSchema(db) {
       role text not null check (role in ('member', 'coordinator', 'admin')),
       preferred_locale text not null default 'fr' check (preferred_locale in ('fr', 'nl', 'en')),
       bio text,
+      avatar_path text,
       created_at text not null,
       updated_at text not null
     );
@@ -369,6 +372,11 @@ function createSchema(db) {
     db.exec("alter table beds add column area_id integer references garden_areas(id) on delete restrict");
   }
   db.exec("create index if not exists beds_area_idx on beds(area_id, display_number)");
+
+  const memberColumns = db.prepare("pragma table_info(members)").all();
+  if (!memberColumns.some((column) => column.name === "avatar_path")) {
+    db.exec("alter table members add column avatar_path text");
+  }
 }
 
 const seedBeds = [
@@ -536,7 +544,7 @@ function getSession(db, req) {
   if (!token) return null;
   const tokenHash = sha256(token);
   const row = db.prepare(`select s.token_hash, s.csrf_token, s.expires_at,
-    m.id, m.username, m.display_name, m.role, m.preferred_locale, m.bio, m.created_at
+    m.id, m.username, m.display_name, m.role, m.preferred_locale, m.bio, m.avatar_path, m.created_at
     from sessions s join members m on m.id = s.member_id where s.token_hash = ?`).get(tokenHash);
   if (!row) return null;
   if (row.expires_at <= now()) {
@@ -566,21 +574,31 @@ function requireCoordinator(session) {
 }
 
 function requestOrigin(req, configuredBaseUrl, trustProxy = false) {
-  if (configuredBaseUrl) return configuredBaseUrl;
-  const protocol = trustProxy && String(req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim() === "https" ? "https" : "http";
-  const rawHost = trustProxy ? (req.headers["x-forwarded-host"] ?? req.headers.host) : req.headers.host;
-  const host = String(rawHost ?? "localhost").split(",")[0].trim();
+  const forwardedHost = trustProxy ? String(req.headers["x-forwarded-host"] ?? "").split(",")[0].trim() : "";
+  const rawHost = forwardedHost || req.headers.host;
+  let host = String(rawHost ?? "localhost").split(",")[0].trim();
+  const forwardedProtocol = trustProxy ? String(req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim().toLowerCase() : "";
+  if (forwardedProtocol && !["http", "https"].includes(forwardedProtocol)) throw new HttpError(400, "Protocole transmis invalide.");
+  const protocol = forwardedProtocol || (req.socket.encrypted ? "https" : "http");
+  const forwardedPort = trustProxy ? String(req.headers["x-forwarded-port"] ?? "").split(",")[0].trim() : "";
+  if (forwardedPort && (!/^\d{1,5}$/.test(forwardedPort) || Number(forwardedPort) > 65535 || Number(forwardedPort) < 1)) {
+    throw new HttpError(400, "Port transmis invalide.");
+  }
+  const hostHasPort = host.startsWith("[") ? /\]:\d+$/.test(host) : /:\d+$/.test(host);
+  const defaultPort = (protocol === "https" && forwardedPort === "443") || (protocol === "http" && forwardedPort === "80");
+  if (forwardedHost && forwardedPort && !hostHasPort && !defaultPort) host = `${host}:${forwardedPort}`;
   if (!/^(?:\[[0-9a-f:]+\]|[a-z0-9.-]+)(?::\d{1,5})?$/i.test(host)) {
     throw new HttpError(400, "En-tête Host invalide.");
   }
+  if (!rawHost && configuredBaseUrl) return configuredBaseUrl;
   return `${protocol}://${host}`;
 }
 
-function photoData(value) {
+function photoData(value, maxBytes = PHOTO_BYTES) {
   const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(value ?? ""));
   if (!match) throw new HttpError(400, "Photo JPEG, PNG ou WebP requise.");
   const bytes = Buffer.from(match[2], "base64");
-  if (!bytes.length || bytes.length > PHOTO_BYTES) throw new HttpError(413, "La photo doit faire moins de 6 Mo.");
+  if (!bytes.length || bytes.length > maxBytes) throw new HttpError(413, `La photo doit faire moins de ${Math.round(maxBytes / 1024 / 1024)} Mo.`);
   const validSignature = match[1] === "image/jpeg"
     ? bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
     : match[1] === "image/png"
@@ -945,9 +963,30 @@ export function createApp(options = {}) {
           return json(res, 200, { member: memberJson(row) });
         }
 
+        if (req.method === "POST" && path === "/api/profile/avatar") {
+          requireCsrf(req, session);
+          const body = await readJson(req);
+          const photo = photoData(body.dataUrl, AVATAR_BYTES);
+          const filename = `avatar-${session.member.id}-${randomBytes(12).toString("hex")}.${photo.extension}`;
+          const filePath = join(uploadsDir, filename);
+          const current = db.prepare("select avatar_path from members where id = ?").get(session.member.id);
+          writeFileSync(filePath, photo.bytes, { flag: "wx", mode: 0o600 });
+          try {
+            db.prepare("update members set avatar_path = ?, updated_at = ? where id = ?")
+              .run(filename, now(), session.member.id);
+          } catch (error) {
+            rmSync(filePath, { force: true });
+            throw error;
+          }
+          if (current?.avatar_path && /^avatar-\d+-[a-f0-9]{24}\.(?:jpg|png|webp)$/.test(current.avatar_path)) {
+            rmSync(join(uploadsDir, current.avatar_path), { force: true });
+          }
+          return json(res, 200, { member: memberJson(db.prepare("select * from members where id = ?").get(session.member.id)) });
+        }
+
         if (req.method === "GET" && path === "/api/members") {
           requireCoordinator(session);
-          const rows = db.prepare("select id, username, display_name, role, preferred_locale, bio, created_at from members order by display_name collate nocase").all();
+          const rows = db.prepare("select id, username, display_name, role, preferred_locale, bio, avatar_path, created_at from members order by display_name collate nocase").all();
           return json(res, 200, { members: rows.map(memberJson) });
         }
 
@@ -1048,12 +1087,13 @@ export function createApp(options = {}) {
           const coordinator = ["coordinator", "admin"].includes(session.member.role);
           if (!coordinator && (event.state === "draft" || event.audience === "coordinators")) throw new HttpError(404, "Événement introuvable.");
           const registrations = coordinator ? db.prepare(`select r.status, r.adults, r.teenagers, r.children, r.young_children,
-            m.id as member_id, m.display_name, m.username
+            m.id as member_id, m.display_name, m.username, m.avatar_path
             from event_registrations r join members m on m.id = r.member_id
             where r.event_id = ? and r.status != 'cancelled'
             order by case r.status when 'going' then 0 when 'attended' then 1 when 'waitlisted' then 2 else 3 end, m.display_name collate nocase`).all(eventId)
             .map((entry) => ({
-              memberId: entry.member_id, memberName: entry.display_name, username: entry.username, status: entry.status,
+              memberId: entry.member_id, memberName: entry.display_name, username: entry.username,
+              avatarUrl: entry.avatar_path ? `/media/${entry.avatar_path}` : null, status: entry.status,
               adults: entry.adults, teenagers: entry.teenagers, children: entry.children, youngChildren: entry.young_children,
               partySize: entry.adults + entry.teenagers + entry.children + entry.young_children,
             })) : undefined;
@@ -1243,6 +1283,8 @@ export function createApp(options = {}) {
       if (path.startsWith("/media/")) {
         const mediaSession = requireSession(db, req);
         const filename = path.slice("/media/".length);
+        const avatar = db.prepare("select id from members where avatar_path = ?").get(filename);
+        if (avatar) return serveFile(res, uploadsDir, filename, "private, no-store");
         const photo = db.prepare(`select a.members_can_access from bed_photos p
           join beds b on b.id = p.bed_id join garden_areas a on a.id = b.area_id where p.path = ?`).get(filename);
         if (!photo || (!photo.members_can_access && !["coordinator", "admin"].includes(mediaSession.member.role))) {

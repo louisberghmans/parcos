@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 - 2026-06-23
+
+- Generate invitation, recovery, sharing, and calendar links from the actual
+  request origin, including the HTTPS host forwarded by a trusted reverse proxy.
+- Added authenticated member profile-picture upload and display.
+- Validate avatar file signatures, cap stored avatars at 2 MiB, use unpredictable
+  filenames, and keep avatar responses private to authenticated members.
+
 ## 1.0.0 - 2026-06-22
 
 - Added one-time administrator onboarding for a park and its managed areas.
@@ -10,4 +18,3 @@
   validation, proxy handling, browser headers, and container privileges.
 - Added multi-architecture GHCR publishing with provenance and an SBOM.
 - Released under GPL-3.0-or-later.
-
