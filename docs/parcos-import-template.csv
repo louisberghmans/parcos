@@ -1,0 +1,5 @@
+entity,name,codePrefix,description,locationHint,membersCanAccess,areaCodePrefix,areaName,number,code,section,crop,variety,status,note,harvestNote,title,location,eventType,state,audience,startsAt,endsAt,capacity,preparationNote,accessibilityNote,username,displayName,role,preferredLocale,initialPassword,bio
+area,Grand Potager,GP,Main shared vegetable garden,North entrance,true,,,,,,,,,,,,,,,,,,,,,,,,,,
+bed,,,,,,GP,,1,GP-01,Tomato row,Tomatoes,Noire de Crimee,growing,Water twice a week,,,,,,,,,,,,,,,,,
+event,,,,,,,,,,,,,,,,Public harvest morning,Grand Potager,work,published,public,2026-09-12T10:00:00+02:00,2026-09-12T12:00:00+02:00,25,Bring gloves,Accessible from the north gate,,,,,,
+member,,,,,,,,,,,,,,,,,,,,,,,,,,alex,Alex Martin,member,fr,change-me-please-123,Interested in compost

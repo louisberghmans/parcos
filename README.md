@@ -24,7 +24,7 @@ docker compose up -d
 
 Open `http://YOUR-SERVER:8080`, sign in as the administrator, and complete the
 one-time setup wizard. It asks for the park name and the areas you want to
-manage. The image is available as `ghcr.io/louisberghmans/parcos:1.0.1` and
+manage. The image is available as `ghcr.io/louisberghmans/parcos:1.0.2` and
 `ghcr.io/louisberghmans/parcos:latest` for amd64 and arm64.
 
 To build locally instead:

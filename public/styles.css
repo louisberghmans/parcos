@@ -79,6 +79,8 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .brand-button span:last-child { display: grid; }
 .brand-button strong { font: 19px/1 Georgia, serif; }
 .brand-button small { margin-top: 3px; color: var(--muted); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
+.topbar-actions { display: flex; align-items: center; gap: 9px; }
+.language-toggle { min-width: 42px; height: 34px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--forest-900); font-size: 11px; font-weight: 900; cursor: pointer; }
 .avatar-button, .profile-avatar { display: grid; place-items: center; overflow: hidden; border: 0; border-radius: 50%; background: #ead6d8; color: #7f314a; font-weight: 850; }
 .avatar-button img, .profile-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .avatar-button { width: 42px; height: 42px; cursor: pointer; }
@@ -165,6 +167,7 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .event-card-copy small { color: var(--forest-700); font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
 .event-card-copy strong { overflow: hidden; font: 22px/1.12 Georgia, serif; text-overflow: ellipsis; }
 .event-card-copy > span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.attendee-preview { overflow: hidden; color: var(--forest-700); font-size: 10px; font-style: normal; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .registration-dot, .state-pill { padding: 6px 8px; border-radius: 999px; color: #27604a; background: #dcece4; font-size: 9px; font-style: normal; font-weight: 850; white-space: nowrap; }
 .registration-dot.waitlisted { color: #745916; background: #f5eac4; }
 .round-add { width: 48px; height: 48px; flex: none; border: 0; border-radius: 50%; background: var(--forest-900); color: white; font-size: 29px; line-height: 1; cursor: pointer; box-shadow: 0 8px 20px rgba(23,63,50,.2); }
@@ -292,6 +295,8 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .registration-counts label > span { display: grid; gap: 3px; }
 .registration-counts label small { color: var(--muted); font-size: 10px; }
 .registration-counts input { width: 75px; }
+.public-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.import-panel .invite-result p { margin: 0; color: var(--forest-900); }
 .detail-location { margin-bottom: 10px; color: var(--muted); font-size: 11px; font-weight: 750; text-transform: uppercase; }
 .detail-location span { margin-right: 8px; color: var(--forest-700); }
 .detail-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

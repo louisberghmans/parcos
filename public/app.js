@@ -20,7 +20,96 @@ const state = {
   selectedAreaId: null,
   selectedBed: null,
   selectedEvent: null,
+  publicEvent: null,
+  locale: localStorage.getItem("parcos_locale") || "fr",
 };
+
+const uiTranslations = {
+  en: {
+    "Aujourd’hui": "Today",
+    "Agenda": "Agenda",
+    "Potager": "Garden",
+    "Profil": "Profile",
+    "Se connecter": "Sign in",
+    "Nom d’utilisateur": "Username",
+    "Mot de passe": "Password",
+    "Entrer dans le potager": "Enter the garden",
+    "Créer mon profil": "Create my profile",
+    "Nouveau mot de passe": "New password",
+    "Enregistrer mon profil": "Save my profile",
+    "Mes inscriptions": "My registrations",
+    "Mon profil": "My profile",
+    "Inviter un membre": "Invite a member",
+    "Les membres": "Members",
+    "Se déconnecter": "Sign out",
+    "Tous les événements": "All events",
+    "Mes inscriptions": "My registrations",
+    "Jour": "Day",
+    "Semaine": "Week",
+    "Mois": "Month",
+    "Créer une invitation": "Create invitation",
+    "Je participe": "I will attend",
+    "Me désinscrire": "Cancel my registration",
+    "Ajouter au calendrier": "Add to calendar",
+    "Partager le rendez-vous": "Share event",
+    "Modifier l’événement": "Edit event",
+    "Qui vient avec vous ?": "Who is coming with you?",
+    "Adultes": "Adults",
+    "Ados": "Teenagers",
+    "Enfants": "Children",
+    "Petits": "Little ones",
+    "Confirmer": "Confirm",
+    "Retour": "Back",
+    "Annuler": "Cancel",
+    "Publier": "Publish",
+    "Enregistrer": "Save",
+    "Nouveau rendez-vous": "New event",
+    "Modifier l’événement": "Edit event",
+    "Titre": "Title",
+    "Début": "Start",
+    "Fin": "End",
+    "Type": "Type",
+    "Capacité": "Capacity",
+    "Lieu": "Location",
+    "Description": "Description",
+    "Visibilité": "Visibility",
+    "État": "Status",
+    "Tous les membres": "All members",
+    "Coordinateurs": "Coordinators",
+    "Public avec lien": "Public with link",
+    "Importer des données": "Import data",
+    "Importer le fichier": "Import file",
+    "Participants": "Participants",
+    "Aucune inscription pour le moment.": "No registrations yet.",
+    "Inscrit": "Going",
+    "En attente": "Waitlisted",
+    "Attente": "Waitlist",
+    "Membre": "Member",
+    "Coordinateur": "Coordinator",
+    "Administrateur": "Administrator",
+  },
+};
+
+function currentLocale() {
+  return state.member?.preferredLocale === "en" || state.locale === "en" ? "en" : "fr";
+}
+
+function applyTranslations(root = document) {
+  const translations = uiTranslations[currentLocale()];
+  document.documentElement.lang = currentLocale();
+  if (!translations) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const text = node.nodeValue.trim();
+    if (translations[text]) node.nodeValue = node.nodeValue.replace(text, translations[text]);
+  }
+  root.querySelectorAll?.("[placeholder]").forEach((element) => {
+    const translated = translations[element.getAttribute("placeholder")];
+    if (translated) element.setAttribute("placeholder", translated);
+  });
+}
 
 const statusMeta = {
   unknown: { label: "À vérifier", tone: "unknown" },
@@ -53,15 +142,15 @@ function escapeHtml(value) {
 }
 
 function formatDate(value, options = { day: "numeric", month: "short" }) {
-  return value ? new Intl.DateTimeFormat("fr-BE", options).format(new Date(value)) : "—";
+  return value ? new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", options).format(new Date(value)) : "—";
 }
 
 function formatEventDate(value, options = { weekday: "long", day: "numeric", month: "long" }) {
-  return new Intl.DateTimeFormat("fr-BE", options).format(new Date(value));
+  return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", options).format(new Date(value));
 }
 
 function formatTime(value) {
-  return new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 function datetimeLocalValue(value) {
@@ -71,11 +160,17 @@ function datetimeLocalValue(value) {
 }
 
 function relativeDate(value) {
-  if (!value) return "Jamais";
+  if (!value) return currentLocale() === "en" ? "Never" : "Jamais";
   const days = Math.floor((Date.now() - new Date(value).getTime()) / 86400_000);
-  if (days <= 0) return "Aujourd’hui";
-  if (days === 1) return "Hier";
-  if (days < 7) return `Il y a ${days} jours`;
+  if (currentLocale() === "en") {
+    if (days <= 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+  } else {
+    if (days <= 0) return "Aujourd’hui";
+    if (days === 1) return "Hier";
+    if (days < 7) return `Il y a ${days} jours`;
+  }
   return formatDate(value, { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -258,11 +353,63 @@ function renderReset(token, error = "") {
   });
 }
 
+async function renderPublicEvent(id, error = "") {
+  try {
+    if (!state.publicEvent || state.publicEvent.event.id !== id) state.publicEvent = await api(`/api/public/events/${id}`);
+  } catch (loadError) {
+    app.innerHTML = `<main class="auth-page"><section class="auth-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>Public</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>Événement introuvable.</h1><p>Ce lien est peut-être expiré ou réservé aux membres.</p></div></section><section class="auth-panel"><div class="auth-form-wrap"><button class="button primary" type="button" id="back-login">Retour à ParcOS</button></div></section></main>`;
+    document.querySelector("#back-login").addEventListener("click", () => history.replaceState({}, "", "/") || renderLogin());
+    applyTranslations(app);
+    return;
+  }
+  const { event, registrations = [] } = state.publicEvent;
+  const registration = { adults: 1, teenagers: 0, children: 0, youngChildren: 0 };
+  const capacity = event.capacity === null ? `${event.attendeeCount} participant${event.attendeeCount === 1 ? "" : "s"}` : `${event.attendeeCount}/${event.capacity} participants`;
+  app.innerHTML = `<main class="auth-page public-event-page">
+    <section class="auth-visual invitation-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(formatEventDate(event.startsAt))} à ${escapeHtml(formatTime(event.startsAt))} · ${escapeHtml(event.location)}</p></div></section>
+    <section class="auth-panel"><div class="auth-form-wrap">
+      <div class="public-toolbar"><button class="language-toggle" id="public-language-toggle" type="button">${currentLocale() === "en" ? "FR" : "EN"}</button></div>
+      <p class="eyebrow">Inscription publique</p><h2>Je participe</h2>
+      <p class="muted">${escapeHtml(capacity)}. ${escapeHtml(event.description || "Inscrivez votre groupe pour aider l’équipe à préparer l’accueil.")}</p>
+      ${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}
+      <form id="public-registration-form" class="form-stack event-form">
+        <label>Votre nom<input name="guestName" autocomplete="name" required autofocus></label>
+        <label>Contact facultatif<input name="guestContact" autocomplete="email" placeholder="E-mail ou téléphone"></label>
+        <div class="registration-counts">${[["adults", "Adultes", "18 ans et +"], ["teenagers", "Ados", "13–17 ans"], ["children", "Enfants", "6–12 ans"], ["youngChildren", "Petits", "0–5 ans"]].map(([name, label, hint]) => `<label><span>${label}<small>${hint}</small></span><input name="${name}" type="number" min="0" max="20" value="${registration[name]}"></label>`).join("")}</div>
+        <button class="button primary" type="submit">Confirmer</button>
+        <a class="button ghost" href="/api/public/events/${event.id}/calendar.ics" download>Ajouter au calendrier</a>
+      </form>
+      <div class="detail-section attendee-list"><h3>Participants (${registrations.length})</h3>${registrations.length ? registrations.map((entry) => `<div class="attendee-row"><span class="avatar-button">${avatarContent({ displayName: entry.memberName, avatarUrl: entry.avatarUrl })}</span><span><strong>${escapeHtml(entry.memberName)}</strong><small>${entry.partySize} personne${entry.partySize === 1 ? "" : "s"} · ${entry.status === "waitlisted" ? "liste d’attente" : "inscrit"}</small></span></div>`).join("") : '<p class="muted">Aucune inscription pour le moment.</p>'}</div>
+    </div></section>
+  </main>`;
+  document.querySelector("#public-language-toggle").addEventListener("click", () => {
+    state.locale = currentLocale() === "en" ? "fr" : "en";
+    localStorage.setItem("parcos_locale", state.locale);
+    renderPublicEvent(id);
+  });
+  document.querySelector("#public-registration-form").addEventListener("submit", async (submitEvent) => {
+    submitEvent.preventDefault();
+    const form = submitEvent.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
+    for (const key of ["adults", "teenagers", "children", "youngChildren"]) data[key] = Number(data[key]);
+    form.querySelector("button[type=submit]").disabled = true;
+    try {
+      const result = await api(`/api/public/events/${id}/registration`, { method: "POST", body: JSON.stringify(data) });
+      state.publicEvent = { event: result.event, registrations: result.event ? (await api(`/api/public/events/${id}`)).registrations : [] };
+      showToast(result.status === "waitlisted" ? "Inscription placée sur liste d’attente." : "Inscription confirmée.");
+      renderPublicEvent(id);
+    } catch (publicError) {
+      renderPublicEvent(id, publicError.message);
+    }
+  });
+  applyTranslations(app);
+}
+
 function shell(content) {
   return `<div class="app-shell">
     <header class="topbar">
       <button class="brand-button" data-page="today"><span class="brand-mark small">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></button>
-      <button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button>
+      <div class="topbar-actions"><button class="language-toggle" id="language-toggle" type="button" aria-label="Changer de langue">${currentLocale() === "en" ? "FR" : "EN"}</button><button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button></div>
     </header>
     <main class="main-content">${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
@@ -280,6 +427,7 @@ function renderApp() {
   const page = state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() : renderToday();
   app.innerHTML = shell(page);
   bindShell();
+  applyTranslations(app);
 }
 
 function renderToday() {
@@ -306,9 +454,10 @@ function renderToday() {
 function compactEventCard(event) {
   const meta = eventTypeMeta[event.type] || eventTypeMeta.work;
   const registration = event.registration;
+  const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : "Aucun inscrit";
   return `<button class="next-event-card" data-event-id="${event.id}">
     <span class="event-date-block"><strong>${escapeHtml(formatEventDate(event.startsAt, { day: "2-digit" }))}</strong><small>${escapeHtml(formatEventDate(event.startsAt, { month: "short" }))}</small></span>
-    <span class="event-card-copy"><small>${escapeHtml(meta.label)} · ${escapeHtml(formatTime(event.startsAt))}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)}</span></span>
+    <span class="event-card-copy"><small>${escapeHtml(meta.label)} · ${escapeHtml(formatTime(event.startsAt))}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)}</span><em class="attendee-preview">${escapeHtml(attendees)}</em></span>
     ${registration && registration.status !== "cancelled" ? `<span class="registration-dot ${registration.status}">${registration.status === "waitlisted" ? "En attente" : "Inscrit"}</span>` : '<b>›</b>'}
   </button>`;
 }
@@ -431,8 +580,9 @@ function eventCard(event) {
   const coverUrl = eventCoverUrl(event);
   const registration = event.registration;
   const capacity = event.capacity === null ? `${event.attendeeCount} inscrit${event.attendeeCount === 1 ? "" : "s"}` : `${event.attendeeCount}/${event.capacity} participants`;
+  const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : "Aucun inscrit";
   return `<button class="agenda-event-card type-${event.type} ${event.state === "cancelled" ? "cancelled" : ""}" data-event-id="${event.id}">
-    ${coverUrl ? `<span class="event-card-thumb"><img src="${coverUrl}" alt="" loading="lazy"></span>` : `<span class="event-icon">${meta.icon}</span>`}<span class="event-card-copy"><small>${escapeHtml(formatTime(event.startsAt))}–${escapeHtml(formatTime(event.endsAt))} · ${escapeHtml(meta.label)}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)} · ${escapeHtml(capacity)}</span></span>
+    ${coverUrl ? `<span class="event-card-thumb"><img src="${coverUrl}" alt="" loading="lazy"></span>` : `<span class="event-icon">${meta.icon}</span>`}<span class="event-card-copy"><small>${escapeHtml(formatTime(event.startsAt))}–${escapeHtml(formatTime(event.endsAt))} · ${escapeHtml(meta.label)}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)} · ${escapeHtml(capacity)}</span><em class="attendee-preview">${escapeHtml(attendees)}</em></span>
     <span class="event-card-tail">${event.state !== "published" ? `<em class="state-pill ${event.state}">${escapeHtml(eventStateLabels[event.state])}</em>` : registration && registration.status !== "cancelled" ? `<em class="registration-dot ${registration.status}">${registration.status === "waitlisted" ? "Attente" : "Inscrit"}</em>` : "›"}</span>
   </button>`;
 }
@@ -498,6 +648,7 @@ function renderProfile() {
     </section>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabels[member.role])} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
+    ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
 }
@@ -561,11 +712,32 @@ function bindShell() {
     renderApp();
   }));
   document.querySelector("#create-event")?.addEventListener("click", () => renderEventForm());
+  document.querySelector("#language-toggle")?.addEventListener("click", toggleLanguage);
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
   document.querySelector("#profile-photo-input")?.addEventListener("change", uploadProfilePhoto);
   document.querySelector("#invite-create-form")?.addEventListener("submit", createInvite);
+  document.querySelector("#import-form")?.addEventListener("submit", importData);
   document.querySelectorAll("[data-reset-member]").forEach((button) => button.addEventListener("click", () => createResetLink(Number(button.dataset.resetMember))));
   document.querySelector("#logout-button")?.addEventListener("click", logout);
+}
+
+async function toggleLanguage() {
+  const nextLocale = currentLocale() === "en" ? "fr" : "en";
+  state.locale = nextLocale;
+  localStorage.setItem("parcos_locale", nextLocale);
+  if (state.member) {
+    try {
+      const result = await api("/api/profile", { method: "PATCH", body: JSON.stringify({
+        displayName: state.member.displayName,
+        bio: state.member.bio,
+        preferredLocale: nextLocale,
+      }) });
+      state.member = result.member;
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+  renderApp();
 }
 
 async function loadAreas() {
@@ -692,7 +864,8 @@ function renderEventSheet() {
       ${event.accessibilityNote ? `<div class="event-note accessibility"><small>Accessibilité</small><p>${escapeHtml(event.accessibilityNote)}</p></div>` : ""}
       ${event.state === "published" ? `<div class="event-registration-actions">${activeRegistration ? `<button class="button secondary" id="edit-registration">${registration.status === "waitlisted" ? "Modifier ma demande" : `Inscrit · ${registration.partySize} personne${registration.partySize === 1 ? "" : "s"}`}</button><button class="button ghost" id="cancel-registration">Me désinscrire</button>` : '<button class="button primary" id="join-event">Je participe</button>'}<a class="button ghost" href="/api/events/${event.id}/calendar.ics" download>Ajouter au calendrier</a></div>` : ""}
       <button class="button ghost share-event-button" id="share-event">Partager le rendez-vous</button>
-      ${isCoordinator() ? `<div class="coordinator-event-tools"><button class="button secondary" id="edit-event">Modifier l’événement</button></div><div class="detail-section attendee-list"><h3>Inscriptions (${registrations.length})</h3>${registrations.length ? registrations.map((entry) => `<div class="attendee-row"><span class="avatar-button">${avatarContent({ displayName: entry.memberName, avatarUrl: entry.avatarUrl })}</span><span><strong>${escapeHtml(entry.memberName)}</strong><small>${entry.partySize} personne${entry.partySize === 1 ? "" : "s"} · ${entry.status === "waitlisted" ? "liste d’attente" : "inscrit"}</small></span></div>`).join("") : '<p class="muted">Aucune inscription pour le moment.</p>'}</div>` : ""}
+      ${isCoordinator() ? `<div class="coordinator-event-tools"><button class="button secondary" id="edit-event">Modifier l’événement</button></div>` : ""}
+      <div class="detail-section attendee-list"><h3>Participants (${registrations.length})</h3>${registrations.length ? registrations.map((entry) => `<div class="attendee-row"><span class="avatar-button">${avatarContent({ displayName: entry.memberName, avatarUrl: entry.avatarUrl })}</span><span><strong>${escapeHtml(entry.memberName)}</strong><small>${entry.partySize} personne${entry.partySize === 1 ? "" : "s"} · ${entry.status === "waitlisted" ? "liste d’attente" : "inscrit"}${entry.public ? " · public" : ""}</small></span></div>`).join("") : '<p class="muted">Aucune inscription pour le moment.</p>'}</div>
     </div></section></div>`;
   bindModal();
   document.querySelector("#join-event")?.addEventListener("click", joinEventQuick);
@@ -700,6 +873,7 @@ function renderEventSheet() {
   document.querySelector("#cancel-registration")?.addEventListener("click", cancelEventRegistration);
   document.querySelector("#edit-event")?.addEventListener("click", () => renderEventForm(event));
   document.querySelector("#share-event")?.addEventListener("click", shareEvent);
+  applyTranslations(modalRoot);
 }
 
 async function joinEventQuick() {
@@ -724,6 +898,7 @@ function renderRegistrationForm() {
   bindModal();
   document.querySelector("#back-to-event").addEventListener("click", renderEventSheet);
   document.querySelector("#registration-form").addEventListener("submit", saveEventRegistration);
+  applyTranslations(modalRoot);
 }
 
 async function saveEventRegistration(submitEvent) {
@@ -758,7 +933,7 @@ async function cancelEventRegistration() {
 
 async function shareEvent() {
   const event = state.selectedEvent.event;
-  const url = `${location.origin}/?event=${event.id}`;
+  const url = `${location.origin}/?${event.audience === "public" ? "publicEvent" : "event"}=${event.id}`;
   const text = `${event.title} — ${formatEventDate(event.startsAt)} à ${formatTime(event.startsAt)}, ${event.location}`;
   try {
     if (navigator.share) await navigator.share({ title: event.title, text, url });
@@ -783,12 +958,13 @@ function renderEventForm(event = null) {
     <label>Description<textarea name="description" maxlength="3000" placeholder="Que va-t-on faire ?">${escapeHtml(event?.description || "")}</textarea></label>
     <label>À prévoir<textarea name="preparationNote" maxlength="1000" placeholder="Gants, vêtements, matériel…">${escapeHtml(event?.preparationNote || "")}</textarea></label>
     <label>Accessibilité<textarea name="accessibilityNote" maxlength="1000" placeholder="Accès, besoins particuliers…">${escapeHtml(event?.accessibilityNote || "")}</textarea></label>
-    <div class="two-fields"><label>Visibilité<select name="audience"><option value="members" ${event?.audience !== "coordinators" ? "selected" : ""}>Tous les membres</option><option value="coordinators" ${event?.audience === "coordinators" ? "selected" : ""}>Coordinateurs</option></select></label><label>État<select name="state">${Object.entries(eventStateLabels).map(([value, label]) => `<option value="${value}" ${(event?.state || "published") === value ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>
+    <div class="two-fields"><label>Visibilité<select name="audience"><option value="members" ${!event || event.audience === "members" ? "selected" : ""}>Tous les membres</option><option value="public" ${event?.audience === "public" ? "selected" : ""}>Public avec lien</option><option value="coordinators" ${event?.audience === "coordinators" ? "selected" : ""}>Coordinateurs</option></select></label><label>État<select name="state">${Object.entries(eventStateLabels).map(([value, label]) => `<option value="${value}" ${(event?.state || "published") === value ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>
     <div class="button-row"><button type="button" class="button ghost" id="cancel-event-form">Annuler</button><button class="button primary" type="submit">${event ? "Enregistrer" : "Publier"}</button></div>
   </form></div></section></div>`;
   bindModal();
   document.querySelector("#cancel-event-form").addEventListener("click", () => event ? renderEventSheet() : dismissModal());
   document.querySelector("#event-form").addEventListener("submit", (submitEvent) => saveEvent(submitEvent, event));
+  applyTranslations(modalRoot);
 }
 
 async function saveEvent(submitEvent, existing) {
@@ -975,6 +1151,66 @@ async function createInvite(event) {
   }
 }
 
+function parseDelimited(text) {
+  const delimiter = text.includes("\t") && !text.includes(",") ? "\t" : ",";
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const next = text[index + 1];
+    if (character === '"' && quoted && next === '"') {
+      field += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === delimiter && !quoted) {
+      row.push(field);
+      field = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && next === "\n") index += 1;
+      row.push(field);
+      if (row.some((value) => value.trim())) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += character;
+    }
+  }
+  row.push(field);
+  if (row.some((value) => value.trim())) rows.push(row);
+  if (rows.length < 2) throw new Error("Le fichier doit contenir une ligne d’en-têtes et au moins une ligne de données.");
+  const headers = rows[0].map((header) => header.trim());
+  return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
+}
+
+async function importData(event) {
+  event.preventDefault();
+  const file = document.querySelector("#import-file").files[0];
+  const resultBox = document.querySelector("#import-result");
+  if (!file) return;
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    if (/\.xlsx$/i.test(file.name)) throw new Error("Exportez le fichier Excel en CSV avant import.");
+    const rows = parseDelimited(await file.text());
+    const result = await api("/api/import", { method: "POST", body: JSON.stringify({ rows }) });
+    if (result.errors?.length) {
+      resultBox.innerHTML = `<div class="form-error"><strong>Import annulé.</strong>${result.errors.slice(0, 8).map((entry) => `<p>Ligne ${entry.row}: ${escapeHtml(entry.message)}</p>`).join("")}</div>`;
+    } else {
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadMembers()]);
+      resultBox.innerHTML = `<div class="invite-result"><small>Import terminé</small><p>${result.imported.areas} lieux, ${result.imported.beds} planches, ${result.imported.events} événements, ${result.imported.members} membres.</p></div>`;
+      renderApp();
+      showToast("Données importées.");
+    }
+  } catch (error) {
+    resultBox.innerHTML = `<div class="form-error">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function createResetLink(memberId) {
   const resultBox = document.querySelector("#reset-result");
   try {
@@ -1004,6 +1240,8 @@ async function logout() {
 
 async function boot() {
   const params = new URLSearchParams(location.search);
+  const publicEventId = Number(params.get("publicEvent"));
+  if (publicEventId) return renderPublicEvent(publicEventId);
   const invitation = params.get("invite");
   if (invitation) return renderInvite(invitation);
   const reset = params.get("reset");

@@ -139,8 +139,25 @@ function registrationJson(row) {
   };
 }
 
-function eventJson(row) {
+function attendeeJson(entry) {
+  return {
+    memberId: entry.member_id ?? null,
+    memberName: entry.member_name,
+    username: entry.username ?? null,
+    avatarUrl: entry.avatar_path ? `/media/${entry.avatar_path}` : null,
+    status: entry.status,
+    adults: entry.adults,
+    teenagers: entry.teenagers,
+    children: entry.children,
+    youngChildren: entry.young_children,
+    partySize: entry.adults + entry.teenagers + entry.children + entry.young_children,
+    public: Boolean(entry.is_public),
+  };
+}
+
+function eventJson(row, attendees = null) {
   const attendeeCount = Number(row.attendee_count ?? 0);
+  const activeAttendees = attendees?.filter((entry) => ["going", "attended"].includes(entry.status)) ?? [];
   return {
     id: row.id,
     title: row.title,
@@ -158,6 +175,8 @@ function eventJson(row) {
     spotsRemaining: row.capacity === null ? null : Math.max(0, row.capacity - attendeeCount),
     creatorName: row.creator_name ?? null,
     registration: registrationJson(row),
+    attendeeNames: activeAttendees.slice(0, 4).map((entry) => entry.memberName),
+    attendeeOverflow: Math.max(0, activeAttendees.length - 4),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -333,7 +352,7 @@ function createSchema(db) {
       location text not null,
       event_type text not null check (event_type in ('work', 'workshop', 'community', 'school', 'planning', 'milestone')),
       state text not null default 'published' check (state in ('draft', 'published', 'cancelled', 'completed')),
-      audience text not null default 'members' check (audience in ('members', 'coordinators')),
+      audience text not null default 'members' check (audience in ('members', 'coordinators', 'public')),
       starts_at text not null,
       ends_at text not null,
       capacity integer check (capacity is null or capacity > 0),
@@ -360,6 +379,21 @@ function createSchema(db) {
     );
     create index if not exists event_registrations_event_idx on event_registrations(event_id, status, updated_at);
 
+    create table if not exists public_event_registrations (
+      id integer primary key,
+      event_id integer not null references events(id) on delete cascade,
+      guest_name text not null,
+      guest_contact text,
+      adults integer not null default 1 check (adults >= 0),
+      teenagers integer not null default 0 check (teenagers >= 0),
+      children integer not null default 0 check (children >= 0),
+      young_children integer not null default 0 check (young_children >= 0),
+      status text not null check (status in ('going', 'waitlisted', 'cancelled', 'attended', 'no_show')),
+      created_at text not null,
+      updated_at text not null
+    );
+    create index if not exists public_event_registrations_event_idx on public_event_registrations(event_id, status, updated_at);
+
     create table if not exists app_meta (
       key text primary key,
       value text not null,
@@ -377,6 +411,37 @@ function createSchema(db) {
   if (!memberColumns.some((column) => column.name === "avatar_path")) {
     db.exec("alter table members add column avatar_path text");
   }
+
+  const eventsSql = db.prepare("select sql from sqlite_master where type = 'table' and name = 'events'").get()?.sql ?? "";
+  if (eventsSql && !eventsSql.includes("'public'")) {
+    db.exec(`
+      pragma foreign_keys = off;
+      pragma legacy_alter_table = on;
+      alter table events rename to events_legacy_public_migration;
+      create table events (
+        id integer primary key,
+        title text not null,
+        description text,
+        location text not null,
+        event_type text not null check (event_type in ('work', 'workshop', 'community', 'school', 'planning', 'milestone')),
+        state text not null default 'published' check (state in ('draft', 'published', 'cancelled', 'completed')),
+        audience text not null default 'members' check (audience in ('members', 'coordinators', 'public')),
+        starts_at text not null,
+        ends_at text not null,
+        capacity integer check (capacity is null or capacity > 0),
+        accessibility_note text,
+        preparation_note text,
+        created_by integer references members(id) on delete set null,
+        created_at text not null,
+        updated_at text not null
+      );
+      insert into events select * from events_legacy_public_migration;
+      drop table events_legacy_public_migration;
+      pragma legacy_alter_table = off;
+      pragma foreign_keys = on;
+    `);
+  }
+  db.exec("create index if not exists events_starts_idx on events(starts_at, state)");
 }
 
 const seedBeds = [
@@ -657,8 +722,13 @@ function eventSelect(db, memberId, eventId = null) {
   const where = eventId === null ? "" : "where e.id = ?";
   const parameters = eventId === null ? [memberId] : [memberId, eventId];
   return db.prepare(`select e.*, creator.display_name as creator_name,
-    coalesce((select sum(r.adults + r.teenagers + r.children + r.young_children)
-      from event_registrations r where r.event_id = e.id and r.status in ('going', 'attended')), 0) as attendee_count,
+    coalesce((select sum(total) from (
+      select r.adults + r.teenagers + r.children + r.young_children as total
+      from event_registrations r where r.event_id = e.id and r.status in ('going', 'attended')
+      union all
+      select pr.adults + pr.teenagers + pr.children + pr.young_children as total
+      from public_event_registrations pr where pr.event_id = e.id and pr.status in ('going', 'attended')
+    )), 0) as attendee_count,
     mine.status as registration_status, mine.adults as registration_adults,
     mine.teenagers as registration_teenagers, mine.children as registration_children,
     mine.young_children as registration_young_children
@@ -672,6 +742,28 @@ function findEvent(db, eventId, memberId) {
   const row = eventSelect(db, memberId, eventId)[0];
   if (!row) throw new HttpError(404, "Événement introuvable.");
   return row;
+}
+
+function findPublicEvent(db, eventId) {
+  const row = eventSelect(db, null, eventId)[0];
+  if (!row || row.state !== "published" || row.audience !== "public") throw new HttpError(404, "Événement public introuvable.");
+  return row;
+}
+
+function eventAttendees(db, eventId) {
+  return db.prepare(`select * from (
+    select 0 as is_public, r.status, r.adults, r.teenagers, r.children, r.young_children,
+      m.id as member_id, m.display_name as member_name, m.username, m.avatar_path, r.updated_at
+    from event_registrations r join members m on m.id = r.member_id
+    where r.event_id = ? and r.status != 'cancelled'
+    union all
+    select 1 as is_public, pr.status, pr.adults, pr.teenagers, pr.children, pr.young_children,
+      null as member_id, pr.guest_name as member_name, null as username, null as avatar_path, pr.updated_at
+    from public_event_registrations pr
+    where pr.event_id = ? and pr.status != 'cancelled'
+  )
+    order by case status when 'going' then 0 when 'attended' then 1 when 'waitlisted' then 2 else 3 end, member_name collate nocase`)
+    .all(eventId, eventId).map(attendeeJson);
 }
 
 function eventInput(body, existing = {}) {
@@ -692,7 +784,7 @@ function eventInput(body, existing = {}) {
   }
   const allowedTypes = ["work", "workshop", "community", "school", "planning", "milestone"];
   const allowedStates = ["draft", "published", "cancelled", "completed"];
-  const allowedAudiences = ["members", "coordinators"];
+  const allowedAudiences = ["members", "coordinators", "public"];
   return {
     title: textValue("title", existing.title, 140, true),
     description: textValue("description", existing.description, 3000),
@@ -723,15 +815,142 @@ function registrationCounts(body) {
 function rebalanceWaitlist(db, eventId) {
   const event = db.prepare("select capacity from events where id = ?").get(eventId);
   if (!event?.capacity) return;
-  let occupied = Number(db.prepare(`select coalesce(sum(adults + teenagers + children + young_children), 0) as total
-    from event_registrations where event_id = ? and status in ('going', 'attended')`).get(eventId).total);
-  const waiting = db.prepare(`select id, adults + teenagers + children + young_children as party_size
-    from event_registrations where event_id = ? and status = 'waitlisted' order by updated_at, id`).all(eventId);
+  let occupied = Number(db.prepare(`select coalesce(sum(total), 0) as total from (
+    select adults + teenagers + children + young_children as total from event_registrations where event_id = ? and status in ('going', 'attended')
+    union all
+    select adults + teenagers + children + young_children as total from public_event_registrations where event_id = ? and status in ('going', 'attended')
+  )`).get(eventId, eventId).total);
+  const waiting = db.prepare(`select 'member' as source, id, adults + teenagers + children + young_children as party_size, updated_at
+    from event_registrations where event_id = ? and status = 'waitlisted'
+    union all
+    select 'public' as source, id, adults + teenagers + children + young_children as party_size, updated_at
+    from public_event_registrations where event_id = ? and status = 'waitlisted'
+    order by updated_at, id`).all(eventId, eventId);
   for (const entry of waiting) {
     if (occupied + entry.party_size <= event.capacity) {
-      db.prepare("update event_registrations set status = 'going', updated_at = ? where id = ?").run(now(), entry.id);
+      const table = entry.source === "public" ? "public_event_registrations" : "event_registrations";
+      db.prepare(`update ${table} set status = 'going', updated_at = ? where id = ?`).run(now(), entry.id);
       occupied += entry.party_size;
     }
+  }
+}
+
+function occupiedSeats(db, eventId, excludeMemberId = null) {
+  return Number(db.prepare(`select coalesce(sum(total), 0) as total from (
+    select adults + teenagers + children + young_children as total
+      from event_registrations where event_id = ? and (? is null or member_id != ?) and status in ('going', 'attended')
+    union all
+    select adults + teenagers + children + young_children as total
+      from public_event_registrations where event_id = ? and status in ('going', 'attended')
+  )`).get(eventId, excludeMemberId, excludeMemberId, eventId).total);
+}
+
+function publicRegistrationInput(body) {
+  const guestName = cleanDisplayName(body.guestName ?? body.displayName);
+  const guestContact = String(body.guestContact ?? body.email ?? "").trim().slice(0, 160) || null;
+  return { guestName, guestContact, ...registrationCounts(body) };
+}
+
+function booleanImportValue(value, fallback = true) {
+  const textValue = String(value ?? "").trim().toLowerCase();
+  if (!textValue) return fallback;
+  return ["1", "true", "yes", "y", "oui", "o"].includes(textValue);
+}
+
+function importRows(db, rows, adminId) {
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 500) {
+    throw new HttpError(400, "Importez entre 1 et 500 lignes.");
+  }
+  const timestamp = now();
+  const result = { imported: { areas: 0, beds: 0, events: 0, members: 0 }, errors: [] };
+  db.exec("begin immediate");
+  try {
+    for (const [index, rawRow] of rows.entries()) {
+      const rowNumber = index + 2;
+      const row = Object.fromEntries(Object.entries(rawRow ?? {}).map(([key, value]) => [String(key).trim(), value]));
+      const entity = String(row.entity ?? row.type ?? "").trim().toLowerCase();
+      if (!entity) continue;
+      try {
+        if (entity === "area") {
+          const values = areaInput({
+            name: row.name,
+            codePrefix: row.codePrefix,
+            description: row.description,
+            locationHint: row.locationHint,
+            membersCanAccess: booleanImportValue(row.membersCanAccess, true),
+          });
+          const sortOrder = Number(db.prepare("select coalesce(max(sort_order), 0) + 1 as next from garden_areas").get().next);
+          db.prepare(`insert into garden_areas
+            (name, slug, code_prefix, description, location_hint, members_can_access, sort_order, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(values.name, values.slug, values.codePrefix, values.description, values.locationHint, values.membersCanAccess ? 1 : 0, sortOrder, timestamp, timestamp);
+          result.imported.areas += 1;
+        } else if (entity === "bed") {
+          const areaCode = String(row.areaCodePrefix ?? row.codePrefix ?? "").trim().toUpperCase();
+          const areaName = String(row.areaName ?? row.garden ?? "").trim();
+          const area = db.prepare("select * from garden_areas where code_prefix = ? or name = ? collate nocase").get(areaCode, areaName);
+          if (!area) throw new HttpError(400, "Lieu introuvable pour cette planche.");
+          const suggestedNumber = Number(db.prepare("select coalesce(max(display_number), 0) + 1 as next from beds where area_id = ?").get(area.id).next);
+          const number = row.number === undefined || row.number === "" ? suggestedNumber : Number(row.number);
+          if (!Number.isInteger(number) || number < 1 || number > 999) throw new HttpError(400, "Numéro de planche invalide.");
+          const code = String(row.code ?? `${area.code_prefix}-${String(number).padStart(2, "0")}`).trim().toUpperCase();
+          if (!/^[A-Z0-9][A-Z0-9-]{1,15}$/.test(code)) throw new HttpError(400, "Code de planche invalide.");
+          const status = ["unknown", "ready", "growing", "harvest", "clear", "winter"].includes(row.status) ? row.status : "unknown";
+          const value = (key, max) => String(row[key] ?? "").trim().slice(0, max) || null;
+          const sortOrder = Number(db.prepare("select coalesce(max(sort_order), 0) + 1 as next from beds").get().next);
+          db.prepare(`insert into beds
+            (area_id, code, display_number, garden, section, location_hint, sort_order, crop, variety, status, note, harvest_note, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(area.id, code, number, area.name, value("section", 120) || area.name, value("locationHint", 240), sortOrder,
+              value("crop", 120), value("variety", 120), status, value("note", 1000), value("harvestNote", 1000), timestamp);
+          result.imported.beds += 1;
+        } else if (entity === "event") {
+          const values = eventInput({
+            title: row.title,
+            description: row.description,
+            location: row.location,
+            type: row.eventType ?? row.type,
+            state: row.state || "published",
+            audience: row.audience || "members",
+            startsAt: row.startsAt,
+            endsAt: row.endsAt,
+            capacity: row.capacity,
+            accessibilityNote: row.accessibilityNote,
+            preparationNote: row.preparationNote,
+          });
+          db.prepare(`insert into events
+            (title, description, location, event_type, state, audience, starts_at, ends_at, capacity, accessibility_note, preparation_note, created_by, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(values.title, values.description, values.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
+              values.capacity, values.accessibilityNote, values.preparationNote, adminId, timestamp, timestamp);
+          result.imported.events += 1;
+        } else if (entity === "member") {
+          const username = cleanUsername(row.username);
+          const displayName = cleanDisplayName(row.displayName ?? row.name);
+          const password = validatePassword(row.initialPassword ?? row.password);
+          const role = ["member", "coordinator"].includes(row.role) ? row.role : "member";
+          const locale = ["fr", "en"].includes(row.preferredLocale) ? row.preferredLocale : "fr";
+          const bio = String(row.bio ?? "").trim().slice(0, 400) || null;
+          db.prepare(`insert into members (username, display_name, password_hash, role, preferred_locale, bio, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(username, displayName, passwordHash(password), role, locale, bio, timestamp, timestamp);
+          result.imported.members += 1;
+        } else {
+          throw new HttpError(400, `Type inconnu: ${entity}.`);
+        }
+      } catch (error) {
+        result.errors.push({ row: rowNumber, message: error.message });
+      }
+    }
+    if (result.errors.length) {
+      db.exec("rollback");
+      return result;
+    }
+    db.exec("commit");
+    return result;
+  } catch (error) {
+    db.exec("rollback");
+    throw error;
   }
 }
 
@@ -896,6 +1115,41 @@ export function createApp(options = {}) {
           }
         }
 
+        const publicEventMatch = /^\/api\/public\/events\/(\d+)$/.exec(path);
+        if (publicEventMatch && req.method === "GET") {
+          const eventId = Number(publicEventMatch[1]);
+          const event = findPublicEvent(db, eventId);
+          const attendees = eventAttendees(db, eventId);
+          return json(res, 200, { event: eventJson(event, attendees), registrations: attendees });
+        }
+
+        const publicEventCalendarMatch = /^\/api\/public\/events\/(\d+)\/calendar\.ics$/.exec(path);
+        if (publicEventCalendarMatch && req.method === "GET") {
+          const event = findPublicEvent(db, Number(publicEventCalendarMatch[1]));
+          const body = eventCalendar(event, requestOrigin(req, baseUrl, trustProxy));
+          return text(res, 200, body, "text/calendar; charset=utf-8", { "Content-Disposition": `attachment; filename=parcos-public-${event.id}.ics` });
+        }
+
+        const publicRegistrationMatch = /^\/api\/public\/events\/(\d+)\/registration$/.exec(path);
+        if (publicRegistrationMatch && req.method === "POST") {
+          const eventId = Number(publicRegistrationMatch[1]);
+          const event = findPublicEvent(db, eventId);
+          const values = publicRegistrationInput(await readJson(req));
+          const occupied = occupiedSeats(db, eventId);
+          const status = event.capacity !== null && occupied + values.partySize > event.capacity ? "waitlisted" : "going";
+          const timestamp = now();
+          const result = db.prepare(`insert into public_event_registrations
+            (event_id, guest_name, guest_contact, adults, teenagers, children, young_children, status, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(eventId, values.guestName, values.guestContact, values.adults, values.teenagers, values.children, values.youngChildren, status, timestamp, timestamp);
+          rebalanceWaitlist(db, eventId);
+          return json(res, 201, {
+            registrationId: result.lastInsertRowid,
+            event: eventJson(findPublicEvent(db, eventId), eventAttendees(db, eventId)),
+            status,
+          });
+        }
+
         const session = requireSession(db, req);
 
         if (req.method === "GET" && path === "/api/me") {
@@ -990,6 +1244,13 @@ export function createApp(options = {}) {
           return json(res, 200, { members: rows.map(memberJson) });
         }
 
+        if (req.method === "POST" && path === "/api/import") {
+          requireCsrf(req, session);
+          if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
+          const body = await readJson(req);
+          return json(res, 200, importRows(db, body.rows, session.member.id));
+        }
+
         if (req.method === "POST" && path === "/api/invites") {
           requireCsrf(req, session);
           requireCoordinator(session);
@@ -1021,9 +1282,9 @@ export function createApp(options = {}) {
         if (req.method === "GET" && path === "/api/events") {
           const coordinator = ["coordinator", "admin"].includes(session.member.role);
           const events = eventSelect(db, session.member.id)
-            .filter((event) => coordinator || (event.state !== "draft" && event.audience === "members"))
+            .filter((event) => coordinator || (event.state !== "draft" && ["members", "public"].includes(event.audience)))
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-            .map(eventJson);
+            .map((event) => eventJson(event, eventAttendees(db, event.id)));
           return json(res, 200, { events });
         }
 
@@ -1037,7 +1298,8 @@ export function createApp(options = {}) {
             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(values.title, values.description, values.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
               values.capacity, values.accessibilityNote, values.preparationNote, session.member.id, timestamp, timestamp);
-          return json(res, 201, { event: eventJson(findEvent(db, Number(result.lastInsertRowid), session.member.id)) });
+          const eventId = Number(result.lastInsertRowid);
+          return json(res, 201, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
         }
 
         const eventCalendarMatch = /^\/api\/events\/(\d+)\/calendar\.ics$/.exec(path);
@@ -1056,8 +1318,7 @@ export function createApp(options = {}) {
           if (event.state !== "published") throw new HttpError(409, "Les inscriptions ne sont pas ouvertes pour cet événement.");
           if (event.audience === "coordinators" && !["coordinator", "admin"].includes(session.member.role)) throw new HttpError(403, "Cet événement est réservé aux coordinateurs.");
           const counts = registrationCounts(await readJson(req));
-          const occupied = Number(db.prepare(`select coalesce(sum(adults + teenagers + children + young_children), 0) as total
-            from event_registrations where event_id = ? and member_id != ? and status in ('going', 'attended')`).get(eventId, session.member.id).total);
+          const occupied = occupiedSeats(db, eventId, session.member.id);
           const status = event.capacity !== null && occupied + counts.partySize > event.capacity ? "waitlisted" : "going";
           const timestamp = now();
           db.prepare(`insert into event_registrations
@@ -1067,7 +1328,7 @@ export function createApp(options = {}) {
               children = excluded.children, young_children = excluded.young_children, status = excluded.status, updated_at = excluded.updated_at`)
             .run(eventId, session.member.id, counts.adults, counts.teenagers, counts.children, counts.youngChildren, status, timestamp, timestamp);
           rebalanceWaitlist(db, eventId);
-          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id)) });
+          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
         }
 
         if (eventRegistrationMatch && req.method === "DELETE") {
@@ -1077,7 +1338,7 @@ export function createApp(options = {}) {
           db.prepare("update event_registrations set status = 'cancelled', updated_at = ? where event_id = ? and member_id = ?")
             .run(now(), eventId, session.member.id);
           rebalanceWaitlist(db, eventId);
-          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id)) });
+          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
         }
 
         const eventMatch = /^\/api\/events\/(\d+)$/.exec(path);
@@ -1086,18 +1347,8 @@ export function createApp(options = {}) {
           const event = findEvent(db, eventId, session.member.id);
           const coordinator = ["coordinator", "admin"].includes(session.member.role);
           if (!coordinator && (event.state === "draft" || event.audience === "coordinators")) throw new HttpError(404, "Événement introuvable.");
-          const registrations = coordinator ? db.prepare(`select r.status, r.adults, r.teenagers, r.children, r.young_children,
-            m.id as member_id, m.display_name, m.username, m.avatar_path
-            from event_registrations r join members m on m.id = r.member_id
-            where r.event_id = ? and r.status != 'cancelled'
-            order by case r.status when 'going' then 0 when 'attended' then 1 when 'waitlisted' then 2 else 3 end, m.display_name collate nocase`).all(eventId)
-            .map((entry) => ({
-              memberId: entry.member_id, memberName: entry.display_name, username: entry.username,
-              avatarUrl: entry.avatar_path ? `/media/${entry.avatar_path}` : null, status: entry.status,
-              adults: entry.adults, teenagers: entry.teenagers, children: entry.children, youngChildren: entry.young_children,
-              partySize: entry.adults + entry.teenagers + entry.children + entry.young_children,
-            })) : undefined;
-          return json(res, 200, { event: eventJson(event), ...(registrations ? { registrations } : {}) });
+          const registrations = eventAttendees(db, eventId);
+          return json(res, 200, { event: eventJson(event, registrations), registrations });
         }
 
         if (eventMatch && req.method === "PATCH") {
@@ -1111,7 +1362,7 @@ export function createApp(options = {}) {
             .run(values.title, values.description, values.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
               values.capacity, values.accessibilityNote, values.preparationNote, now(), eventId);
           rebalanceWaitlist(db, eventId);
-          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id)) });
+          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
         }
 
         if (req.method === "GET" && path === "/api/areas") {

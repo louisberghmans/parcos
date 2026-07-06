@@ -84,6 +84,38 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(createdEvent.body.event.title, "Récolte collective");
   const eventId = createdEvent.body.event.id;
 
+  const publicEvent = await request(baseUrl, "/api/events", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ title: "Portes ouvertes", description: "Accueil du quartier.", location: "Grand Potager", type: "community", state: "published", audience: "public", startsAt, endsAt, capacity: 4 }),
+  });
+  assert.equal(publicEvent.response.status, 201);
+  assert.equal(publicEvent.body.event.audience, "public");
+  const publicEventId = publicEvent.body.event.id;
+
+  const publicDetail = await request(baseUrl, `/api/public/events/${publicEventId}`);
+  assert.equal(publicDetail.response.status, 200);
+  assert.equal(publicDetail.body.event.title, "Portes ouvertes");
+  const publicRegistration = await request(baseUrl, `/api/public/events/${publicEventId}/registration`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ guestName: "Neighbour Guest", guestContact: "guest@example.test", adults: 2, children: 1 }),
+  });
+  assert.equal(publicRegistration.response.status, 201);
+  assert.equal(publicRegistration.body.status, "going");
+  assert.equal(publicRegistration.body.event.attendeeCount, 3);
+
+  const imported = await request(baseUrl, "/api/import", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ rows: [
+      { entity: "area", name: "Zone import", codePrefix: "ZI", membersCanAccess: "true" },
+      { entity: "bed", areaCodePrefix: "ZI", number: "1", crop: "Basilic", status: "growing" },
+    ] }),
+  });
+  assert.equal(imported.response.status, 200);
+  assert.deepEqual(imported.body.imported, { areas: 1, beds: 1, events: 0, members: 0 });
+
   const calendar = await fetch(`${baseUrl}/api/events/${eventId}/calendar.ics`, { headers: { cookie: adminCookie } });
   assert.equal(calendar.status, 200);
   assert.match(calendar.headers.get("content-type"), /^text\/calendar/);
@@ -117,6 +149,8 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const memberEvents = await request(baseUrl, "/api/events", { headers: { cookie: memberCookie } });
   assert.equal(memberEvents.response.status, 200);
   assert.ok(memberEvents.body.events.some((event) => event.id === eventId));
+  const publicEventForMember = memberEvents.body.events.find((event) => event.id === publicEventId);
+  assert.equal(publicEventForMember.attendeeNames[0], "Neighbour Guest");
 
   const registration = await request(baseUrl, `/api/events/${eventId}/registration`, {
     method: "POST",
@@ -130,6 +164,8 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const eventDetail = await request(baseUrl, `/api/events/${eventId}`, { headers: { cookie: adminCookie } });
   assert.equal(eventDetail.body.registrations.length, 1);
   assert.equal(eventDetail.body.registrations[0].partySize, 2);
+  const memberEventDetail = await request(baseUrl, `/api/events/${eventId}`, { headers: { cookie: memberCookie } });
+  assert.equal(memberEventDetail.body.registrations[0].memberName, "Test Member");
 
   const forbidden = await request(baseUrl, "/api/beds/1", {
     method: "PATCH",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 - 2026-07-06
+
+- Added member-visible attendance names on event cards and event details.
+- Added public events with non-member registration links.
+- Added FR/EN language toggling for member and public event flows.
+- Added admin-only CSV import with database structure documentation and a
+  starter template.
+
 ## 1.0.1 - 2026-06-23
 
 - Generate invitation, recovery, sharing, and calendar links from the actual
