@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4 - 2026-07-09
+
+- Fixed embedded YouTube tutorial playback by allowing YouTube frames with a
+  strict-origin referrer policy.
+- Replaced photo upload pencil/text controls with clearer camera-icon actions.
+
 ## 1.0.2 - 2026-07-06
 
 - Added member-visible attendance names on event cards and event details.

@@ -32,6 +32,9 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
 
   const anonymousBeds = await request(baseUrl, "/api/beds");
   assert.equal(anonymousBeds.response.status, 401);
+  const home = await fetch(`${baseUrl}/`);
+  assert.equal(home.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.match(home.headers.get("content-security-policy"), /frame-src .*youtube-nocookie\.com/);
 
   const login = await request(baseUrl, "/api/auth/login", {
     method: "POST",

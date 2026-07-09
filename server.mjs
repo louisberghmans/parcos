@@ -253,7 +253,7 @@ function text(res, status, body, contentType, headers = {}) {
 
 function securityHeaders(res) {
   res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
-  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Permissions-Policy", "camera=(self), geolocation=(), microphone=()");

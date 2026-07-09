@@ -24,6 +24,7 @@ body { min-height: 100vh; margin: 0; background: var(--cream); }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(44, 103, 81, .28); outline-offset: 2px; }
+.icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 h1, h2, h3, p { margin-top: 0; }
 h1, h2 { font-family: Georgia, "Times New Roman", serif; }
 h1 { margin-bottom: 12px; font-size: clamp(38px, 8vw, 58px); line-height: .98; letter-spacing: -.035em; }
@@ -65,6 +66,8 @@ h2 { margin-bottom: 8px; font-size: 28px; line-height: 1.06; }
 .form-stack label small { color: var(--muted); font-weight: 500; line-height: 1.4; }
 input, textarea, select { width: 100%; border: 1px solid #d6d8d2; border-radius: 12px; background: #fff; color: var(--ink); }
 input, select { height: 48px; padding: 0 13px; }
+input[type="file"] { height: auto; min-height: 48px; padding: 7px; color: var(--muted); }
+input[type="file"]::file-selector-button { min-height: 32px; margin-right: 10px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--forest-100); color: var(--forest-900); font-weight: 850; cursor: pointer; }
 textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .button { min-height: 46px; padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 13px; font-weight: 800; cursor: pointer; }
 .button:disabled { opacity: .55; cursor: wait; }
@@ -215,7 +218,9 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .profile-hero { padding: 20px 0 34px; display: grid; justify-items: center; text-align: center; }
 .profile-photo-control { margin-bottom: 14px; position: relative; }
 .profile-avatar { width: 88px; height: 88px; font-size: 26px; }
-.profile-photo-button { width: 31px; height: 31px; display: grid; place-items: center; position: absolute; right: -3px; bottom: -3px; overflow: hidden; border: 2px solid var(--paper); border-radius: 50%; background: var(--forest-900); color: white; cursor: pointer; }
+.profile-photo-button { width: 38px; height: 38px; display: grid; place-items: center; position: absolute; right: -7px; bottom: -4px; overflow: hidden; border: 2px solid var(--paper); border-radius: 50%; background: var(--forest-900); color: white; box-shadow: 0 8px 18px rgba(23,63,50,.24); cursor: pointer; transition: background .18s ease, transform .18s ease; }
+.profile-photo-button:hover { background: var(--forest-700); transform: translateY(-1px); }
+.profile-photo-button .icon { width: 18px; height: 18px; }
 .profile-photo-button.working::after { content: "…"; position: absolute; inset: 0; display: grid; place-items: center; background: var(--forest-700); }
 .profile-hero h1 { margin-bottom: 7px; font-size: 41px; }
 .profile-hero p { color: var(--muted); }
@@ -331,6 +336,8 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .file-button { position: relative; overflow: hidden; }
 .file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .file-button.working::after { content: "Traitement…"; position: absolute; inset: 0; display: grid; place-items: center; background: var(--forest-100); }
+.photo-upload-button { gap: 8px; }
+.photo-upload-button:hover { background: #cfe2d8; }
 .activity { padding: 9px 0; display: grid; grid-template-columns: 12px 1fr; gap: 9px; border-bottom: 1px solid #e8e6de; }
 .activity i { width: 8px; height: 8px; margin-top: 5px; border: 2px solid var(--paper); border-radius: 50%; background: var(--forest-700); box-shadow: 0 0 0 1px var(--forest-700); }
 .activity span { display: grid; gap: 3px; }

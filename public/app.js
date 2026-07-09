@@ -24,6 +24,10 @@ const state = {
   locale: localStorage.getItem("parcos_locale") || "fr",
 };
 
+function cameraIcon() {
+  return `<svg class="icon camera-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 4.5l1.6 2h2.4a2 2 0 0 1 2 2v8.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h2.4l1.6-2h5z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>`;
+}
+
 const uiTranslations = {
   en: {
     "Aujourd’hui": "Today",
@@ -739,9 +743,14 @@ function bedNoteCard(note) {
   </article>`;
 }
 
+function youtubeEmbedSrc(video) {
+  const separator = video.embedUrl.includes("?") ? "&" : "?";
+  return `${video.embedUrl}${separator}rel=0&origin=${encodeURIComponent(location.origin)}`;
+}
+
 function howToVideoCard(video) {
   return `<article class="how-to-card">
-    <div class="video-frame"><iframe src="${escapeHtml(video.embedUrl)}" title="${escapeHtml(video.title)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+    <div class="video-frame"><iframe src="${escapeHtml(youtubeEmbedSrc(video))}" title="${escapeHtml(video.title)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
     <div><strong>${escapeHtml(video.title)}</strong>${video.note ? `<p>${escapeHtml(video.note)}</p>` : ""}</div>
   </article>`;
 }
@@ -785,7 +794,7 @@ function bedCard(bed) {
 function renderProfile() {
   const registrations = state.events.filter((event) => event.registration && event.registration.status !== "cancelled" && new Date(event.endsAt) >= new Date());
   return `<section class="page profile-page">
-    <div class="profile-hero"><div class="profile-photo-control"><span class="profile-avatar">${avatarContent(state.member)}</span><label class="profile-photo-button file-button" aria-label="Modifier ma photo">&#9998;<input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div><h1>${escapeHtml(state.member.displayName)}</h1><p>${escapeHtml(roleLabel(state.member.role))} · @${escapeHtml(state.member.username)}</p><small>Appuyez sur le crayon pour ajouter ou changer votre photo.</small></div>
+    <div class="profile-hero"><div class="profile-photo-control"><span class="profile-avatar">${avatarContent(state.member)}</span><label class="profile-photo-button file-button camera-upload-button" aria-label="Ajouter ou changer ma photo" title="Ajouter ou changer ma photo">${cameraIcon()}<input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div><h1>${escapeHtml(state.member.displayName)}</h1><p>${escapeHtml(roleLabel(state.member.role))} · @${escapeHtml(state.member.username)}</p><small>Appuyez sur l'appareil photo pour ajouter ou changer votre photo.</small></div>
     <section class="panel"><div class="section-heading compact"><div><p class="eyebrow">À venir</p><h2>Mes inscriptions</h2></div><span class="count-pill">${registrations.length}</span></div>${registrations.length ? `<div class="profile-event-list">${registrations.map(compactEventCard).join("")}</div>` : '<p class="muted">Vous n’êtes inscrit à aucun événement à venir.</p>'}</section>
     <section class="panel"><div class="section-heading compact"><div><p class="eyebrow">Mon compte</p><h2>Mon profil</h2></div></div>
       <form id="profile-form" class="form-stack compact-form">
@@ -1162,7 +1171,7 @@ function renderBedSheetLegacy(editing = false) {
       <div class="detail-title"><div><h2 id="bed-title">${escapeHtml(bed.crop || "Planche disponible")}</h2><p>${escapeHtml(bed.variety || "Aucune culture renseignée")}</p></div><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>
       <div class="location-card"><span>⌖</span><div><small>Pour la trouver</small><strong>${escapeHtml(bed.locationHint || "Emplacement à préciser")}</strong></div></div>
       ${editing ? bedEditForm(bed) : `<div class="detail-section"><h3>Note du potager</h3><p>${escapeHtml(bed.note || "Aucune note pour le moment.")}</p></div>${bed.harvestNote ? `<div class="harvest-note"><small>Consigne de récolte</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}`}
-      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button">Ajouter une photo<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
+      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button photo-upload-button">${cameraIcon()}<span>Ajouter une photo</span><input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
       ${!editing ? `<div class="detail-section history"><h3>Journal de la planche</h3>${activities.length ? activities.map((activity) => `<div class="activity"><i></i><span><strong>${escapeHtml(activity.note || "Mise à jour")}</strong><small>${escapeHtml(activity.memberName || "Membre")} · ${escapeHtml(relativeDate(activity.createdAt))}</small></span></div>`).join("") : '<p class="muted">Aucune activité enregistrée.</p>'}</div>` : ""}
     </div>
   </section></div>`;
@@ -1196,7 +1205,7 @@ function renderBedSheet(editing = false) {
       ${editing ? bedEditForm(bed) : `<div class="detail-section note-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Notes", "Notes")}</p><h3>${t("Commentaires horodatés", "Timestamped comments")}</h3></div><span class="count-pill">${notes.length}</span></div><div class="note-list">${noteList}</div></div>${bed.harvestNote ? `<div class="harvest-note"><small>${t("Dernière consigne de récolte", "Latest harvest instruction")}</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}
       <div class="detail-section harvest-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Récoltes", "Harvests")}</p><h3>${t("Photos et partages", "Photos and shares")}</h3></div><span class="count-pill">${harvests.length}</span></div>${harvestForm}<div class="harvest-list">${harvests.length ? harvests.map(harvestCard).join("") : `<p class="muted">${t("Aucune récolte ajoutée pour le moment.", "No harvests added yet.")}</p>`}</div></div>
       <div class="detail-section how-to-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Savoir-faire", "How-tos")}</p><h3>${t("Tutos vidéo", "Video tutorials")}</h3></div></div>${howToForm}<div class="how-to-list">${howToVideos.length ? howToVideos.map(howToVideoCard).join("") : `<p class="muted">${t("Aucun tuto lié à cette planche.", "No tutorial linked to this bed.")}</p>`}</div></div>`}
-      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button">${t("Ajouter une photo", "Add a photo")}<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
+      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button photo-upload-button">${cameraIcon()}<span>${t("Ajouter une photo", "Add a photo")}</span><input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
       ${!editing ? `<div class="detail-section history"><h3>${t("Journal de la planche", "Bed history")}</h3>${activities.length ? activities.map((activity) => `<div class="activity"><i></i><span><strong>${escapeHtml(activity.note || t("Mise à jour", "Update"))}</strong><small>${escapeHtml(activity.memberName || t("Membre", "Member"))} - ${escapeHtml(relativeDate(activity.createdAt))}</small></span></div>`).join("") : `<p class="muted">${t("Aucune activité enregistrée.", "No activity recorded.")}</p>`}</div>` : ""}
     </div>
   </section></div>`;
