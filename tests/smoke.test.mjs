@@ -189,6 +189,16 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(update.response.status, 200);
   assert.equal(update.body.bed.status, "harvest");
 
+  const noteUpdate = await request(baseUrl, "/api/beds/1", {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ note: "Verifier les tuteurs.", harvestNote: "Cueillir les fruits rouges." }),
+  });
+  assert.equal(noteUpdate.response.status, 200);
+  const notesDetail = await request(baseUrl, "/api/beds/1", { headers: { cookie: adminCookie } });
+  assert.ok(notesDetail.body.notes.some((note) => note.type === "garden" && note.body === "Verifier les tuteurs." && note.memberName === "Administrateur ParcOS" && note.createdAt));
+  assert.ok(notesDetail.body.notes.some((note) => note.type === "harvest" && note.body === "Cueillir les fruits rouges." && note.memberName === "Administrateur ParcOS" && note.createdAt));
+
   const png = readFileSync(new URL("../assets/potager-kale.jpg", import.meta.url)).toString("base64");
   const photo = await request(baseUrl, "/api/beds/1/photos", {
     method: "POST",
@@ -202,6 +212,34 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const privatePhoto = await fetch(`${baseUrl}${photo.body.bed.photoUrl}`, { headers: { cookie: memberCookie } });
   assert.equal(privatePhoto.status, 200);
   assert.equal(privatePhoto.headers.get("cache-control"), "private, no-store");
+
+  const harvest = await request(baseUrl, "/api/beds/1/harvests", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ dataUrl: `data:image/jpeg;base64,${png}`, quantity: "2 paniers", note: "A partager ce soir." }),
+  });
+  assert.equal(harvest.response.status, 201);
+  assert.equal(harvest.body.harvests[0].quantity, "2 paniers");
+  assert.match(harvest.body.harvests[0].photoUrl, /^\/media\/harvest-/);
+  const harvestDetail = await request(baseUrl, "/api/beds/1", { headers: { cookie: memberCookie } });
+  assert.equal(harvestDetail.body.harvests[0].memberName, "Test Member");
+  const harvestPhoto = await fetch(`${baseUrl}${harvest.body.harvests[0].photoUrl}`, { headers: { cookie: memberCookie } });
+  assert.equal(harvestPhoto.status, 200);
+
+  const howTo = await request(baseUrl, "/api/beds/1/how-tos", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ title: "Tailler les tomates", url: "https://youtu.be/dQw4w9WgXcQ", note: "Technique courte." }),
+  });
+  assert.equal(howTo.response.status, 201);
+  assert.equal(howTo.body.howToVideos[0].youtubeVideoId, "dQw4w9WgXcQ");
+  assert.match(howTo.body.howToVideos[0].embedUrl, /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ/);
+  const memberHowTo = await request(baseUrl, "/api/beds/1/how-tos", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ url: "https://youtu.be/dQw4w9WgXcQ" }),
+  });
+  assert.equal(memberHowTo.response.status, 403);
 
   const avatar = await request(baseUrl, "/api/profile/avatar", {
     method: "POST",

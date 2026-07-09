@@ -87,11 +87,65 @@ const uiTranslations = {
     "Membre": "Member",
     "Coordinateur": "Coordinator",
     "Administrateur": "Administrator",
+    "Bonjour": "Hello",
+    "Que se passe-t-il au potager ?": "What is happening in the garden?",
+    "Le potager aujourd’hui": "The garden today",
+    "Voir les planches": "View beds",
+    "Prochain rendez-vous": "Next event",
+    "À l’agenda": "On the agenda",
+    "Tout voir": "View all",
+    "Rien de prévu pour le moment": "Nothing planned yet",
+    "Les prochains rendez-vous apparaîtront ici.": "Upcoming events will appear here.",
+    "En un coup d’œil": "At a glance",
+    "État du potager": "Garden status",
+    "Disponibles": "Available",
+    "Sans photo": "No photo",
+    "Récolte ouverte": "Harvest open",
+    "Prêt maintenant": "Ready now",
+    "Aucun inscrit": "No registrations",
+    "Cultiver ensemble": "Growing together",
+    "Chantiers, ateliers et moments partagés au potager.": "Workdays, workshops and shared moments in the garden.",
+    "Créer un événement": "Create event",
+    "Mois précédent": "Previous month",
+    "Mois suivant": "Next month",
+    "Période affichée": "Displayed period",
+    "Événements affichés": "Displayed events",
+    "Aucun rendez-vous pour cette période": "No events in this period",
+    "Choisissez un autre jour, une autre semaine ou un autre mois.": "Choose another day, week or month.",
+    "Se repérer sur place": "Find your way on site",
+    "Les potagers": "Gardens",
+    "Chaque lieu, ses accès et ses planches.": "Each place, its access and its beds.",
+    "Gérer les lieux": "Manage places",
+    "Accessible aux membres": "Accessible to members",
+    "Accès coordinateurs": "Coordinator access",
+    "Lieu du potager partagé.": "Shared garden place.",
+    "Ajouter une planche": "Add a bed",
+    "Numéro, culture ou emplacement…": "Number, crop or location...",
+    "Rechercher une planche": "Search for a bed",
+    "Toutes": "All",
+    "Aucune planche trouvée": "No beds found",
+    "Ajoutez une première planche ou changez de filtre.": "Add a first bed or change the filter.",
+    "Essayez un autre filtre ou terme de recherche.": "Try another filter or search term.",
+    "Planche disponible": "Available bed",
+    "Culture à préciser": "Crop to specify",
+    "Mis à jour": "Updated",
+    "Photo à ajouter": "Add photo",
+    "Nom affiché": "Display name",
+    "À propos": "About",
+    "Langue": "Language",
+    "Mot de passe actuel": "Current password",
+    "Nouveau mot de passe": "New password",
+    "facultatif": "optional",
+    "requis pour le modifier": "required to change it",
   },
 };
 
 function currentLocale() {
   return state.member?.preferredLocale === "en" || state.locale === "en" ? "en" : "fr";
+}
+
+function t(fr, en) {
+  return currentLocale() === "en" ? en : fr;
 }
 
 function applyTranslations(root = document) {
@@ -102,11 +156,13 @@ function applyTranslations(root = document) {
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
-    const text = node.nodeValue.trim();
-    if (translations[text]) node.nodeValue = node.nodeValue.replace(text, translations[text]);
+    const trimmed = node.nodeValue.trim();
+    const text = trimmed.replace(/\s+/g, " ");
+    if (translations[text]) node.nodeValue = node.nodeValue.replace(trimmed, translations[text]);
   }
   root.querySelectorAll?.("[placeholder]").forEach((element) => {
-    const translated = translations[element.getAttribute("placeholder")];
+    const key = element.getAttribute("placeholder")?.trim().replace(/\s+/g, " ");
+    const translated = translations[key];
     if (translated) element.setAttribute("placeholder", translated);
   });
 }
@@ -131,6 +187,59 @@ const eventTypeMeta = {
 };
 const eventStateLabels = { draft: "Brouillon", published: "Publié", cancelled: "Annulé", completed: "Terminé" };
 
+const localizedStatusLabels = {
+  unknown: { fr: statusMeta.unknown.label, en: "To check" },
+  ready: { fr: statusMeta.ready.label, en: "Available" },
+  growing: { fr: statusMeta.growing.label, en: "Growing" },
+  harvest: { fr: statusMeta.harvest.label, en: "Ready to harvest" },
+  clear: { fr: statusMeta.clear.label, en: "To clear" },
+  winter: { fr: statusMeta.winter.label, en: "Resting" },
+};
+
+function statusMetaFor(status) {
+  const meta = statusMeta[status] || statusMeta.unknown;
+  const label = localizedStatusLabels[status] || localizedStatusLabels.unknown;
+  return { ...meta, label: t(label.fr, label.en) };
+}
+
+const localizedRoleLabels = {
+  member: { fr: roleLabels.member, en: "Member" },
+  coordinator: { fr: roleLabels.coordinator, en: "Coordinator" },
+  admin: { fr: roleLabels.admin, en: "Administrator" },
+};
+
+function roleLabel(role) {
+  const label = localizedRoleLabels[role] || localizedRoleLabels.member;
+  return t(label.fr, label.en);
+}
+
+const localizedEventTypeLabels = {
+  work: { fr: eventTypeMeta.work.label, en: "Workday" },
+  workshop: { fr: eventTypeMeta.workshop.label, en: "Workshop" },
+  community: { fr: eventTypeMeta.community.label, en: "Community" },
+  school: { fr: eventTypeMeta.school.label, en: "School" },
+  planning: { fr: eventTypeMeta.planning.label, en: "Coordination" },
+  milestone: { fr: eventTypeMeta.milestone.label, en: "Season" },
+};
+
+function eventTypeMetaFor(type) {
+  const meta = eventTypeMeta[type] || eventTypeMeta.work;
+  const label = localizedEventTypeLabels[type] || localizedEventTypeLabels.work;
+  return { ...meta, label: t(label.fr, label.en) };
+}
+
+const localizedEventStateLabels = {
+  draft: { fr: eventStateLabels.draft, en: "Draft" },
+  published: { fr: eventStateLabels.published, en: "Published" },
+  cancelled: { fr: eventStateLabels.cancelled, en: "Cancelled" },
+  completed: { fr: eventStateLabels.completed, en: "Completed" },
+};
+
+function eventStateLabel(state) {
+  const label = localizedEventStateLabels[state] || localizedEventStateLabels.published;
+  return t(label.fr, label.en);
+}
+
 function eventCoverUrl(event) {
   return event.title === "Permanence au potager" ? "/assets/permanence-jardin-stylisee.png" : null;
 }
@@ -151,6 +260,16 @@ function formatEventDate(value, options = { weekday: "long", day: "numeric", mon
 
 function formatTime(value) {
   return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function datetimeLocalValue(value) {
@@ -435,30 +554,33 @@ function renderToday() {
   const attention = state.beds.filter((bed) => ["clear", "unknown"].includes(bed.status));
   const noPhoto = state.beds.filter((bed) => !bed.photoUrl).length;
   const nextEvent = state.events.find((event) => new Date(event.endsAt) >= new Date() && event.state === "published");
+  const locale = currentLocale() === "en" ? "en-GB" : "fr-BE";
+  const bedWord = (count) => t(`planche${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "s"}`);
+  const zoneWord = (count) => t(`zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`);
   return `<section class="page today-page">
-    <div class="welcome-row"><div><p class="eyebrow">Bonjour ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>Que se passe-t-il<br>au potager ?</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat("fr-BE", { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
-    <article class="hero-card"><div><span class="hero-kicker">Le potager aujourd’hui</span><h2>${harvest.length} planche${harvest.length === 1 ? "" : "s"} à récolter</h2><p>${attention.length} zone${attention.length === 1 ? "" : "s"} demande${attention.length === 1 ? "" : "nt"} de l’attention.</p><button class="button light" data-page="garden">Voir les planches</button></div></article>
+    <div class="welcome-row"><div><p class="eyebrow">${t("Bonjour", "Hello")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Que se passe-t-il", "What is happening")}<br>${t("au potager ?", "in the garden?")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
+    <article class="hero-card"><div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
     <div class="section-heading"><div><p class="eyebrow">Prochain rendez-vous</p><h2>À l’agenda</h2></div><button class="text-link" data-page="agenda">Tout voir</button></div>
     ${nextEvent ? compactEventCard(nextEvent) : '<div class="empty-state"><strong>Rien de prévu pour le moment</strong><p>Les prochains rendez-vous apparaîtront ici.</p></div>'}
     <div class="section-heading"><div><p class="eyebrow">En un coup d’œil</p><h2>État du potager</h2></div></div>
     <div class="stat-grid">
-      <button data-filter-link="harvest"><strong>${harvest.length}</strong><span>À récolter</span></button>
-      <button data-filter-link="ready"><strong>${state.beds.filter((bed) => bed.status === "ready").length}</strong><span>Disponibles</span></button>
-      <button data-filter-link="clear"><strong>${attention.length}</strong><span>À vérifier</span></button>
-      <button data-filter-link="no-photo"><strong>${noPhoto}</strong><span>Sans photo</span></button>
+      <button data-filter-link="harvest"><strong>${harvest.length}</strong><span>${t("À récolter", "To harvest")}</span></button>
+      <button data-filter-link="ready"><strong>${state.beds.filter((bed) => bed.status === "ready").length}</strong><span>${t("Disponibles", "Available")}</span></button>
+      <button data-filter-link="clear"><strong>${attention.length}</strong><span>${t("À vérifier", "To check")}</span></button>
+      <button data-filter-link="no-photo"><strong>${noPhoto}</strong><span>${t("Sans photo", "No photo")}</span></button>
     </div>
-    ${harvest.length ? `<div class="section-heading compact"><div><p class="eyebrow">Récolte ouverte</p><h2>Prêt maintenant</h2></div></div><div class="mini-bed-list">${harvest.slice(0, 4).map(miniBed).join("")}</div>` : ""}
+    ${harvest.length ? `<div class="section-heading compact"><div><p class="eyebrow">${t("Récolte ouverte", "Harvest open")}</p><h2>${t("Prêt maintenant", "Ready now")}</h2></div></div><div class="mini-bed-list">${harvest.slice(0, 4).map(miniBed).join("")}</div>` : ""}
   </section>`;
 }
 
 function compactEventCard(event) {
-  const meta = eventTypeMeta[event.type] || eventTypeMeta.work;
+  const meta = eventTypeMetaFor(event.type);
   const registration = event.registration;
-  const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : "Aucun inscrit";
+  const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : t("Aucun inscrit", "No registrations");
   return `<button class="next-event-card" data-event-id="${event.id}">
     <span class="event-date-block"><strong>${escapeHtml(formatEventDate(event.startsAt, { day: "2-digit" }))}</strong><small>${escapeHtml(formatEventDate(event.startsAt, { month: "short" }))}</small></span>
     <span class="event-card-copy"><small>${escapeHtml(meta.label)} · ${escapeHtml(formatTime(event.startsAt))}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)}</span><em class="attendee-preview">${escapeHtml(attendees)}</em></span>
-    ${registration && registration.status !== "cancelled" ? `<span class="registration-dot ${registration.status}">${registration.status === "waitlisted" ? "En attente" : "Inscrit"}</span>` : '<b>›</b>'}
+    ${registration && registration.status !== "cancelled" ? `<span class="registration-dot ${registration.status}">${registration.status === "waitlisted" ? t("En attente", "Waitlisted") : t("Inscrit", "Going")}</span>` : '<b>›</b>'}
   </button>`;
 }
 
@@ -576,24 +698,52 @@ function renderAgenda() {
 }
 
 function eventCard(event) {
-  const meta = eventTypeMeta[event.type] || eventTypeMeta.work;
+  const meta = eventTypeMetaFor(event.type);
   const coverUrl = eventCoverUrl(event);
   const registration = event.registration;
-  const capacity = event.capacity === null ? `${event.attendeeCount} inscrit${event.attendeeCount === 1 ? "" : "s"}` : `${event.attendeeCount}/${event.capacity} participants`;
-  const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : "Aucun inscrit";
+  const capacity = event.capacity === null
+    ? t(`${event.attendeeCount} inscrit${event.attendeeCount === 1 ? "" : "s"}`, `${event.attendeeCount} registration${event.attendeeCount === 1 ? "" : "s"}`)
+    : t(`${event.attendeeCount}/${event.capacity} participants`, `${event.attendeeCount}/${event.capacity} participants`);
+  const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : t("Aucun inscrit", "No registrations");
   return `<button class="agenda-event-card type-${event.type} ${event.state === "cancelled" ? "cancelled" : ""}" data-event-id="${event.id}">
     ${coverUrl ? `<span class="event-card-thumb"><img src="${coverUrl}" alt="" loading="lazy"></span>` : `<span class="event-icon">${meta.icon}</span>`}<span class="event-card-copy"><small>${escapeHtml(formatTime(event.startsAt))}–${escapeHtml(formatTime(event.endsAt))} · ${escapeHtml(meta.label)}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)} · ${escapeHtml(capacity)}</span><em class="attendee-preview">${escapeHtml(attendees)}</em></span>
-    <span class="event-card-tail">${event.state !== "published" ? `<em class="state-pill ${event.state}">${escapeHtml(eventStateLabels[event.state])}</em>` : registration && registration.status !== "cancelled" ? `<em class="registration-dot ${registration.status}">${registration.status === "waitlisted" ? "Attente" : "Inscrit"}</em>` : "›"}</span>
+    <span class="event-card-tail">${event.state !== "published" ? `<em class="state-pill ${event.state}">${escapeHtml(eventStateLabel(event.state))}</em>` : registration && registration.status !== "cancelled" ? `<em class="registration-dot ${registration.status}">${registration.status === "waitlisted" ? t("Attente", "Waitlist") : t("Inscrit", "Going")}</em>` : "›"}</span>
   </button>`;
 }
 
 function miniBed(bed) {
-  return `<button class="mini-bed" data-bed-id="${bed.id}">${thumbnail(bed)}<span><small>${escapeHtml(bed.code)} · ${escapeHtml(bed.section)}</small><strong>${escapeHtml(bed.crop || "Planche disponible")}</strong></span><b>›</b></button>`;
+  return `<button class="mini-bed" data-bed-id="${bed.id}">${thumbnail(bed)}<span><small>${escapeHtml(bed.code)} · ${escapeHtml(bed.section)}</small><strong>${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</strong></span><b>›</b></button>`;
 }
 
 function thumbnail(bed, large = false) {
   if (bed.photoUrl) return `<span class="bed-thumb ${large ? "large" : ""}"><img src="${escapeHtml(bed.photoUrl)}" alt="Photo de la planche ${escapeHtml(bed.number)}" loading="lazy"></span>`;
-  return `<span class="bed-thumb placeholder ${large ? "large" : ""}"><b>${escapeHtml(String(bed.number).padStart(2, "0"))}</b><small>Photo à ajouter</small></span>`;
+  return `<span class="bed-thumb placeholder ${large ? "large" : ""}"><b>${escapeHtml(String(bed.number).padStart(2, "0"))}</b><small>${t("Photo à ajouter", "Add photo")}</small></span>`;
+}
+
+function harvestCard(harvest) {
+  return `<article class="harvest-card">
+    ${harvest.photoUrl ? `<img src="${escapeHtml(harvest.photoUrl)}" alt="${escapeHtml(t("Photo de récolte", "Harvest photo"))}" loading="lazy">` : ""}
+    <div><strong>${escapeHtml(harvest.quantity || t("Récolte partagée", "Shared harvest"))}</strong>
+      ${harvest.note ? `<p>${escapeHtml(harvest.note)}</p>` : ""}
+      <small>${escapeHtml(harvest.memberName || t("Membre", "Member"))} - ${escapeHtml(relativeDate(harvest.createdAt))}</small>
+    </div>
+  </article>`;
+}
+
+function bedNoteCard(note) {
+  const label = note.type === "harvest" ? t("Récolte", "Harvest") : t("Potager", "Garden");
+  const memberName = note.memberName === "Ancienne note" ? t("Ancienne note", "Legacy note") : note.memberName || t("Membre", "Member");
+  return `<article class="note-card">
+    <small>${escapeHtml(label)} - ${escapeHtml(memberName)} - ${escapeHtml(formatDateTime(note.createdAt))}</small>
+    <p>${escapeHtml(note.body)}</p>
+  </article>`;
+}
+
+function howToVideoCard(video) {
+  return `<article class="how-to-card">
+    <div class="video-frame"><iframe src="${escapeHtml(video.embedUrl)}" title="${escapeHtml(video.title)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+    <div><strong>${escapeHtml(video.title)}</strong>${video.note ? `<p>${escapeHtml(video.note)}</p>` : ""}</div>
+  </article>`;
 }
 
 function filteredBeds() {
@@ -610,23 +760,24 @@ function renderGarden() {
   const beds = filteredBeds();
   const area = state.areas.find((item) => item.id === state.selectedAreaId) || state.areas[0];
   const groups = [...new Set(beds.map((bed) => bed.section))];
+  const bedCountLabel = (count) => t(`${count} planche${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "s"}`);
   return `<section class="page garden-page">
     <div class="page-title"><div><p class="eyebrow">Se repérer sur place</p><h1>Les potagers</h1><p class="lede">Chaque lieu, ses accès et ses planches.</p></div>${isCoordinator() ? '<button class="round-add" id="manage-areas" aria-label="Gérer les lieux">⚙</button>' : ""}</div>
-    <div class="area-switcher">${state.areas.map((item) => `<button data-area-id="${item.id}" class="${item.id === area?.id ? "active" : ""}"><span><strong>${escapeHtml(item.name)}</strong><small>${item.bedCount} planche${item.bedCount === 1 ? "" : "s"}</small></span>${!item.membersCanAccess ? '<em>Coordination</em>' : ""}</button>`).join("")}</div>
-    ${area ? `<div class="area-intro"><div><p class="eyebrow">${area.membersCanAccess ? "Accessible aux membres" : "Accès coordinateurs"}</p><h2>${escapeHtml(area.name)}</h2><p>${escapeHtml(area.description || area.locationHint || "Lieu du potager partagé.")}</p></div>${isCoordinator() ? '<button class="button secondary" id="add-bed">+ Ajouter une planche</button>' : ""}</div>` : ""}
-    <label class="search-box"><span>⌕</span><input id="bed-search" type="search" value="${escapeHtml(state.search)}" placeholder="Numéro, culture ou emplacement…" aria-label="Rechercher une planche"></label>
+    <div class="area-switcher">${state.areas.map((item) => `<button data-area-id="${item.id}" class="${item.id === area?.id ? "active" : ""}"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(bedCountLabel(item.bedCount))}</small></span>${!item.membersCanAccess ? `<em>${t("Coordination", "Coordination")}</em>` : ""}</button>`).join("")}</div>
+    ${area ? `<div class="area-intro"><div><p class="eyebrow">${area.membersCanAccess ? t("Accessible aux membres", "Accessible to members") : t("Accès coordinateurs", "Coordinator access")}</p><h2>${escapeHtml(area.name)}</h2><p>${escapeHtml(area.description || area.locationHint || t("Lieu du potager partagé.", "Shared garden place."))}</p></div>${isCoordinator() ? `<button class="button secondary" id="add-bed">+ ${t("Ajouter une planche", "Add a bed")}</button>` : ""}</div>` : ""}
+    <label class="search-box"><span>⌕</span><input id="bed-search" type="search" value="${escapeHtml(state.search)}" placeholder="${t("Numéro, culture ou emplacement…", "Number, crop or location...")}" aria-label="${t("Rechercher une planche", "Search for a bed")}"></label>
     <div class="filter-row">
-      ${[["all", "Toutes"], ["harvest", "À récolter"], ["growing", "Ça pousse"], ["ready", "Disponibles"], ["clear", "À nettoyer"], ["no-photo", "Sans photo"]].map(([value, label]) => `<button data-filter="${value}" class="${state.filter === value ? "active" : ""}">${label}</button>`).join("")}
+      ${[["all", t("Toutes", "All")], ["harvest", t("À récolter", "To harvest")], ["growing", t("Ça pousse", "Growing")], ["ready", t("Disponibles", "Available")], ["clear", t("À nettoyer", "To clear")], ["no-photo", t("Sans photo", "No photo")]].map(([value, label]) => `<button data-filter="${value}" class="${state.filter === value ? "active" : ""}">${label}</button>`).join("")}
     </div>
-    ${groups.length ? groups.map((group) => `<section class="bed-group"><div class="group-heading"><h2>${escapeHtml(group)}</h2><span>${beds.filter((bed) => bed.section === group).length}</span></div><div class="bed-card-list">${beds.filter((bed) => bed.section === group).map(bedCard).join("")}</div></section>`).join("") : `<div class="empty-state"><strong>Aucune planche trouvée</strong><p>${isCoordinator() ? "Ajoutez une première planche ou changez de filtre." : "Essayez un autre filtre ou terme de recherche."}</p></div>`}
+    ${groups.length ? groups.map((group) => `<section class="bed-group"><div class="group-heading"><h2>${escapeHtml(group)}</h2><span>${beds.filter((bed) => bed.section === group).length}</span></div><div class="bed-card-list">${beds.filter((bed) => bed.section === group).map(bedCard).join("")}</div></section>`).join("") : `<div class="empty-state"><strong>${t("Aucune planche trouvée", "No beds found")}</strong><p>${isCoordinator() ? t("Ajoutez une première planche ou changez de filtre.", "Add a first bed or change the filter.") : t("Essayez un autre filtre ou terme de recherche.", "Try another filter or search term.")}</p></div>`}
   </section>`;
 }
 
 function bedCard(bed) {
-  const status = statusMeta[bed.status] || statusMeta.unknown;
+  const status = statusMetaFor(bed.status);
   return `<button class="bed-card" data-bed-id="${bed.id}">
     ${thumbnail(bed)}
-    <span class="bed-card-body"><span class="bed-card-location"><b>${escapeHtml(bed.code)}</b>${escapeHtml(bed.garden)} · ${escapeHtml(bed.section)}</span><strong>${escapeHtml(bed.crop || "Planche disponible")}</strong><small>${escapeHtml(bed.variety || bed.locationHint || "Culture à préciser")}</small><span class="bed-updated">Mis à jour ${escapeHtml(relativeDate(bed.updatedAt).toLowerCase())}</span></span>
+    <span class="bed-card-body"><span class="bed-card-location"><b>${escapeHtml(bed.code)}</b>${escapeHtml(bed.garden)} · ${escapeHtml(bed.section)}</span><strong>${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</strong><small>${escapeHtml(bed.variety || bed.locationHint || t("Culture à préciser", "Crop to specify"))}</small><span class="bed-updated">${t("Mis à jour", "Updated")} ${escapeHtml(relativeDate(bed.updatedAt).toLowerCase())}</span></span>
     <span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span>
   </button>`;
 }
@@ -634,7 +785,7 @@ function bedCard(bed) {
 function renderProfile() {
   const registrations = state.events.filter((event) => event.registration && event.registration.status !== "cancelled" && new Date(event.endsAt) >= new Date());
   return `<section class="page profile-page">
-    <div class="profile-hero"><div class="profile-photo-control"><span class="profile-avatar">${avatarContent(state.member)}</span><label class="profile-photo-button file-button" aria-label="Modifier ma photo">&#9998;<input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div><h1>${escapeHtml(state.member.displayName)}</h1><p>${escapeHtml(roleLabels[state.member.role])} · @${escapeHtml(state.member.username)}</p><small>Appuyez sur le crayon pour ajouter ou changer votre photo.</small></div>
+    <div class="profile-hero"><div class="profile-photo-control"><span class="profile-avatar">${avatarContent(state.member)}</span><label class="profile-photo-button file-button" aria-label="Modifier ma photo">&#9998;<input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div><h1>${escapeHtml(state.member.displayName)}</h1><p>${escapeHtml(roleLabel(state.member.role))} · @${escapeHtml(state.member.username)}</p><small>Appuyez sur le crayon pour ajouter ou changer votre photo.</small></div>
     <section class="panel"><div class="section-heading compact"><div><p class="eyebrow">À venir</p><h2>Mes inscriptions</h2></div><span class="count-pill">${registrations.length}</span></div>${registrations.length ? `<div class="profile-event-list">${registrations.map(compactEventCard).join("")}</div>` : '<p class="muted">Vous n’êtes inscrit à aucun événement à venir.</p>'}</section>
     <section class="panel"><div class="section-heading compact"><div><p class="eyebrow">Mon compte</p><h2>Mon profil</h2></div></div>
       <form id="profile-form" class="form-stack compact-form">
@@ -647,7 +798,7 @@ function renderProfile() {
       </form>
     </section>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
-    <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabels[member.role])} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
+    <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
@@ -812,10 +963,11 @@ async function createArea(submitEvent) {
 function renderCreateBedForm() {
   const area = state.areas.find((item) => item.id === state.selectedAreaId);
   if (!area) return;
-  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="new-bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button><div class="sheet-content form-sheet"><p class="eyebrow">${escapeHtml(area.name)}</p><h2 id="new-bed-title">Ajouter une planche</h2><p class="muted">Le prochain numéro et le code ${escapeHtml(area.codePrefix)} seront proposés automatiquement.</p><form id="bed-create-form" class="form-stack bed-edit-form"><div class="two-fields"><label>Numéro <small>(automatique si vide)</small><input name="number" type="number" min="1" max="999" placeholder="${area.bedCount + 1}"></label><label>Code <small>(facultatif)</small><input name="code" maxlength="16" placeholder="${escapeHtml(area.codePrefix)}-${String(area.bedCount + 1).padStart(2, "0")}"></label></div><label>Secteur<input name="section" value="${escapeHtml(area.name)}" required></label><div class="two-fields"><label>Culture<input name="crop" placeholder="Ex. Tomates"></label><label>Variété<input name="variety"></label></div><label>État<select name="status">${Object.entries(statusMeta).map(([value, meta]) => `<option value="${value}" ${value === "unknown" ? "selected" : ""}>${escapeHtml(meta.label)}</option>`).join("")}</select></label><label>Repère sur place<input name="locationHint" value="${escapeHtml(area.locationHint)}"></label><label>Note du potager<textarea name="note"></textarea></label><div class="button-row"><button type="button" class="button ghost" id="cancel-bed-create">Annuler</button><button class="button primary" type="submit">Ajouter la planche</button></div></form></div></section></div>`;
+  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="new-bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button><div class="sheet-content form-sheet"><p class="eyebrow">${escapeHtml(area.name)}</p><h2 id="new-bed-title">Ajouter une planche</h2><p class="muted">Le prochain numéro et le code ${escapeHtml(area.codePrefix)} seront proposés automatiquement.</p><form id="bed-create-form" class="form-stack bed-edit-form"><div class="two-fields"><label>Numéro <small>(automatique si vide)</small><input name="number" type="number" min="1" max="999" placeholder="${area.bedCount + 1}"></label><label>Code <small>(facultatif)</small><input name="code" maxlength="16" placeholder="${escapeHtml(area.codePrefix)}-${String(area.bedCount + 1).padStart(2, "0")}"></label></div><label>Secteur<input name="section" value="${escapeHtml(area.name)}" required></label><div class="two-fields"><label>Culture<input name="crop" placeholder="Ex. Tomates"></label><label>Variété<input name="variety"></label></div><label>État<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${value === "unknown" ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label><label>Repère sur place<input name="locationHint" value="${escapeHtml(area.locationHint)}"></label><label>Note du potager<textarea name="note"></textarea></label><div class="button-row"><button type="button" class="button ghost" id="cancel-bed-create">Annuler</button><button class="button primary" type="submit">Ajouter la planche</button></div></form></div></section></div>`;
   bindModal();
   document.querySelector("#cancel-bed-create").addEventListener("click", dismissModal);
   document.querySelector("#bed-create-form").addEventListener("submit", createBed);
+  applyTranslations(modalRoot);
 }
 
 async function createBed(submitEvent) {
@@ -849,7 +1001,7 @@ async function openEvent(id) {
 
 function renderEventSheet() {
   const { event, registrations = [] } = state.selectedEvent;
-  const meta = eventTypeMeta[event.type] || eventTypeMeta.work;
+  const meta = eventTypeMetaFor(event.type);
   const coverUrl = eventCoverUrl(event);
   const registration = event.registration;
   const activeRegistration = registration && registration.status !== "cancelled";
@@ -857,7 +1009,7 @@ function renderEventSheet() {
   modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet event-sheet" role="dialog" aria-modal="true" aria-labelledby="event-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button>
     <div class="event-sheet-hero type-${event.type} ${coverUrl ? "permanence-cover" : ""}"><span class="event-hero-icon">${meta.icon}</span><div><span class="event-type-label">${escapeHtml(meta.label)}</span><h2 id="event-title">${escapeHtml(event.title)}</h2></div></div>
     <div class="sheet-content">
-      ${event.state !== "published" ? `<div class="event-state-banner ${event.state}"><strong>${escapeHtml(eventStateLabels[event.state])}</strong><span>${event.state === "cancelled" ? "Ce rendez-vous n’aura pas lieu." : event.state === "draft" ? "Visible uniquement par l’équipe de coordination." : "Ce rendez-vous est terminé."}</span></div>` : ""}
+      ${event.state !== "published" ? `<div class="event-state-banner ${event.state}"><strong>${escapeHtml(eventStateLabel(event.state))}</strong><span>${event.state === "cancelled" ? t("Ce rendez-vous n’aura pas lieu.", "This event will not take place.") : event.state === "draft" ? t("Visible uniquement par l’équipe de coordination.", "Visible only to the coordination team.") : t("Ce rendez-vous est terminé.", "This event is complete.")}</span></div>` : ""}
       <div class="event-facts"><div><span>□</span><p><small>Date et heure</small><strong>${escapeHtml(formatEventDate(event.startsAt))}</strong><b>${escapeHtml(formatTime(event.startsAt))}–${escapeHtml(formatTime(event.endsAt))}</b></p></div><div><span>⌖</span><p><small>Lieu</small><strong>${escapeHtml(event.location)}</strong><b>${escapeHtml(capacity)}</b></p></div></div>
       ${event.description ? `<div class="detail-section"><h3>Au programme</h3><p>${escapeHtml(event.description)}</p></div>` : ""}
       ${event.preparationNote ? `<div class="event-note"><small>À prévoir</small><p>${escapeHtml(event.preparationNote)}</p></div>` : ""}
@@ -953,12 +1105,12 @@ function renderEventForm(event = null) {
   modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="event-form-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button><div class="sheet-content form-sheet"><p class="eyebrow">Coordination</p><h2 id="event-form-title">${event ? "Modifier l’événement" : "Nouveau rendez-vous"}</h2><form id="event-form" class="form-stack event-form">
     <label>Titre<input name="title" maxlength="140" required value="${escapeHtml(event?.title || "")}" placeholder="Ex. Désherbage collectif"></label>
     <div class="two-fields"><label>Début<input name="startsAt" type="datetime-local" required value="${datetimeLocalValue(start)}"></label><label>Fin<input name="endsAt" type="datetime-local" required value="${datetimeLocalValue(end)}"></label></div>
-    <div class="two-fields"><label>Type<select name="type">${Object.entries(eventTypeMeta).map(([value, meta]) => `<option value="${value}" ${event?.type === value ? "selected" : ""}>${escapeHtml(meta.label)}</option>`).join("")}</select></label><label>Capacité <small>(vide = illimitée)</small><input name="capacity" type="number" min="1" max="1000" value="${escapeHtml(event?.capacity ?? "")}"></label></div>
+    <div class="two-fields"><label>Type<select name="type">${Object.keys(eventTypeMeta).map((value) => `<option value="${value}" ${event?.type === value ? "selected" : ""}>${escapeHtml(eventTypeMetaFor(value).label)}</option>`).join("")}</select></label><label>Capacité <small>(vide = illimitée)</small><input name="capacity" type="number" min="1" max="1000" value="${escapeHtml(event?.capacity ?? "")}"></label></div>
     <label>Lieu<input name="location" maxlength="180" required value="${escapeHtml(event?.location || "Grand Potager")}"></label>
     <label>Description<textarea name="description" maxlength="3000" placeholder="Que va-t-on faire ?">${escapeHtml(event?.description || "")}</textarea></label>
     <label>À prévoir<textarea name="preparationNote" maxlength="1000" placeholder="Gants, vêtements, matériel…">${escapeHtml(event?.preparationNote || "")}</textarea></label>
     <label>Accessibilité<textarea name="accessibilityNote" maxlength="1000" placeholder="Accès, besoins particuliers…">${escapeHtml(event?.accessibilityNote || "")}</textarea></label>
-    <div class="two-fields"><label>Visibilité<select name="audience"><option value="members" ${!event || event.audience === "members" ? "selected" : ""}>Tous les membres</option><option value="public" ${event?.audience === "public" ? "selected" : ""}>Public avec lien</option><option value="coordinators" ${event?.audience === "coordinators" ? "selected" : ""}>Coordinateurs</option></select></label><label>État<select name="state">${Object.entries(eventStateLabels).map(([value, label]) => `<option value="${value}" ${(event?.state || "published") === value ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>
+    <div class="two-fields"><label>Visibilité<select name="audience"><option value="members" ${!event || event.audience === "members" ? "selected" : ""}>Tous les membres</option><option value="public" ${event?.audience === "public" ? "selected" : ""}>Public avec lien</option><option value="coordinators" ${event?.audience === "coordinators" ? "selected" : ""}>Coordinateurs</option></select></label><label>État<select name="state">${Object.keys(eventStateLabels).map((value) => `<option value="${value}" ${(event?.state || "published") === value ? "selected" : ""}>${escapeHtml(eventStateLabel(value))}</option>`).join("")}</select></label></div>
     <div class="button-row"><button type="button" class="button ghost" id="cancel-event-form">Annuler</button><button class="button primary" type="submit">${event ? "Enregistrer" : "Publier"}</button></div>
   </form></div></section></div>`;
   bindModal();
@@ -1000,9 +1152,9 @@ async function openBed(id) {
   }
 }
 
-function renderBedSheet(editing = false) {
+function renderBedSheetLegacy(editing = false) {
   const { bed, activities } = state.selectedBed;
-  const status = statusMeta[bed.status] || statusMeta.unknown;
+  const status = statusMetaFor(bed.status);
   modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button>
     <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
     <div class="sheet-content">
@@ -1010,7 +1162,7 @@ function renderBedSheet(editing = false) {
       <div class="detail-title"><div><h2 id="bed-title">${escapeHtml(bed.crop || "Planche disponible")}</h2><p>${escapeHtml(bed.variety || "Aucune culture renseignée")}</p></div><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>
       <div class="location-card"><span>⌖</span><div><small>Pour la trouver</small><strong>${escapeHtml(bed.locationHint || "Emplacement à préciser")}</strong></div></div>
       ${editing ? bedEditForm(bed) : `<div class="detail-section"><h3>Note du potager</h3><p>${escapeHtml(bed.note || "Aucune note pour le moment.")}</p></div>${bed.harvestNote ? `<div class="harvest-note"><small>Consigne de récolte</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}`}
-      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button">Ajouter une photo<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"></label></div>` : ""}
+      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button">Ajouter une photo<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
       ${!editing ? `<div class="detail-section history"><h3>Journal de la planche</h3>${activities.length ? activities.map((activity) => `<div class="activity"><i></i><span><strong>${escapeHtml(activity.note || "Mise à jour")}</strong><small>${escapeHtml(activity.memberName || "Membre")} · ${escapeHtml(relativeDate(activity.createdAt))}</small></span></div>`).join("") : '<p class="muted">Aucune activité enregistrée.</p>'}</div>` : ""}
     </div>
   </section></div>`;
@@ -1021,15 +1173,63 @@ function renderBedSheet(editing = false) {
   document.querySelector("#bed-photo-input")?.addEventListener("change", uploadBedPhoto);
 }
 
-function bedEditForm(bed) {
+function renderBedSheet(editing = false) {
+  const { bed, activities, notes = [], harvests = [], howToVideos = [] } = state.selectedBed;
+  const status = statusMetaFor(bed.status);
+  const harvestForm = `<form id="harvest-form" class="form-stack harvest-form">
+    <div class="two-fields"><label>${t("Quantité récoltée", "Harvested quantity")}<input name="quantity" maxlength="120" placeholder="${t("Ex. 2 paniers de tomates", "E.g. 2 baskets of tomatoes")}"></label><label>${t("Photo", "Photo")}<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label></div>
+    <label>${t("Commentaire", "Comment")}<textarea name="note" maxlength="600" placeholder="${t("Ex. À partager en priorité aujourd'hui.", "E.g. Share first today.")}"></textarea></label>
+    <button class="button secondary" type="submit">${t("Ajouter cette récolte", "Add this harvest")}</button>
+  </form>`;
+  const howToForm = isCoordinator() ? `<form id="how-to-form" class="form-stack how-to-form">
+    <div class="two-fields"><label>${t("Titre", "Title")}<input name="title" maxlength="140" placeholder="${t("Ex. Tailler les tomates", "E.g. Pruning tomatoes")}"></label><label>${t("Lien YouTube", "YouTube link")}<input name="url" type="url" placeholder="https://youtu.be/..." required></label></div>
+    <label>${t("Note", "Note")}<textarea name="note" maxlength="600" placeholder="${t("Pourquoi cette vidéo est utile ici ?", "Why is this video useful here?")}"></textarea></label>
+    <button class="button secondary" type="submit">${t("Ajouter le tuto", "Add tutorial")}</button>
+  </form>` : "";
+  const noteList = notes.length ? notes.map(bedNoteCard).join("") : `<p class="muted">${t("Aucune note pour le moment.", "No notes yet.")}</p>`;
+  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">x</button>
+    <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
+    <div class="sheet-content">
+      <div class="detail-location"><span>${escapeHtml(bed.code)}</span>${escapeHtml(bed.garden)} - ${escapeHtml(bed.section)}</div>
+      <div class="detail-title"><div><h2 id="bed-title">${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</h2><p>${escapeHtml(bed.variety || t("Aucune culture renseignée", "No crop listed"))}</p></div><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>
+      <div class="location-card"><span>#</span><div><small>${t("Pour la trouver", "How to find it")}</small><strong>${escapeHtml(bed.locationHint || t("Emplacement à préciser", "Location to be specified"))}</strong></div></div>
+      ${editing ? bedEditForm(bed) : `<div class="detail-section note-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Notes", "Notes")}</p><h3>${t("Commentaires horodatés", "Timestamped comments")}</h3></div><span class="count-pill">${notes.length}</span></div><div class="note-list">${noteList}</div></div>${bed.harvestNote ? `<div class="harvest-note"><small>${t("Dernière consigne de récolte", "Latest harvest instruction")}</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}
+      <div class="detail-section harvest-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Récoltes", "Harvests")}</p><h3>${t("Photos et partages", "Photos and shares")}</h3></div><span class="count-pill">${harvests.length}</span></div>${harvestForm}<div class="harvest-list">${harvests.length ? harvests.map(harvestCard).join("") : `<p class="muted">${t("Aucune récolte ajoutée pour le moment.", "No harvests added yet.")}</p>`}</div></div>
+      <div class="detail-section how-to-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Savoir-faire", "How-tos")}</p><h3>${t("Tutos vidéo", "Video tutorials")}</h3></div></div>${howToForm}<div class="how-to-list">${howToVideos.length ? howToVideos.map(howToVideoCard).join("") : `<p class="muted">${t("Aucun tuto lié à cette planche.", "No tutorial linked to this bed.")}</p>`}</div></div>`}
+      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button">${t("Ajouter une photo", "Add a photo")}<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
+      ${!editing ? `<div class="detail-section history"><h3>${t("Journal de la planche", "Bed history")}</h3>${activities.length ? activities.map((activity) => `<div class="activity"><i></i><span><strong>${escapeHtml(activity.note || t("Mise à jour", "Update"))}</strong><small>${escapeHtml(activity.memberName || t("Membre", "Member"))} - ${escapeHtml(relativeDate(activity.createdAt))}</small></span></div>`).join("") : `<p class="muted">${t("Aucune activité enregistrée.", "No activity recorded.")}</p>`}</div>` : ""}
+    </div>
+  </section></div>`;
+  bindModal();
+  document.querySelector("#edit-bed-button")?.addEventListener("click", () => renderBedSheet(true));
+  document.querySelector("#cancel-edit")?.addEventListener("click", () => renderBedSheet(false));
+  document.querySelector("#bed-edit-form")?.addEventListener("submit", saveBed);
+  document.querySelector("#bed-photo-input")?.addEventListener("change", uploadBedPhoto);
+  document.querySelector("#harvest-form")?.addEventListener("submit", submitHarvest);
+  document.querySelector("#how-to-form")?.addEventListener("submit", addHowToVideo);
+}
+
+function bedEditFormLegacy(bed) {
   return `<form id="bed-edit-form" class="form-stack bed-edit-form">
     <div class="two-fields"><label>Culture<input name="crop" value="${escapeHtml(bed.crop || "")}" placeholder="Ex. Tomates"></label><label>Variété<input name="variety" value="${escapeHtml(bed.variety || "")}"></label></div>
-    <label>État<select name="status">${Object.entries(statusMeta).map(([value, meta]) => `<option value="${value}" ${bed.status === value ? "selected" : ""}>${escapeHtml(meta.label)}</option>`).join("")}</select></label>
+    <label>État<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${bed.status === value ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label>
     <div class="two-fields"><label>Secteur<input name="section" value="${escapeHtml(bed.section)}" required></label><label>Repère sur place<input name="locationHint" value="${escapeHtml(bed.locationHint || "")}"></label></div>
     <label>Note du potager<textarea name="note">${escapeHtml(bed.note || "")}</textarea></label>
     <label>Consigne de récolte<textarea name="harvestNote">${escapeHtml(bed.harvestNote || "")}</textarea></label>
     <label>Note pour le journal<input name="activityNote" placeholder="Ex. Désherbage terminé"></label>
     <div class="button-row"><button type="button" class="button ghost" id="cancel-edit">Annuler</button><button class="button primary" type="submit">Enregistrer</button></div>
+  </form>`;
+}
+
+function bedEditForm(bed) {
+  return `<form id="bed-edit-form" class="form-stack bed-edit-form">
+    <div class="two-fields"><label>${t("Culture", "Crop")}<input name="crop" value="${escapeHtml(bed.crop || "")}" placeholder="${t("Ex. Tomates", "E.g. Tomatoes")}"></label><label>${t("Variété", "Variety")}<input name="variety" value="${escapeHtml(bed.variety || "")}"></label></div>
+    <label>${t("État", "Status")}<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${bed.status === value ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label>
+    <div class="two-fields"><label>${t("Secteur", "Section")}<input name="section" value="${escapeHtml(bed.section)}" required></label><label>${t("Repère sur place", "Location hint")}<input name="locationHint" value="${escapeHtml(bed.locationHint || "")}"></label></div>
+    <label>${t("Note du potager", "Garden note")}<textarea name="note">${escapeHtml(bed.note || "")}</textarea></label>
+    <label>${t("Consigne de récolte", "Harvest instruction")}<textarea name="harvestNote">${escapeHtml(bed.harvestNote || "")}</textarea></label>
+    <label>${t("Note pour le journal", "Activity note")}<input name="activityNote" placeholder="${t("Ex. Désherbage terminé", "E.g. Weeding completed")}"></label>
+    <div class="button-row"><button type="button" class="button ghost" id="cancel-edit">${t("Annuler", "Cancel")}</button><button class="button primary" type="submit">${t("Enregistrer", "Save")}</button></div>
   </form>`;
 }
 
@@ -1117,6 +1317,56 @@ async function uploadBedPhoto(event) {
     showToast("Photo ajoutée.");
   } catch (error) {
     label.classList.remove("working");
+    showToast(error.message);
+  }
+}
+
+async function submitHarvest(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const file = form.elements.photo.files[0];
+  if (!file) return showToast("Ajoutez une photo de la recolte.");
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const dataUrl = await compressPhoto(file);
+    await api(`/api/beds/${state.selectedBed.bed.id}/harvests`, {
+      method: "POST",
+      body: JSON.stringify({
+        dataUrl,
+        quantity: form.elements.quantity.value,
+        note: form.elements.note.value,
+      }),
+    });
+    await loadBeds();
+    state.selectedBed = await api(`/api/beds/${state.selectedBed.bed.id}`);
+    renderBedSheet(false);
+    showToast("Recolte ajoutee.");
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function addHowToVideo(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    await api(`/api/beds/${state.selectedBed.bed.id}/how-tos`, {
+      method: "POST",
+      body: JSON.stringify({
+        title: form.elements.title.value,
+        url: form.elements.url.value,
+        note: form.elements.note.value,
+      }),
+    });
+    state.selectedBed = await api(`/api/beds/${state.selectedBed.bed.id}`);
+    renderBedSheet(false);
+    showToast("Tuto ajoute.");
+  } catch (error) {
+    button.disabled = false;
     showToast(error.message);
   }
 }

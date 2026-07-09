@@ -182,6 +182,43 @@ function eventJson(row, attendees = null) {
   };
 }
 
+function harvestJson(row) {
+  return {
+    id: row.id,
+    bedId: row.bed_id,
+    quantity: row.quantity ?? "",
+    note: row.note ?? "",
+    photoUrl: row.photo_path ? `/media/${row.photo_path}` : null,
+    memberName: row.member_name ?? "Membre",
+    createdAt: row.created_at,
+  };
+}
+
+function bedNoteJson(row) {
+  return {
+    id: row.id,
+    bedId: row.bed_id,
+    type: row.note_type,
+    body: row.body,
+    memberName: row.member_name ?? "Ancienne note",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function howToVideoJson(row) {
+  return {
+    id: row.id,
+    bedId: row.bed_id,
+    title: row.title,
+    note: row.note ?? "",
+    youtubeVideoId: row.youtube_video_id,
+    embedUrl: `https://www.youtube-nocookie.com/embed/${row.youtube_video_id}`,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function parseCookies(header = "") {
   return Object.fromEntries(
     header.split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
@@ -215,7 +252,7 @@ function text(res, status, body, contentType, headers = {}) {
 }
 
 function securityHeaders(res) {
-  res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -332,6 +369,53 @@ function createSchema(db) {
       created_at text not null
     );
     create index if not exists bed_photos_bed_idx on bed_photos(bed_id, is_cover, created_at desc);
+
+    create table if not exists bed_notes (
+      id integer primary key,
+      bed_id integer not null references beds(id) on delete cascade,
+      member_id integer references members(id) on delete set null,
+      note_type text not null check (note_type in ('garden', 'harvest')),
+      body text not null,
+      created_at text not null,
+      updated_at text not null
+    );
+    create index if not exists bed_notes_bed_idx on bed_notes(bed_id, created_at desc);
+
+    create table if not exists harvests (
+      id integer primary key,
+      bed_id integer not null references beds(id) on delete cascade,
+      member_id integer references members(id) on delete set null,
+      quantity text,
+      note text,
+      created_at text not null,
+      updated_at text not null
+    );
+    create index if not exists harvests_bed_idx on harvests(bed_id, created_at desc);
+
+    create table if not exists harvest_photos (
+      id integer primary key,
+      harvest_id integer not null references harvests(id) on delete cascade,
+      path text not null unique,
+      content_type text not null,
+      caption text,
+      uploaded_by integer references members(id) on delete set null,
+      created_at text not null
+    );
+    create index if not exists harvest_photos_harvest_idx on harvest_photos(harvest_id, created_at desc);
+
+    create table if not exists how_to_videos (
+      id integer primary key,
+      bed_id integer not null references beds(id) on delete cascade,
+      title text not null,
+      youtube_video_id text not null,
+      source_url text not null,
+      note text,
+      created_by integer references members(id) on delete set null,
+      created_at text not null,
+      updated_at text not null,
+      unique(bed_id, youtube_video_id)
+    );
+    create index if not exists how_to_videos_bed_idx on how_to_videos(bed_id, created_at desc);
 
     create table if not exists activities (
       id integer primary key,
@@ -674,6 +758,55 @@ function photoData(value, maxBytes = PHOTO_BYTES) {
   return { bytes, contentType: match[1], extension };
 }
 
+function youtubeVideoId(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) throw new HttpError(400, "Lien YouTube requis.");
+  if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new HttpError(400, "Lien YouTube invalide.");
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  let candidate = "";
+  if (host === "youtu.be") {
+    candidate = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+  } else if (host === "youtube.com" || host === "youtube-nocookie.com" || host === "m.youtube.com") {
+    if (parsed.pathname === "/watch") candidate = parsed.searchParams.get("v") ?? "";
+    else candidate = parsed.pathname.split("/").filter(Boolean).at(-1) ?? "";
+  }
+  if (!/^[A-Za-z0-9_-]{11}$/.test(candidate)) throw new HttpError(400, "Lien YouTube invalide.");
+  return candidate;
+}
+
+function insertBedNote(db, bedId, memberId, type, body, timestamp = now()) {
+  const cleanBody = String(body ?? "").trim().slice(0, 1000);
+  if (!cleanBody) return null;
+  return db.prepare(`insert into bed_notes (bed_id, member_id, note_type, body, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?)`).run(bedId, memberId ?? null, type, cleanBody, timestamp, timestamp);
+}
+
+function backfillBedNotes(db) {
+  const done = db.prepare("select value from app_meta where key = 'bed_notes_backfill_v1'").get()?.value;
+  if (done) return;
+  const timestamp = now();
+  db.exec("begin immediate");
+  try {
+    const rows = db.prepare("select id, note, harvest_note, updated_at from beds where note is not null or harvest_note is not null").all();
+    for (const row of rows) {
+      if (String(row.note ?? "").trim()) insertBedNote(db, row.id, null, "garden", row.note, row.updated_at || timestamp);
+      if (String(row.harvest_note ?? "").trim()) insertBedNote(db, row.id, null, "harvest", row.harvest_note, row.updated_at || timestamp);
+    }
+    db.prepare(`insert into app_meta (key, value, updated_at) values ('bed_notes_backfill_v1', 'done', ?)
+      on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(timestamp);
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+    throw error;
+  }
+}
+
 function slugify(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
@@ -898,11 +1031,13 @@ function importRows(db, rows, adminId) {
           const status = ["unknown", "ready", "growing", "harvest", "clear", "winter"].includes(row.status) ? row.status : "unknown";
           const value = (key, max) => String(row[key] ?? "").trim().slice(0, max) || null;
           const sortOrder = Number(db.prepare("select coalesce(max(sort_order), 0) + 1 as next from beds").get().next);
-          db.prepare(`insert into beds
+          const createdBed = db.prepare(`insert into beds
             (area_id, code, display_number, garden, section, location_hint, sort_order, crop, variety, status, note, harvest_note, updated_at)
             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(area.id, code, number, area.name, value("section", 120) || area.name, value("locationHint", 240), sortOrder,
               value("crop", 120), value("variety", 120), status, value("note", 1000), value("harvestNote", 1000), timestamp);
+          insertBedNote(db, Number(createdBed.lastInsertRowid), adminId, "garden", row.note, timestamp);
+          insertBedNote(db, Number(createdBed.lastInsertRowid), adminId, "harvest", row.harvestNote, timestamp);
           result.imported.beds += 1;
         } else if (entity === "event") {
           const values = eventInput({
@@ -1027,6 +1162,7 @@ export function createApp(options = {}) {
   createSchema(db);
   seedDatabase(db, options.adminUsername ?? env.PARCOS_ADMIN_USERNAME, options.adminPassword ?? env.PARCOS_ADMIN_PASSWORD,
     options.seedDemoData ?? env.PARCOS_SEED_DEMO === "true");
+  backfillBedNotes(db);
   db.prepare("delete from sessions where expires_at <= ?").run(now());
 
   const loginAttempts = new Map();
@@ -1435,7 +1571,10 @@ export function createApp(options = {}) {
               values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
               .run(areaId, code, number, area.name, value("section", 120) || area.name, value("locationHint", 240), sortOrder,
                 value("crop", 120), value("variety", 120), status, value("note", 1000), value("harvestNote", 1000), timestamp);
-            return json(res, 201, { bed: bedJson(findBed(db, Number(result.lastInsertRowid))) });
+            const bedId = Number(result.lastInsertRowid);
+            insertBedNote(db, bedId, session.member.id, "garden", body.note, timestamp);
+            insertBedNote(db, bedId, session.member.id, "harvest", body.harvestNote, timestamp);
+            return json(res, 201, { bed: bedJson(findBed(db, bedId)) });
           } catch (error) {
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Ce numéro ou ce code de planche existe déjà dans ce lieu.");
             throw error;
@@ -1457,10 +1596,19 @@ export function createApp(options = {}) {
           const bed = requireBedAccess(findBed(db, bedId), session);
           const photos = db.prepare("select id, path, caption, created_at from bed_photos where bed_id = ? order by is_cover desc, created_at desc").all(bedId)
             .map((photo) => ({ id: photo.id, url: `/media/${photo.path}`, caption: photo.caption, createdAt: photo.created_at }));
+          const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
+            from harvests h
+            left join harvest_photos hp on hp.harvest_id = h.id
+            left join members m on m.id = h.member_id
+            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map(harvestJson);
+          const notes = db.prepare(`select n.*, m.display_name as member_name
+            from bed_notes n left join members m on m.id = n.member_id
+            where n.bed_id = ? order by n.created_at desc, n.id desc limit 50`).all(bedId).map(bedNoteJson);
+          const howToVideos = db.prepare("select * from how_to_videos where bed_id = ? order by created_at desc, id desc").all(bedId).map(howToVideoJson);
           const activities = db.prepare(`select a.id, a.activity_type, a.note, a.created_at, m.display_name
             from activities a left join members m on m.id = a.member_id where a.bed_id = ? order by a.created_at desc limit 30`).all(bedId)
             .map((activity) => ({ id: activity.id, type: activity.activity_type, note: activity.note, createdAt: activity.created_at, memberName: activity.display_name }));
-          return json(res, 200, { bed: bedJson(bed), photos, activities });
+          return json(res, 200, { bed: bedJson(bed), photos, notes, harvests, howToVideos, activities });
         }
 
         if (bedMatch && req.method === "PATCH") {
@@ -1485,6 +1633,8 @@ export function createApp(options = {}) {
           try {
             db.prepare(`update beds set crop = ?, variety = ?, status = ?, note = ?, harvest_note = ?, section = ?, location_hint = ?, updated_at = ? where id = ?`)
               .run(after.crop, after.variety, after.status, after.note, after.harvestNote, after.section, after.locationHint, timestamp, bedId);
+            if (after.note && after.note !== before.note) insertBedNote(db, bedId, session.member.id, "garden", after.note, timestamp);
+            if (after.harvestNote && after.harvestNote !== before.harvest_note) insertBedNote(db, bedId, session.member.id, "harvest", after.harvestNote, timestamp);
             const summary = String(body.activityNote ?? "").trim().slice(0, 500) || `Mise à jour de ${before.code}`;
             db.prepare(`insert into activities (bed_id, member_id, activity_type, note, before_json, after_json, created_at)
               values (?, ?, 'bed_updated', ?, ?, ?, ?)`)
@@ -1528,6 +1678,72 @@ export function createApp(options = {}) {
           return json(res, 201, { bed: bedJson(findBed(db, bedId)) });
         }
 
+        const harvestMatch = /^\/api\/beds\/(\d+)\/harvests$/.exec(path);
+        if (harvestMatch && req.method === "POST") {
+          requireCsrf(req, session);
+          const bedId = Number(harvestMatch[1]);
+          const bed = requireBedAccess(findBed(db, bedId), session);
+          const body = await readJson(req);
+          const photo = photoData(body.dataUrl);
+          const filename = `harvest-${bedId}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}`;
+          const filePath = join(uploadsDir, filename);
+          const timestamp = now();
+          writeFileSync(filePath, photo.bytes, { flag: "wx" });
+          try {
+            db.exec("begin immediate");
+            const result = db.prepare(`insert into harvests (bed_id, member_id, quantity, note, created_at, updated_at)
+              values (?, ?, ?, ?, ?, ?)`)
+              .run(bedId, session.member.id, String(body.quantity ?? "").trim().slice(0, 120) || null,
+                String(body.note ?? "").trim().slice(0, 600) || null, timestamp, timestamp);
+            db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
+              values (?, ?, ?, ?, ?, ?)`)
+              .run(result.lastInsertRowid, filename, photo.contentType, String(body.caption ?? "").trim().slice(0, 200) || null, session.member.id, timestamp);
+            db.prepare("update beds set status = 'harvest', updated_at = ? where id = ?").run(timestamp, bedId);
+            db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
+              values (?, ?, 'harvest_added', ?, ?)`)
+              .run(bedId, session.member.id, `Recolte ajoutee pour ${bed.code}`, timestamp);
+            db.exec("commit");
+          } catch (error) {
+            db.exec("rollback");
+            rmSync(filePath, { force: true });
+            if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Cette photo de recolte existe deja.");
+            throw error;
+          }
+          const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
+            from harvests h
+            left join harvest_photos hp on hp.harvest_id = h.id
+            left join members m on m.id = h.member_id
+            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map(harvestJson);
+          return json(res, 201, { bed: bedJson(findBed(db, bedId)), harvests });
+        }
+
+        const howToMatch = /^\/api\/beds\/(\d+)\/how-tos$/.exec(path);
+        if (howToMatch && req.method === "POST") {
+          requireCsrf(req, session);
+          requireCoordinator(session);
+          const bedId = Number(howToMatch[1]);
+          const bed = findBed(db, bedId);
+          const body = await readJson(req);
+          const videoId = youtubeVideoId(body.url ?? body.youtubeUrl ?? body.youtubeVideoId);
+          const title = String(body.title ?? "").trim().slice(0, 140) || "Tutoriel video";
+          const note = String(body.note ?? "").trim().slice(0, 600) || null;
+          const sourceUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          const timestamp = now();
+          try {
+            db.prepare(`insert into how_to_videos (bed_id, title, youtube_video_id, source_url, note, created_by, created_at, updated_at)
+              values (?, ?, ?, ?, ?, ?, ?, ?)`)
+              .run(bedId, title, videoId, sourceUrl, note, session.member.id, timestamp, timestamp);
+          } catch (error) {
+            if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Cette video est deja liee a cette planche.");
+            throw error;
+          }
+          db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
+            values (?, ?, 'how_to_added', ?, ?)`)
+            .run(bedId, session.member.id, `Tutoriel ajoutÃ© pour ${bed.code}`, timestamp);
+          const howToVideos = db.prepare("select * from how_to_videos where bed_id = ? order by created_at desc, id desc").all(bedId).map(howToVideoJson);
+          return json(res, 201, { howToVideos });
+        }
+
         throw new HttpError(404, "API introuvable.");
       }
 
@@ -1538,7 +1754,11 @@ export function createApp(options = {}) {
         if (avatar) return serveFile(res, uploadsDir, filename, "private, no-store");
         const photo = db.prepare(`select a.members_can_access from bed_photos p
           join beds b on b.id = p.bed_id join garden_areas a on a.id = b.area_id where p.path = ?`).get(filename);
-        if (!photo || (!photo.members_can_access && !["coordinator", "admin"].includes(mediaSession.member.role))) {
+        const harvestPhoto = photo ? null : db.prepare(`select a.members_can_access from harvest_photos hp
+          join harvests h on h.id = hp.harvest_id
+          join beds b on b.id = h.bed_id join garden_areas a on a.id = b.area_id where hp.path = ?`).get(filename);
+        const media = photo ?? harvestPhoto;
+        if (!media || (!media.members_can_access && !["coordinator", "admin"].includes(mediaSession.member.role))) {
           throw new HttpError(404, "Photo introuvable.");
         }
         res.setHeader("Cache-Control", "private, no-store");
