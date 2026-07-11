@@ -206,6 +206,19 @@ function bedNoteJson(row) {
   };
 }
 
+function activityJson(row) {
+  return {
+    id: row.id,
+    bedId: row.bed_id,
+    bedCode: row.bed_code ?? null,
+    bedCrop: row.bed_crop ?? "",
+    type: row.activity_type,
+    note: row.note ?? "",
+    memberName: row.member_name ?? "Membre",
+    createdAt: row.created_at,
+  };
+}
+
 function howToVideoJson(row) {
   return {
     id: row.id,
@@ -631,7 +644,7 @@ function seedDatabase(db, adminUsername, adminPassword, demoData = false) {
       ["Permanence au potager", "Équipe prévue : Raymond.", "Grand Potager", "work", "2026-08-15T08:00:00.000Z", "2026-08-15T11:00:00.000Z", 20, "Permanence de 10 h à 13 h."],
       ["Permanence au potager", "Équipe prévue : Raymond et Joël.", "Grand Potager", "work", "2026-08-23T08:00:00.000Z", "2026-08-23T11:00:00.000Z", 20, "Permanence de 10 h à 13 h."],
       ["BBQ Maïs", "Barbecue de fin d’été. Équipe de permanence prévue : Laurie et Olivier.", "Grand Potager", "community", "2026-08-30T10:00:00.000Z", "2026-08-30T15:00:00.000Z", 40, "Les détails pratiques et la récolte de maïs seront confirmés plus près de la date."],
-      ["Permanence au potager", "Équipe prévue : Louis et Joël.", "Grand Potager", "work", "2026-09-05T08:00:00.000Z", "2026-09-05T11:00:00.000Z", 20, "Permanence de 10 h à 13 h."],
+      ["Permanence au potager", "Équipe prévue : Marie et Joël.", "Grand Potager", "work", "2026-09-05T08:00:00.000Z", "2026-09-05T11:00:00.000Z", 20, "Permanence de 10 h à 13 h."],
       ["Sculpture de citrouilles", "Atelier d’automne autour des citrouilles du potager.", "Grand Potager", "workshop", "2026-10-11T12:00:00.000Z", "2026-10-11T15:00:00.000Z", 24, "Les horaires et le matériel seront confirmés par les coordinateurs."],
       ["Plantation de bulbes", "Plantation collective des bulbes pour préparer le printemps.", "Grand Potager", "workshop", "2026-11-15T09:00:00.000Z", "2026-11-15T12:00:00.000Z", 24, "Prévoyez des gants et des vêtements adaptés à la météo."],
       ["Hivernage du potager", "Dernière rencontre de l’année pour protéger les cultures et ranger le matériel.", "Grand Potager", "milestone", "2026-12-13T09:00:00.000Z", "2026-12-13T12:00:00.000Z", 30, "Permanence de 10 h à 13 h."],
@@ -1559,7 +1572,7 @@ export function createApp(options = {}) {
           const suggestedNumber = Number(db.prepare("select coalesce(max(display_number), 0) + 1 as next from beds where area_id = ?").get(areaId).next);
           const number = body.number === undefined || body.number === "" ? suggestedNumber : Number(body.number);
           if (!Number.isInteger(number) || number < 1 || number > 999) throw new HttpError(400, "Le numéro de planche doit être compris entre 1 et 999.");
-          const code = String(body.code ?? `${area.code_prefix}-${String(number).padStart(2, "0")}`).trim().toUpperCase();
+          const code = String(body.code || `${area.code_prefix}-${String(number).padStart(2, "0")}`).trim().toUpperCase();
           if (!/^[A-Z0-9][A-Z0-9-]{1,15}$/.test(code)) throw new HttpError(400, "Le code de planche est invalide.");
           const status = ["unknown", "ready", "growing", "harvest", "clear", "winter"].includes(body.status) ? body.status : "unknown";
           const value = (key, max) => String(body[key] ?? "").trim().slice(0, max) || null;
@@ -1588,6 +1601,19 @@ export function createApp(options = {}) {
             left join bed_photos p on p.bed_id = b.id and p.is_cover = 1
             where ? = 1 or a.members_can_access = 1 order by a.sort_order, b.sort_order, b.display_number`).all(coordinator ? 1 : 0);
           return json(res, 200, { beds: rows.map(bedJson) });
+        }
+
+        if (req.method === "GET" && path === "/api/activities") {
+          const coordinator = ["coordinator", "admin"].includes(session.member.role);
+          const rows = db.prepare(`select activity.*, member.display_name as member_name,
+            bed.code as bed_code, bed.crop as bed_crop
+            from activities activity
+            join beds bed on bed.id = activity.bed_id
+            join garden_areas area on area.id = bed.area_id
+            left join members member on member.id = activity.member_id
+            where ? = 1 or area.members_can_access = 1
+            order by activity.created_at desc, activity.id desc limit 20`).all(coordinator ? 1 : 0);
+          return json(res, 200, { activities: rows.map(activityJson) });
         }
 
         const bedMatch = /^\/api\/beds\/(\d+)$/.exec(path);
@@ -1645,6 +1671,47 @@ export function createApp(options = {}) {
             throw error;
           }
           return json(res, 200, { bed: bedJson(findBed(db, bedId)) });
+        }
+
+        const logMatch = /^\/api\/beds\/(\d+)\/logs$/.exec(path);
+        if (logMatch && req.method === "POST") {
+          requireCsrf(req, session);
+          const bedId = Number(logMatch[1]);
+          const bed = requireBedAccess(findBed(db, bedId), session);
+          const body = await readJson(req);
+          const type = String(body.type ?? "");
+          if (!["work", "observation", "problem", "harvest", "photo"].includes(type)) {
+            throw new HttpError(400, "Type de journal invalide.");
+          }
+          const note = String(body.note ?? "").trim().slice(0, 600);
+          if (!note) throw new HttpError(400, "Ajoutez une courte description.");
+          if (type === "photo" && !body.dataUrl) throw new HttpError(400, "Ajoutez une photo.");
+          const photo = body.dataUrl ? photoData(body.dataUrl) : null;
+          const filename = photo ? `bed-${bedId}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}` : null;
+          const filePath = filename ? join(uploadsDir, filename) : null;
+          const timestamp = now();
+          if (photo) writeFileSync(filePath, photo.bytes, { flag: "wx" });
+          try {
+            db.exec("begin immediate");
+            if (photo) {
+              db.prepare("update bed_photos set is_cover = 0 where bed_id = ?").run(bedId);
+              db.prepare(`insert into bed_photos (bed_id, path, content_type, caption, uploaded_by, is_cover, created_at)
+                values (?, ?, ?, ?, ?, 1, ?)`).run(bedId, filename, photo.contentType, note.slice(0, 200), session.member.id, timestamp);
+            }
+            const result = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
+              values (?, ?, ?, ?, ?)`).run(bedId, session.member.id, `log_${type}`, note, timestamp);
+            db.prepare("update beds set updated_at = ? where id = ?").run(timestamp, bedId);
+            db.exec("commit");
+            const activity = db.prepare(`select activity.*, member.display_name as member_name,
+              bed.code as bed_code, bed.crop as bed_crop
+              from activities activity join beds bed on bed.id = activity.bed_id
+              left join members member on member.id = activity.member_id where activity.id = ?`).get(result.lastInsertRowid);
+            return json(res, 201, { activity: activityJson(activity), bed: bedJson(findBed(db, bedId)) });
+          } catch (error) {
+            db.exec("rollback");
+            if (filePath) rmSync(filePath, { force: true });
+            throw error;
+          }
         }
 
         const photoMatch = /^\/api\/beds\/(\d+)\/photos$/.exec(path);

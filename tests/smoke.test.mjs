@@ -58,7 +58,7 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const nurseryBed = await request(baseUrl, `/api/areas/${nursery.id}/beds`, {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
-    body: JSON.stringify({ crop: "Semis de poireaux", status: "growing", section: "Tables de semis" }),
+    body: JSON.stringify({ code: "", crop: "Semis de poireaux", status: "growing", section: "Tables de semis" }),
   });
   assert.equal(nurseryBed.response.status, 201);
   assert.match(nurseryBed.body.bed.code, /^PN-/);
@@ -148,6 +148,40 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(memberBeds.body.beds.some((bed) => bed.id === orchardBed.body.bed.id), true);
   const hiddenBed = await request(baseUrl, `/api/beds/${nurseryBed.body.bed.id}`, { headers: { cookie: memberCookie } });
   assert.equal(hiddenBed.response.status, 404);
+
+  const quickLog = await request(baseUrl, "/api/beds/1/logs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ type: "work", note: "Desherbage termine." }),
+  });
+  assert.equal(quickLog.response.status, 201);
+  assert.equal(quickLog.body.activity.type, "log_work");
+  assert.equal(quickLog.body.activity.memberName, "Test Member");
+
+  const recentActivity = await request(baseUrl, "/api/activities", { headers: { cookie: memberCookie } });
+  assert.equal(recentActivity.response.status, 200);
+  assert.ok(recentActivity.body.activities.some((activity) => activity.note === "Desherbage termine." && activity.bedCode === "GP-01"));
+
+  const hiddenLog = await request(baseUrl, `/api/beds/${nurseryBed.body.bed.id}/logs`, {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ type: "observation", note: "Should remain hidden." }),
+  });
+  assert.equal(hiddenLog.response.status, 404);
+
+  const logWithoutCsrf = await request(baseUrl, "/api/beds/1/logs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ type: "problem", note: "No CSRF." }),
+  });
+  assert.equal(logWithoutCsrf.response.status, 403);
+
+  const photoLogWithoutPhoto = await request(baseUrl, "/api/beds/1/logs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ type: "photo", note: "Missing image." }),
+  });
+  assert.equal(photoLogWithoutPhoto.response.status, 400);
 
   const memberEvents = await request(baseUrl, "/api/events", { headers: { cookie: memberCookie } });
   assert.equal(memberEvents.response.status, 200);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 - 2026-07-11
+
+- Added a mobile Quick Log for work, observations, problems, harvests, and
+  photos, available to every member from the main navigation.
+- Added recent garden activity to Today while preserving private-area access
+  controls and CSRF protection.
+- Moved bed edit and camera controls into compact actions beside the bed title.
+- Fixed account-invitation completion so new members return to the app root.
+- Replaced Parc Parmentier-specific default imagery, names, and app metadata
+  with reusable garden defaults, including French, Dutch, and English examples.
+- Fixed automatic bed-code generation when the optional code field is blank.
+
 ## 1.0.4 - 2026-07-09
 
 - Fixed embedded YouTube tutorial playback by allowing YouTube frames with a

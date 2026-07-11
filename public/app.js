@@ -10,6 +10,7 @@ const state = {
   beds: [],
   areas: [],
   events: [],
+  activities: [],
   members: [],
   page: "today",
   filter: "all",
@@ -24,8 +25,21 @@ const state = {
   locale: localStorage.getItem("parcos_locale") || "fr",
 };
 
+const supportedLocales = ["fr", "nl", "en"];
+const localeLabels = { fr: "FR", nl: "NL", en: "EN" };
+const localeDateTags = { fr: "fr-BE", nl: "nl-BE", en: "en-GB" };
+const genericPeople = {
+  fr: { displayName: "Jean Dupont", username: "jean.dupont" },
+  nl: { displayName: "Jan Janssen", username: "jan.janssen" },
+  en: { displayName: "John Doe", username: "john.doe" },
+};
+
 function cameraIcon() {
   return `<svg class="icon camera-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 4.5l1.6 2h2.4a2 2 0 0 1 2 2v8.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h2.4l1.6-2h5z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>`;
+}
+
+function editIcon() {
+  return `<svg class="icon edit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"></path></svg>`;
 }
 
 const uiTranslations = {
@@ -145,15 +159,20 @@ const uiTranslations = {
 };
 
 function currentLocale() {
-  return state.member?.preferredLocale === "en" || state.locale === "en" ? "en" : "fr";
+  const preferred = state.member?.preferredLocale || state.locale;
+  return supportedLocales.includes(preferred) ? preferred : "fr";
+}
+
+function translationLocale() {
+  return currentLocale() === "en" ? "en" : "fr";
 }
 
 function t(fr, en) {
-  return currentLocale() === "en" ? en : fr;
+  return translationLocale() === "en" ? en : fr;
 }
 
 function applyTranslations(root = document) {
-  const translations = uiTranslations[currentLocale()];
+  const translations = uiTranslations[translationLocale()];
   document.documentElement.lang = currentLocale();
   if (!translations) return;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -169,6 +188,31 @@ function applyTranslations(root = document) {
     const translated = translations[key];
     if (translated) element.setAttribute("placeholder", translated);
   });
+}
+
+function dateLocaleTag() {
+  return localeDateTags[currentLocale()] || localeDateTags.fr;
+}
+
+function nextLocale() {
+  const index = supportedLocales.indexOf(currentLocale());
+  return supportedLocales[(index + 1) % supportedLocales.length];
+}
+
+function languageToggleLabel() {
+  return localeLabels[nextLocale()];
+}
+
+function genericPerson() {
+  return genericPeople[currentLocale()] || genericPeople.fr;
+}
+
+function appRootUrl() {
+  return new URL("/", location.href).toString();
+}
+
+function brandMarkup(title = "ParcOS", subtitle = state.parcName) {
+  return `<div class="auth-brand"><span class="brand-mark">P</span><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle || "Jardin partagé")}</small></span></div>`;
 }
 
 const statusMeta = {
@@ -190,6 +234,14 @@ const eventTypeMeta = {
   milestone: { label: "Saison", icon: "◌" },
 };
 const eventStateLabels = { draft: "Brouillon", published: "Publié", cancelled: "Annulé", completed: "Terminé" };
+
+const logTypeMeta = {
+  work: { fr: "Travail fait", en: "Work done", icon: "&#10003;" },
+  observation: { fr: "À noter", en: "Note", icon: "&#9673;" },
+  problem: { fr: "Problème", en: "Problem", icon: "!" },
+  harvest: { fr: "Récolte", en: "Harvest", icon: "&#10047;" },
+  photo: { fr: "Photo", en: "Photo", icon: cameraIcon() },
+};
 
 const localizedStatusLabels = {
   unknown: { fr: statusMeta.unknown.label, en: "To check" },
@@ -245,7 +297,7 @@ function eventStateLabel(state) {
 }
 
 function eventCoverUrl(event) {
-  return event.title === "Permanence au potager" ? "/assets/permanence-jardin-stylisee.png" : null;
+  return null;
 }
 
 function escapeHtml(value) {
@@ -255,19 +307,19 @@ function escapeHtml(value) {
 }
 
 function formatDate(value, options = { day: "numeric", month: "short" }) {
-  return value ? new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", options).format(new Date(value)) : "—";
+  return value ? new Intl.DateTimeFormat(dateLocaleTag(), options).format(new Date(value)) : "—";
 }
 
 function formatEventDate(value, options = { weekday: "long", day: "numeric", month: "long" }) {
-  return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", options).format(new Date(value));
+  return new Intl.DateTimeFormat(dateLocaleTag(), options).format(new Date(value));
 }
 
 function formatTime(value) {
-  return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return new Intl.DateTimeFormat(dateLocaleTag(), { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 function formatDateTime(value) {
-  return new Intl.DateTimeFormat(currentLocale() === "en" ? "en-GB" : "fr-BE", {
+  return new Intl.DateTimeFormat(dateLocaleTag(), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -337,8 +389,8 @@ function renderLogin(error = "") {
   modalRoot.innerHTML = "";
   app.innerHTML = `<main class="auth-page">
     <section class="auth-visual">
-      <div class="auth-brand"><span class="brand-mark">P</span><span><strong>Le Potager</strong><small>du Parc Parmentier</small></span></div>
-      <div><p class="eyebrow light">Notre potager, ensemble</p><h1>Bienvenue au Potager<br>du Parc Parmentier.</h1><p>L’espace privé des membres pour observer, cultiver et partager.</p></div>
+      ${brandMarkup()}
+      <div><p class="eyebrow light">Notre potager, ensemble</p><h1>Bienvenue dans<br>votre espace ParcOS.</h1><p>L’espace privé des membres pour observer, cultiver et partager.</p></div>
     </section>
     <section class="auth-panel">
       <div class="auth-form-wrap">
@@ -419,18 +471,19 @@ function renderSetup(error = "") {
 }
 
 function renderInvite(token, error = "") {
+  const sample = genericPerson();
   modalRoot.innerHTML = "";
   app.innerHTML = `<main class="auth-page invitation-page">
     <section class="auth-visual invitation-visual">
-      <div class="auth-brand"><span class="brand-mark">P</span><span><strong>Le Potager</strong><small>du Parc Parmentier</small></span></div>
+      ${brandMarkup()}
       <div><p class="eyebrow light">Invitation personnelle</p><h1>Votre place<br>au potager.</h1><p>Créez votre profil privé ParcOS. Aucune adresse e-mail n’est demandée.</p></div>
     </section>
     <section class="auth-panel"><div class="auth-form-wrap">
       <p class="eyebrow">Nouveau membre</p><h2>Créer mon profil</h2>
       ${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}
       <form id="invite-form" class="form-stack">
-        <label>Votre nom<input name="displayName" autocomplete="name" required autofocus placeholder="Ex. Louis Berghmans"></label>
-        <label>Choisissez un nom d’utilisateur<input name="username" autocomplete="username" required minlength="3" placeholder="Ex. louis"></label>
+        <label>Votre nom<input name="displayName" autocomplete="name" required autofocus placeholder="Ex. ${escapeHtml(sample.displayName)}"></label>
+        <label>Choisissez un nom d’utilisateur<input name="username" autocomplete="username" required minlength="3" placeholder="Ex. ${escapeHtml(sample.username)}"></label>
         <label>Choisissez un mot de passe<input name="password" type="password" autocomplete="new-password" required minlength="12"><small>12 caractères minimum. Un coordinateur pourra réinitialiser votre accès si nécessaire.</small></label>
         <button class="button primary" type="submit">Créer mon profil</button>
       </form>
@@ -443,10 +496,7 @@ function renderInvite(token, error = "") {
       const result = await api("/api/invites/redeem", { method: "POST", body: JSON.stringify({ token, displayName: data.get("displayName"), username: data.get("username"), password: data.get("password") }) });
       state.member = result.member;
       state.csrfToken = result.csrfToken;
-      history.replaceState({}, "", "/");
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadMembers()]);
-      renderApp();
-      showToast("Bienvenue dans ParcOS !");
+      window.location.replace(appRootUrl());
     } catch (inviteError) {
       renderInvite(token, inviteError.message);
     }
@@ -456,7 +506,7 @@ function renderInvite(token, error = "") {
 function renderReset(token, error = "") {
   modalRoot.innerHTML = "";
   app.innerHTML = `<main class="auth-page invitation-page">
-    <section class="auth-visual invitation-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>Le Potager</strong><small>du Parc Parmentier</small></span></div><div><p class="eyebrow light">Récupération du profil</p><h1>Un nouvel accès,<br>le même profil.</h1><p>Choisissez un nouveau mot de passe. Ce lien ne peut être utilisé qu’une fois.</p></div></section>
+    <section class="auth-visual invitation-visual">${brandMarkup()}<div><p class="eyebrow light">Récupération du profil</p><h1>Un nouvel accès,<br>le même profil.</h1><p>Choisissez un nouveau mot de passe. Ce lien ne peut être utilisé qu’une fois.</p></div></section>
     <section class="auth-panel"><div class="auth-form-wrap"><p class="eyebrow">Accès ParcOS</p><h2>Nouveau mot de passe</h2>${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}<form id="reset-form" class="form-stack"><label>Nouveau mot de passe<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>12 caractères minimum.</small></label><button class="button primary" type="submit">Retrouver mon profil</button></form></div></section>
   </main>`;
   document.querySelector("#reset-form").addEventListener("submit", async (event) => {
@@ -491,7 +541,7 @@ async function renderPublicEvent(id, error = "") {
   app.innerHTML = `<main class="auth-page public-event-page">
     <section class="auth-visual invitation-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(formatEventDate(event.startsAt))} à ${escapeHtml(formatTime(event.startsAt))} · ${escapeHtml(event.location)}</p></div></section>
     <section class="auth-panel"><div class="auth-form-wrap">
-      <div class="public-toolbar"><button class="language-toggle" id="public-language-toggle" type="button">${currentLocale() === "en" ? "FR" : "EN"}</button></div>
+      <div class="public-toolbar"><button class="language-toggle" id="public-language-toggle" type="button">${languageToggleLabel()}</button></div>
       <p class="eyebrow">Inscription publique</p><h2>Je participe</h2>
       <p class="muted">${escapeHtml(capacity)}. ${escapeHtml(event.description || "Inscrivez votre groupe pour aider l’équipe à préparer l’accueil.")}</p>
       ${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}
@@ -506,7 +556,7 @@ async function renderPublicEvent(id, error = "") {
     </div></section>
   </main>`;
   document.querySelector("#public-language-toggle").addEventListener("click", () => {
-    state.locale = currentLocale() === "en" ? "fr" : "en";
+    state.locale = nextLocale();
     localStorage.setItem("parcos_locale", state.locale);
     renderPublicEvent(id);
   });
@@ -532,12 +582,13 @@ function shell(content) {
   return `<div class="app-shell">
     <header class="topbar">
       <button class="brand-button" data-page="today"><span class="brand-mark small">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></button>
-      <div class="topbar-actions"><button class="language-toggle" id="language-toggle" type="button" aria-label="Changer de langue">${currentLocale() === "en" ? "FR" : "EN"}</button><button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button></div>
+      <div class="topbar-actions"><button class="language-toggle" id="language-toggle" type="button" aria-label="Changer de langue">${languageToggleLabel()}</button><button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button></div>
     </header>
     <main class="main-content">${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
       <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>Aujourd’hui</button>
       <button data-page="agenda" class="${state.page === "agenda" ? "active" : ""}"><span>□</span>Agenda</button>
+      <button class="quick-log-nav" id="quick-log" type="button" aria-label="${t("Ajouter au journal", "Add to log")}"><span>+</span>${t("Journal", "Log")}</button>
       <button data-page="garden" class="${state.page === "garden" ? "active" : ""}"><span>♧</span>Potager</button>
       <button data-page="profile" class="${state.page === "profile" ? "active" : ""}"><span>○</span>Profil</button>
     </nav>
@@ -558,12 +609,13 @@ function renderToday() {
   const attention = state.beds.filter((bed) => ["clear", "unknown"].includes(bed.status));
   const noPhoto = state.beds.filter((bed) => !bed.photoUrl).length;
   const nextEvent = state.events.find((event) => new Date(event.endsAt) >= new Date() && event.state === "published");
-  const locale = currentLocale() === "en" ? "en-GB" : "fr-BE";
+  const locale = dateLocaleTag();
   const bedWord = (count) => t(`planche${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "s"}`);
   const zoneWord = (count) => t(`zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`);
   return `<section class="page today-page">
     <div class="welcome-row"><div><p class="eyebrow">${t("Bonjour", "Hello")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Que se passe-t-il", "What is happening")}<br>${t("au potager ?", "in the garden?")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
     <article class="hero-card"><div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
+    <button class="quick-log-card" id="today-quick-log" type="button"><span>+</span><strong>${t("Ajouter au journal", "Add to log")}</strong><small>${t("Travail, observation, problème, récolte ou photo", "Work, observation, problem, harvest or photo")}</small></button>
     <div class="section-heading"><div><p class="eyebrow">Prochain rendez-vous</p><h2>À l’agenda</h2></div><button class="text-link" data-page="agenda">Tout voir</button></div>
     ${nextEvent ? compactEventCard(nextEvent) : '<div class="empty-state"><strong>Rien de prévu pour le moment</strong><p>Les prochains rendez-vous apparaîtront ici.</p></div>'}
     <div class="section-heading"><div><p class="eyebrow">En un coup d’œil</p><h2>État du potager</h2></div></div>
@@ -574,7 +626,15 @@ function renderToday() {
       <button data-filter-link="no-photo"><strong>${noPhoto}</strong><span>${t("Sans photo", "No photo")}</span></button>
     </div>
     ${harvest.length ? `<div class="section-heading compact"><div><p class="eyebrow">${t("Récolte ouverte", "Harvest open")}</p><h2>${t("Prêt maintenant", "Ready now")}</h2></div></div><div class="mini-bed-list">${harvest.slice(0, 4).map(miniBed).join("")}</div>` : ""}
+    <div class="section-heading compact"><div><p class="eyebrow">${t("Le journal", "The log")}</p><h2>${t("Activité récente", "Recent activity")}</h2></div></div>
+    <div class="recent-activity-list">${state.activities.length ? state.activities.slice(0, 6).map(recentActivityCard).join("") : `<div class="empty-state compact"><strong>${t("Rien de consigné pour le moment", "Nothing logged yet")}</strong></div>`}</div>
   </section>`;
+}
+
+function recentActivityCard(activity) {
+  const type = activity.type.startsWith("log_") ? activity.type.slice(4) : "observation";
+  const meta = logTypeMeta[type] || logTypeMeta.observation;
+  return `<button class="recent-activity" data-bed-id="${activity.bedId}"><span class="activity-type-icon">${meta.icon}</span><span><small>${escapeHtml(t(meta.fr, meta.en))} - ${escapeHtml(activity.bedCode || "")}</small><strong>${escapeHtml(activity.note)}</strong><em>${escapeHtml(activity.memberName)} - ${escapeHtml(relativeDate(activity.createdAt))}</em></span></button>`;
 }
 
 function compactEventCard(event) {
@@ -843,6 +903,8 @@ function bindShell() {
     next.setSelectionRange(caret, caret);
   });
   document.querySelectorAll("[data-bed-id]").forEach((button) => button.addEventListener("click", () => openBed(Number(button.dataset.bedId))));
+  document.querySelector("#quick-log")?.addEventListener("click", () => renderQuickLog());
+  document.querySelector("#today-quick-log")?.addEventListener("click", () => renderQuickLog());
   document.querySelector("#manage-areas")?.addEventListener("click", renderAreasManager);
   document.querySelector("#add-bed")?.addEventListener("click", renderCreateBedForm);
   document.querySelectorAll("[data-event-id]").forEach((button) => button.addEventListener("click", () => openEvent(Number(button.dataset.eventId))));
@@ -882,15 +944,15 @@ function bindShell() {
 }
 
 async function toggleLanguage() {
-  const nextLocale = currentLocale() === "en" ? "fr" : "en";
-  state.locale = nextLocale;
-  localStorage.setItem("parcos_locale", nextLocale);
+  const locale = nextLocale();
+  state.locale = locale;
+  localStorage.setItem("parcos_locale", locale);
   if (state.member) {
     try {
       const result = await api("/api/profile", { method: "PATCH", body: JSON.stringify({
         displayName: state.member.displayName,
         bio: state.member.bio,
-        preferredLocale: nextLocale,
+        preferredLocale: locale,
       }) });
       state.member = result.member;
     } catch (error) {
@@ -916,10 +978,57 @@ async function loadEvents() {
   state.events = result.events;
 }
 
+async function loadActivities() {
+  const result = await api("/api/activities");
+  state.activities = result.activities;
+}
+
 async function loadMembers() {
   if (!isCoordinator()) return;
   const result = await api("/api/members");
   state.members = result.members;
+}
+
+function renderQuickLog(preselectedBedId = null) {
+  const selectedId = preselectedBedId || state.selectedBed?.bed?.id || state.beds[0]?.id;
+  const bedOptions = state.beds.map((bed) => `<option value="${bed.id}" ${bed.id === selectedId ? "selected" : ""}>${escapeHtml(`${bed.code} - ${bed.crop || t("Planche disponible", "Available bed")}`)}</option>`).join("");
+  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet quick-log-sheet" role="dialog" aria-modal="true" aria-labelledby="quick-log-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="${t("Fermer", "Close")}">x</button><div class="sheet-content form-sheet">
+    <p class="eyebrow">${t("Sur le terrain", "In the garden")}</p><h2 id="quick-log-title">${t("Ajouter au journal", "Add to log")}</h2>
+    <form id="quick-log-form" class="form-stack quick-log-form">
+      <fieldset class="log-type-picker"><legend>${t("Qu’avez-vous fait ou vu ?", "What did you do or see?")}</legend>${Object.entries(logTypeMeta).map(([value, meta], index) => `<label><input type="radio" name="type" value="${value}" ${index === 0 ? "checked" : ""}><span class="activity-type-icon">${meta.icon}</span><strong>${escapeHtml(t(meta.fr, meta.en))}</strong></label>`).join("")}</fieldset>
+      <label>${t("Où ?", "Where?")}<select name="bedId" required>${bedOptions}</select></label>
+      <label>${t("En quelques mots", "In a few words")}<textarea name="note" maxlength="600" required autofocus placeholder="${t("Ex. Désherbage terminé, pucerons repérés…", "E.g. Weeding finished, aphids spotted...")}"></textarea></label>
+      <label class="quick-photo-field">${t("Photo", "Photo")} <small>(${t("facultatif sauf pour une entrée Photo", "optional except for a Photo entry")})</small><input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+      <button class="button primary" type="submit">${t("Ajouter au journal", "Add to log")}</button>
+    </form>
+  </div></section></div>`;
+  bindModal();
+  document.querySelector("#quick-log-form")?.addEventListener("submit", submitQuickLog);
+}
+
+async function submitQuickLog(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const type = new FormData(form).get("type");
+  const file = form.elements.photo.files[0];
+  if (type === "photo" && !file) return showToast(t("Ajoutez une photo.", "Add a photo."));
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const dataUrl = file ? await compressPhoto(file) : null;
+    await api(`/api/beds/${Number(form.elements.bedId.value)}/logs`, { method: "POST", body: JSON.stringify({
+      type,
+      note: form.elements.note.value,
+      dataUrl,
+    }) });
+    await Promise.all([loadBeds(), loadActivities()]);
+    dismissModal();
+    renderApp();
+    showToast(t("Ajouté au journal.", "Added to the log."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
 }
 
 function renderAreasManager() {
@@ -1200,12 +1309,11 @@ function renderBedSheet(editing = false) {
     <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
     <div class="sheet-content">
       <div class="detail-location"><span>${escapeHtml(bed.code)}</span>${escapeHtml(bed.garden)} - ${escapeHtml(bed.section)}</div>
-      <div class="detail-title"><div><h2 id="bed-title">${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</h2><p>${escapeHtml(bed.variety || t("Aucune culture renseignée", "No crop listed"))}</p></div><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>
+      <div class="detail-title"><div class="detail-title-copy"><h2 id="bed-title">${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</h2><p>${escapeHtml(bed.variety || t("Aucune culture renseignée", "No crop listed"))}</p><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>${isCoordinator() && !editing ? `<div class="detail-title-actions"><button class="round-tool-button" id="edit-bed-button" type="button" aria-label="${t("Modifier la planche", "Edit bed")}" title="${t("Modifier la planche", "Edit bed")}">${editIcon()}</button><label class="round-tool-button file-button" aria-label="${t("Ajouter une photo", "Add a photo")}" title="${t("Ajouter une photo", "Add a photo")}">${cameraIcon()}<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}</div>
       <div class="location-card"><span>#</span><div><small>${t("Pour la trouver", "How to find it")}</small><strong>${escapeHtml(bed.locationHint || t("Emplacement à préciser", "Location to be specified"))}</strong></div></div>
       ${editing ? bedEditForm(bed) : `<div class="detail-section note-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Notes", "Notes")}</p><h3>${t("Commentaires horodatés", "Timestamped comments")}</h3></div><span class="count-pill">${notes.length}</span></div><div class="note-list">${noteList}</div></div>${bed.harvestNote ? `<div class="harvest-note"><small>${t("Dernière consigne de récolte", "Latest harvest instruction")}</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}
       <div class="detail-section harvest-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Récoltes", "Harvests")}</p><h3>${t("Photos et partages", "Photos and shares")}</h3></div><span class="count-pill">${harvests.length}</span></div>${harvestForm}<div class="harvest-list">${harvests.length ? harvests.map(harvestCard).join("") : `<p class="muted">${t("Aucune récolte ajoutée pour le moment.", "No harvests added yet.")}</p>`}</div></div>
       <div class="detail-section how-to-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Savoir-faire", "How-tos")}</p><h3>${t("Tutos vidéo", "Video tutorials")}</h3></div></div>${howToForm}<div class="how-to-list">${howToVideos.length ? howToVideos.map(howToVideoCard).join("") : `<p class="muted">${t("Aucun tuto lié à cette planche.", "No tutorial linked to this bed.")}</p>`}</div></div>`}
-      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button photo-upload-button">${cameraIcon()}<span>${t("Ajouter une photo", "Add a photo")}</span><input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
       ${!editing ? `<div class="detail-section history"><h3>${t("Journal de la planche", "Bed history")}</h3>${activities.length ? activities.map((activity) => `<div class="activity"><i></i><span><strong>${escapeHtml(activity.note || t("Mise à jour", "Update"))}</strong><small>${escapeHtml(activity.memberName || t("Membre", "Member"))} - ${escapeHtml(relativeDate(activity.createdAt))}</small></span></div>`).join("") : `<p class="muted">${t("Aucune activité enregistrée.", "No activity recorded.")}</p>`}</div>` : ""}
     </div>
   </section></div>`;
@@ -1491,6 +1599,7 @@ async function logout() {
   state.beds = [];
   state.areas = [];
   state.events = [];
+  state.activities = [];
   if ("caches" in window) {
     for (const key of await caches.keys()) await caches.delete(key);
   }
@@ -1512,7 +1621,7 @@ async function boot() {
     state.setupRequired = result.setupRequired;
     state.parcName = result.parcName;
     if (state.setupRequired) return renderSetup();
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadMembers()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
     renderApp();
     const eventId = Number(params.get("event"));
     if (eventId) openEvent(eventId);

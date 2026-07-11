@@ -1,8 +1,8 @@
 # ParcOS roadmap
 
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
-This roadmap starts from the current 1.0.4 codebase and the MVP product brief.
+This roadmap starts from the current 1.1.0 codebase and the MVP product brief.
 It is meant to be a living planning document: concrete enough to choose the next
 build, but not so detailed that every implementation choice is frozen.
 
@@ -19,6 +19,8 @@ self-hosted 1.0.x product with:
 - Mobile-first private web app with Today, Agenda, Garden, and Profile.
 - Managed areas, beds, bed state, harvest notes, current cover photos, and bed
   activity history.
+- Member Quick Log for work, observations, problems, harvests, and photos, with
+  recent activity visible on Today.
 - Event creation, editing, states, capacity, member registration, waitlist
   balancing, attendee lists for coordinators, sharing, public event pages, guest
   registration for public events, and iCalendar download.
@@ -44,8 +46,8 @@ The largest gaps are not infrastructure; they are operating workflows.
   workflow is still thin.
 - Plantings are represented indirectly through bed crop and variety fields, but
   there is no durable planting lifecycle.
-- Activities exist as a bed journal, but members cannot yet record normal work
-  contributions themselves.
+- Quick Log now captures normal member contributions; the next product question
+  is which entry types people actually use and what should be easier still.
 - The Learn section, announcements, and searchable knowledge base are not built.
 - Recurring event/session support is not built.
 - Registration windows, cancellation notification, and attendee contact flows
@@ -119,50 +121,53 @@ accumulating in two large files:
 
 ### Scheduling recommendation
 
-Use one short hardening milestone before new domain features, then schedule
-features in the order that builds shared foundations:
+Let field behavior drive the next build, while adding only the technical safety
+needed for live data:
 
-1. Hardening and architecture cleanup.
-2. Tasks and contributions.
-3. Attendance operations.
-4. Planting lifecycle.
-5. Learn and announcements.
-6. AI-assisted proposals.
-7. Scale/public polish decisions.
+1. Validate Quick Log and simplify Today and bed details.
+2. Add backup/export safety and a small migration convention.
+3. Add simple tasks connected to real logged problems.
+4. Improve attendance operations.
+5. Add planting, knowledge, and automation only after the daily loop works.
 
 ## Release track
 
-### 1.0.5: field hardening and architecture cleanup
+### 1.1.0: quick field logging and hardening
 
-Goal: make the current private release dependable enough for daily use by a
-small coordinator team and invited members, while reducing the cost of the next
-feature work.
+Goal: make recording real garden work fast enough to become a member habit,
+while keeping the private release dependable for daily use.
+
+Shipped:
+
+- Add one global Quick Log for work, observations, problems, harvests, and
+  photos, without requiring coordinator permissions.
+- Show recent member activity on Today.
+- Put bed edit and photo actions at the top of the bed detail.
+- Fix invitation completion and remove site-specific default names and imagery.
+- Add focused tests for member logging, private-area access, CSRF, and photos.
+
+Acceptance criteria:
+
+- A member can record normal work from any screen in under ten seconds.
+- A basic entry requires only a bed and a short description; photos are optional.
+- The saved entry appears on Today and in the bed journal.
+
+### 1.1.x: field validation and live-data safety
+
+Goal: learn from the first real logs and protect the data already being created.
 
 Build:
 
-- Fix any mojibake or encoding issues visible in rendered French copy.
-- Remove unused legacy render functions and normalize close/location symbols.
-- Add a simple release checklist covering Docker build, smoke tests, fresh
-  install, upgrade from the previous version, and proxy-origin link generation.
-- Document backup restore steps as clearly as backup creation.
-- Add a coordinator-facing "system status" or deployment checklist page only if
-  real testers need it; otherwise keep this in docs.
-- Expand tests around event editing, waitlist rebalance, cancelled/completed
-  events, profile password changes, media authorization, and setup edge cases.
-- Decide whether to keep all UI copy hardcoded in French for the first garden or
-  introduce a small translation dictionary before more screens are added.
-- Introduce a tiny module split once tests are green: schema/migrations,
-  route helpers, event operations, garden operations, and media operations.
-- Write the first explicit migration-version convention before adding task
-  tables.
+- Observe which Quick Log types and fields members use or abandon.
+- Remove or demote Today sections that do not help members act.
+- Simplify the long bed detail into primary information and secondary sections.
+- Add backup/export safety and document a tested restore path.
+- Write the first explicit migration-version convention before adding tables.
+- Expand translations incrementally on touched screens instead of blocking all
+  product work on a complete i18n rewrite.
+- Add focused tests around invitation completion and upgrades from live data.
 
-Release gate:
-
-- A coordinator can install, configure, invite members, run one event, manage
-  registrations, update beds, add photos, recover access, and back up data
-  without developer intervention.
-
-### 1.1: tasks and daily work
+### 1.2: tasks and daily work
 
 Goal: turn ParcOS from a directory/calendar into the garden's daily action list.
 
@@ -184,7 +189,7 @@ Acceptance criteria:
 - A coordinator can see what was done, by whom, where, and when.
 - Completing a task leaves a durable activity record.
 
-### 1.2: attendance and event operations
+### 1.3: attendance and event operations
 
 Goal: make events useful on the day itself, not just before registration.
 
@@ -204,7 +209,7 @@ Acceptance criteria:
 - A coordinator can run an event from ParcOS, mark attendance, close the event,
   and share a useful summary without exporting a spreadsheet.
 
-### 1.3: plantings and harvest lifecycle
+### 1.4: plantings and harvest lifecycle
 
 Goal: make bed state durable across seasons and reduce ambiguity about what is
 actually growing.
@@ -227,7 +232,7 @@ Acceptance criteria:
 - A coordinator can update the garden through seasonal changes without losing
   the historical record of what grew where.
 
-### 1.4: knowledge and announcements
+### 1.5: knowledge and announcements
 
 Goal: let ParcOS teach members how the specific garden works.
 
@@ -245,7 +250,7 @@ Acceptance criteria:
 - A new member can answer common "how do we do this here?" questions from
   ParcOS without asking a coordinator every time.
 
-### 1.5: AI-assisted coordination
+### 1.6: AI-assisted coordination
 
 Goal: use AI as drafting and structuring help while keeping ParcOS data human
 confirmed.
@@ -286,20 +291,18 @@ Acceptance criteria:
 
 ## Near-term priorities
 
-1. Field hardening, release checklist, and migration/route cleanup.
-2. Task model and member contribution flow.
-3. Attendance workflow for coordinators.
-4. Planting lifecycle.
-5. Learn and announcements.
-6. AI-assisted drafts and proposed actions.
-7. Public guest surfaces.
+1. Observe Quick Log use and simplify Today and bed details around real habits.
+2. Add backup/export safety and a small migration convention for live data.
+3. Add a deliberately simple task model connected to logged problems.
+4. Improve attendance operations for coordinators.
+5. Add the planting lifecycle only after daily logging and tasks are proven.
+6. Add Learn, announcements, and AI-assisted drafts later.
 
 ## Open decisions
 
-- Should the next release be a small 1.0.5 hardening release or should route
-  modularization happen inside 1.1 tasks?
-- Should the UI remain primarily French until the first real deployment settles,
-  or should localization be introduced before the app grows more screens?
+- Which Quick Log types do members use in the garden, and which fields create
+  hesitation or get skipped?
+- Which Today sections help people act, and which can be removed?
 - Should tasks be deliberately simple at first, or should they include due dates,
   recurrence, priority, and assignment from day one?
 - Should member contributions be visible as lightweight profile history, or kept
@@ -313,9 +316,7 @@ Acceptance criteria:
 
 ## Suggested next build
 
-The best next build is a 1.0.5 hardening pass followed immediately by 1.1 tasks.
-
-That sequence keeps the current release trustworthy before adding the workflow
-that most changes ParcOS' daily value. Tasks also create the right foundation
-for contributions, Today improvements, Learn links, planting activities, and
-event preparation work.
+The best next build is a short field-validation pass on Quick Log and a quieter
+Today screen. In parallel, add backup/export safety and the first explicit
+migration convention now that the app has live users. Tasks should follow once
+real logs show what work members and coordinators actually need to coordinate.
