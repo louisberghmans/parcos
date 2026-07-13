@@ -24,8 +24,12 @@ docker compose up -d
 
 Open `http://YOUR-SERVER:8080`, sign in as the administrator, and complete the
 one-time setup wizard. It asks for the park name and the areas you want to
-manage. The image is available as `ghcr.io/louisberghmans/parcos:1.1.0` and
+manage. The image is available as `ghcr.io/louisberghmans/parcos:1.1.1` and
 `ghcr.io/louisberghmans/parcos:latest` for amd64 and arm64.
+
+Administrators can configure the welcome, Today, and event images from
+**Profile > App images**. These images are stored in the persistent data volume
+and can be replaced or reset to ParcOS's neutral artwork at any time.
 
 To build locally instead:
 

@@ -1151,6 +1151,18 @@ function setupInfo(db) {
   return { setupRequired: areaCount === 0, parcName };
 }
 
+const brandingKinds = ["login", "today", "event"];
+
+function brandingJson(db) {
+  const branding = Object.fromEntries(brandingKinds.map((kind) => [kind, null]));
+  const rows = db.prepare("select key, value, updated_at from app_meta where key like 'branding_%'").all();
+  for (const row of rows) {
+    const kind = row.key.slice("branding_".length);
+    if (brandingKinds.includes(kind)) branding[kind] = `/branding/${kind}?v=${encodeURIComponent(row.updated_at)}`;
+  }
+  return branding;
+}
+
 export function createApp(options = {}) {
   const dataDir = resolve(options.dataDir ?? env.PARCOS_DATA_DIR ?? join(moduleDir, "data"));
   const publicDir = resolve(options.publicDir ?? join(moduleDir, "public"));
@@ -1272,6 +1284,10 @@ export function createApp(options = {}) {
           return json(res, 200, { event: eventJson(event, attendees), registrations: attendees });
         }
 
+        if (req.method === "GET" && path === "/api/public/branding") {
+          return json(res, 200, { branding: brandingJson(db) });
+        }
+
         const publicEventCalendarMatch = /^\/api\/public\/events\/(\d+)\/calendar\.ics$/.exec(path);
         if (publicEventCalendarMatch && req.method === "GET") {
           const event = findPublicEvent(db, Number(publicEventCalendarMatch[1]));
@@ -1302,7 +1318,35 @@ export function createApp(options = {}) {
         const session = requireSession(db, req);
 
         if (req.method === "GET" && path === "/api/me") {
-          return json(res, 200, { member: session.member, csrfToken: session.csrfToken, ...setupInfo(db) });
+          return json(res, 200, { member: session.member, csrfToken: session.csrfToken, branding: brandingJson(db), ...setupInfo(db) });
+        }
+
+        const brandingApiMatch = /^\/api\/branding\/(login|today|event)$/.exec(path);
+        if (brandingApiMatch && ["POST", "DELETE"].includes(req.method)) {
+          requireCsrf(req, session);
+          if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
+          const kind = brandingApiMatch[1];
+          const key = `branding_${kind}`;
+          const previous = db.prepare("select value from app_meta where key = ?").get(key)?.value ?? null;
+          if (req.method === "DELETE") {
+            db.prepare("delete from app_meta where key = ?").run(key);
+            if (previous) rmSync(join(uploadsDir, previous), { force: true });
+            return json(res, 200, { branding: brandingJson(db) });
+          }
+          const body = await readJson(req);
+          const photo = photoData(body.dataUrl);
+          const filename = `branding-${kind}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}`;
+          const filePath = join(uploadsDir, filename);
+          writeFileSync(filePath, photo.bytes, { flag: "wx" });
+          try {
+            db.prepare(`insert into app_meta (key, value, updated_at) values (?, ?, ?)
+              on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(key, filename, now());
+          } catch (error) {
+            rmSync(filePath, { force: true });
+            throw error;
+          }
+          if (previous && previous !== filename) rmSync(join(uploadsDir, previous), { force: true });
+          return json(res, 200, { branding: brandingJson(db) });
         }
 
         if (req.method === "POST" && path === "/api/setup") {
@@ -1830,6 +1874,13 @@ export function createApp(options = {}) {
         }
         res.setHeader("Cache-Control", "private, no-store");
         return serveFile(res, uploadsDir, filename, "private, no-store");
+      }
+
+      const brandingMediaMatch = /^\/branding\/(login|today|event)$/.exec(path);
+      if (brandingMediaMatch && req.method === "GET") {
+        const filename = db.prepare("select value from app_meta where key = ?").get(`branding_${brandingMediaMatch[1]}`)?.value;
+        if (!filename) throw new HttpError(404, "Image introuvable.");
+        return serveFile(res, uploadsDir, filename, "public, no-cache");
       }
 
       if (path.startsWith("/assets/")) {

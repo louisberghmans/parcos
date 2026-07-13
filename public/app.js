@@ -11,6 +11,7 @@ const state = {
   areas: [],
   events: [],
   activities: [],
+  branding: { login: null, today: null, event: null },
   members: [],
   page: "today",
   filter: "all",
@@ -215,6 +216,11 @@ function brandMarkup(title = "ParcOS", subtitle = state.parcName) {
   return `<div class="auth-brand"><span class="brand-mark">P</span><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle || "Jardin partagé")}</small></span></div>`;
 }
 
+function brandingImage(kind, className) {
+  const url = state.branding[kind];
+  return url ? `<img class="${className}" src="${escapeHtml(url)}" alt="">` : "";
+}
+
 const statusMeta = {
   unknown: { label: "À vérifier", tone: "unknown" },
   ready: { label: "Disponible", tone: "ready" },
@@ -297,7 +303,7 @@ function eventStateLabel(state) {
 }
 
 function eventCoverUrl(event) {
-  return null;
+  return state.branding.event;
 }
 
 function escapeHtml(value) {
@@ -389,6 +395,7 @@ function renderLogin(error = "") {
   modalRoot.innerHTML = "";
   app.innerHTML = `<main class="auth-page">
     <section class="auth-visual">
+      ${brandingImage("login", "auth-visual-image")}
       ${brandMarkup()}
       <div><p class="eyebrow light">Notre potager, ensemble</p><h1>Bienvenue dans<br>votre espace ParcOS.</h1><p>L’espace privé des membres pour observer, cultiver et partager.</p></div>
     </section>
@@ -417,8 +424,9 @@ function renderLogin(error = "") {
       state.csrfToken = result.csrfToken;
       state.setupRequired = result.setupRequired;
       state.parcName = result.parcName;
+      if (result.branding) state.branding = { ...state.branding, ...result.branding };
       if (state.setupRequired) return renderSetup();
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadMembers()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
       renderApp();
       const linkedEventId = Number(new URLSearchParams(location.search).get("event"));
       if (linkedEventId) openEvent(linkedEventId);
@@ -436,7 +444,7 @@ function renderSetup(error = "") {
     <label class="setup-access"><input name="membersCanAccess" type="checkbox" checked> Visible par les membres</label>
     ${index ? '<button type="button" class="text-link remove-setup-area">Retirer</button>' : ""}
   </div>`;
-  app.innerHTML = `<main class="auth-page setup-page"><section class="auth-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>Configuration initiale</small></span></div><div><p class="eyebrow light">Bienvenue, admin</p><h1>Commençons par<br>votre terrain.</h1><p>Ces informations structurent les lieux, planches et droits d’accès de votre installation.</p></div></section>
+  app.innerHTML = `<main class="auth-page setup-page"><section class="auth-visual">${brandingImage("login", "auth-visual-image")}<div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>Configuration initiale</small></span></div><div><p class="eyebrow light">Bienvenue, admin</p><h1>Commençons par<br>votre terrain.</h1><p>Ces informations structurent les lieux, planches et droits d’accès de votre installation.</p></div></section>
     <section class="auth-panel"><div class="auth-form-wrap setup-wrap"><p class="eyebrow">Étape unique</p><h2>Quel parc gérez-vous ?</h2>${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}
       <form id="setup-form" class="form-stack"><label>Nom du parc<input name="parcName" maxlength="100" required autofocus placeholder="Ex. Parc des Tilleuls"></label><fieldset><legend>Lieux et zones à gérer</legend><div id="setup-areas">${areaRow(0)}</div><button type="button" class="button ghost" id="add-setup-area">+ Ajouter un lieu</button></fieldset><button class="button primary" type="submit">Créer mon espace ParcOS</button></form>
     </div></section></main>`;
@@ -461,7 +469,7 @@ function renderSetup(error = "") {
       const result = await api("/api/setup", { method: "POST", body: JSON.stringify({ parcName: new FormData(event.currentTarget).get("parcName"), areas }) });
       state.setupRequired = result.setupRequired;
       state.parcName = result.parcName;
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadMembers()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
       renderApp();
       showToast("Votre espace ParcOS est prêt.");
     } catch (setupError) {
@@ -475,6 +483,7 @@ function renderInvite(token, error = "") {
   modalRoot.innerHTML = "";
   app.innerHTML = `<main class="auth-page invitation-page">
     <section class="auth-visual invitation-visual">
+      ${brandingImage("login", "auth-visual-image")}
       ${brandMarkup()}
       <div><p class="eyebrow light">Invitation personnelle</p><h1>Votre place<br>au potager.</h1><p>Créez votre profil privé ParcOS. Aucune adresse e-mail n’est demandée.</p></div>
     </section>
@@ -506,7 +515,7 @@ function renderInvite(token, error = "") {
 function renderReset(token, error = "") {
   modalRoot.innerHTML = "";
   app.innerHTML = `<main class="auth-page invitation-page">
-    <section class="auth-visual invitation-visual">${brandMarkup()}<div><p class="eyebrow light">Récupération du profil</p><h1>Un nouvel accès,<br>le même profil.</h1><p>Choisissez un nouveau mot de passe. Ce lien ne peut être utilisé qu’une fois.</p></div></section>
+    <section class="auth-visual invitation-visual">${brandingImage("login", "auth-visual-image")}${brandMarkup()}<div><p class="eyebrow light">Récupération du profil</p><h1>Un nouvel accès,<br>le même profil.</h1><p>Choisissez un nouveau mot de passe. Ce lien ne peut être utilisé qu’une fois.</p></div></section>
     <section class="auth-panel"><div class="auth-form-wrap"><p class="eyebrow">Accès ParcOS</p><h2>Nouveau mot de passe</h2>${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}<form id="reset-form" class="form-stack"><label>Nouveau mot de passe<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>12 caractères minimum.</small></label><button class="button primary" type="submit">Retrouver mon profil</button></form></div></section>
   </main>`;
   document.querySelector("#reset-form").addEventListener("submit", async (event) => {
@@ -517,7 +526,7 @@ function renderReset(token, error = "") {
       state.member = result.member;
       state.csrfToken = result.csrfToken;
       history.replaceState({}, "", "/");
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadMembers()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
       renderApp();
       showToast("Votre accès a été renouvelé.");
     } catch (resetError) {
@@ -530,7 +539,7 @@ async function renderPublicEvent(id, error = "") {
   try {
     if (!state.publicEvent || state.publicEvent.event.id !== id) state.publicEvent = await api(`/api/public/events/${id}`);
   } catch (loadError) {
-    app.innerHTML = `<main class="auth-page"><section class="auth-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>Public</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>Événement introuvable.</h1><p>Ce lien est peut-être expiré ou réservé aux membres.</p></div></section><section class="auth-panel"><div class="auth-form-wrap"><button class="button primary" type="button" id="back-login">Retour à ParcOS</button></div></section></main>`;
+    app.innerHTML = `<main class="auth-page"><section class="auth-visual">${brandingImage("login", "auth-visual-image")}<div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>Public</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>Événement introuvable.</h1><p>Ce lien est peut-être expiré ou réservé aux membres.</p></div></section><section class="auth-panel"><div class="auth-form-wrap"><button class="button primary" type="button" id="back-login">Retour à ParcOS</button></div></section></main>`;
     document.querySelector("#back-login").addEventListener("click", () => history.replaceState({}, "", "/") || renderLogin());
     applyTranslations(app);
     return;
@@ -539,7 +548,7 @@ async function renderPublicEvent(id, error = "") {
   const registration = { adults: 1, teenagers: 0, children: 0, youngChildren: 0 };
   const capacity = event.capacity === null ? `${event.attendeeCount} participant${event.attendeeCount === 1 ? "" : "s"}` : `${event.attendeeCount}/${event.capacity} participants`;
   app.innerHTML = `<main class="auth-page public-event-page">
-    <section class="auth-visual invitation-visual"><div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(formatEventDate(event.startsAt))} à ${escapeHtml(formatTime(event.startsAt))} · ${escapeHtml(event.location)}</p></div></section>
+    <section class="auth-visual invitation-visual">${brandingImage("event", "auth-visual-image")}<div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(formatEventDate(event.startsAt))} à ${escapeHtml(formatTime(event.startsAt))} · ${escapeHtml(event.location)}</p></div></section>
     <section class="auth-panel"><div class="auth-form-wrap">
       <div class="public-toolbar"><button class="language-toggle" id="public-language-toggle" type="button">${languageToggleLabel()}</button></div>
       <p class="eyebrow">Inscription publique</p><h2>Je participe</h2>
@@ -614,7 +623,7 @@ function renderToday() {
   const zoneWord = (count) => t(`zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`);
   return `<section class="page today-page">
     <div class="welcome-row"><div><p class="eyebrow">${t("Bonjour", "Hello")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Que se passe-t-il", "What is happening")}<br>${t("au potager ?", "in the garden?")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
-    <article class="hero-card"><div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
+    <article class="hero-card">${brandingImage("today", "hero-card-image")}<div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
     <button class="quick-log-card" id="today-quick-log" type="button"><span>+</span><strong>${t("Ajouter au journal", "Add to log")}</strong><small>${t("Travail, observation, problème, récolte ou photo", "Work, observation, problem, harvest or photo")}</small></button>
     <div class="section-heading"><div><p class="eyebrow">Prochain rendez-vous</p><h2>À l’agenda</h2></div><button class="text-link" data-page="agenda">Tout voir</button></div>
     ${nextEvent ? compactEventCard(nextEvent) : '<div class="empty-state"><strong>Rien de prévu pour le moment</strong><p>Les prochains rendez-vous apparaîtront ici.</p></div>'}
@@ -851,6 +860,15 @@ function bedCard(bed) {
   </button>`;
 }
 
+function brandingSettings() {
+  const items = [
+    ["login", t("Accueil et connexion", "Welcome and sign-in"), t("Visible avant la connexion et sur les invitations.", "Shown before sign-in and on invitations.")],
+    ["today", t("Page Aujourd’hui", "Today page"), t("Image principale du tableau de bord.", "Main dashboard image.")],
+    ["event", t("Événements", "Events"), t("Image utilisée par défaut dans l’agenda et les événements publics.", "Default image for the agenda and public events.")],
+  ];
+  return `<section class="panel branding-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Identité du jardin", "Garden identity")}</p><h2>${t("Images de l’application", "App images")}</h2></div></div><div class="branding-list">${items.map(([kind, title, description]) => `<div class="branding-setting" data-branding-kind="${kind}"><div class="branding-preview ${kind} ${state.branding[kind] ? "has-image" : ""}">${state.branding[kind] ? `<img src="${escapeHtml(state.branding[kind])}" alt="">` : `<span>${t("Image neutre", "Neutral image")}</span>`}</div><div class="branding-setting-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(description)}</small><div class="branding-actions"><label class="button secondary file-button">${cameraIcon()}<span>${state.branding[kind] ? t("Remplacer", "Replace") : t("Choisir une photo", "Choose photo")}</span><input data-branding-input="${kind}" type="file" accept="image/jpeg,image/png,image/webp"></label>${state.branding[kind] ? `<button class="button ghost" type="button" data-branding-reset="${kind}">${t("Utiliser l’image neutre", "Use neutral image")}</button>` : ""}</div></div></div>`).join("")}</div></section>`;
+}
+
 function renderProfile() {
   const registrations = state.events.filter((event) => event.registration && event.registration.status !== "cancelled" && new Date(event.endsAt) >= new Date());
   return `<section class="page profile-page">
@@ -868,6 +886,7 @@ function renderProfile() {
     </section>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
+    ${state.member.role === "admin" ? brandingSettings() : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
@@ -937,6 +956,8 @@ function bindShell() {
   document.querySelector("#language-toggle")?.addEventListener("click", toggleLanguage);
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
   document.querySelector("#profile-photo-input")?.addEventListener("change", uploadProfilePhoto);
+  document.querySelectorAll("[data-branding-input]").forEach((input) => input.addEventListener("change", uploadBrandingImage));
+  document.querySelectorAll("[data-branding-reset]").forEach((button) => button.addEventListener("click", () => resetBrandingImage(button.dataset.brandingReset)));
   document.querySelector("#invite-create-form")?.addEventListener("submit", createInvite);
   document.querySelector("#import-form")?.addEventListener("submit", importData);
   document.querySelectorAll("[data-reset-member]").forEach((button) => button.addEventListener("click", () => createResetLink(Number(button.dataset.resetMember))));
@@ -987,6 +1008,11 @@ async function loadMembers() {
   if (!isCoordinator()) return;
   const result = await api("/api/members");
   state.members = result.members;
+}
+
+async function loadBranding() {
+  const result = await api("/api/public/branding");
+  state.branding = { login: null, today: null, event: null, ...result.branding };
 }
 
 function renderQuickLog(preselectedBedId = null) {
@@ -1125,7 +1151,7 @@ function renderEventSheet() {
   const activeRegistration = registration && registration.status !== "cancelled";
   const capacity = event.capacity === null ? `${event.attendeeCount} participant${event.attendeeCount === 1 ? "" : "s"}` : `${event.attendeeCount} participant${event.attendeeCount === 1 ? "" : "s"} · ${event.spotsRemaining} place${event.spotsRemaining === 1 ? "" : "s"} libre${event.spotsRemaining === 1 ? "" : "s"}`;
   modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet event-sheet" role="dialog" aria-modal="true" aria-labelledby="event-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button>
-    <div class="event-sheet-hero type-${event.type} ${coverUrl ? "permanence-cover" : ""}"><span class="event-hero-icon">${meta.icon}</span><div><span class="event-type-label">${escapeHtml(meta.label)}</span><h2 id="event-title">${escapeHtml(event.title)}</h2></div></div>
+    <div class="event-sheet-hero type-${event.type} ${coverUrl ? "permanence-cover" : ""}">${coverUrl ? `<img class="event-hero-image" src="${escapeHtml(coverUrl)}" alt="">` : ""}<span class="event-hero-icon">${meta.icon}</span><div><span class="event-type-label">${escapeHtml(meta.label)}</span><h2 id="event-title">${escapeHtml(event.title)}</h2></div></div>
     <div class="sheet-content">
       ${event.state !== "published" ? `<div class="event-state-banner ${event.state}"><strong>${escapeHtml(eventStateLabel(event.state))}</strong><span>${event.state === "cancelled" ? t("Ce rendez-vous n’aura pas lieu.", "This event will not take place.") : event.state === "draft" ? t("Visible uniquement par l’équipe de coordination.", "Visible only to the coordination team.") : t("Ce rendez-vous est terminé.", "This event is complete.")}</span></div>` : ""}
       <div class="event-facts"><div><span>□</span><p><small>Date et heure</small><strong>${escapeHtml(formatEventDate(event.startsAt))}</strong><b>${escapeHtml(formatTime(event.startsAt))}–${escapeHtml(formatTime(event.endsAt))}</b></p></div><div><span>⌖</span><p><small>Lieu</small><strong>${escapeHtml(event.location)}</strong><b>${escapeHtml(capacity)}</b></p></div></div>
@@ -1420,6 +1446,38 @@ async function uploadProfilePhoto(event) {
   }
 }
 
+async function uploadBrandingImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const kind = event.target.dataset.brandingInput;
+  const setting = event.target.closest(".branding-setting");
+  setting?.classList.add("working");
+  try {
+    const dataUrl = await compressPhoto(file, 2000, 0.85);
+    const result = await api(`/api/branding/${kind}`, { method: "POST", body: JSON.stringify({ dataUrl }) });
+    state.branding = { ...state.branding, ...result.branding };
+    renderApp();
+    showToast(t("Image de l’application enregistrée.", "App image saved."));
+  } catch (error) {
+    setting?.classList.remove("working");
+    showToast(error.message);
+  }
+}
+
+async function resetBrandingImage(kind) {
+  const setting = document.querySelector(`[data-branding-kind="${kind}"]`);
+  setting?.classList.add("working");
+  try {
+    const result = await api(`/api/branding/${kind}`, { method: "DELETE", body: "{}" });
+    state.branding = { ...state.branding, ...result.branding };
+    renderApp();
+    showToast(t("Image neutre rétablie.", "Neutral image restored."));
+  } catch (error) {
+    setting?.classList.remove("working");
+    showToast(error.message);
+  }
+}
+
 async function uploadBedPhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1607,6 +1665,7 @@ async function logout() {
 }
 
 async function boot() {
+  await loadBranding().catch(() => {});
   const params = new URLSearchParams(location.search);
   const publicEventId = Number(params.get("publicEvent"));
   if (publicEventId) return renderPublicEvent(publicEventId);
@@ -1620,6 +1679,7 @@ async function boot() {
     state.csrfToken = result.csrfToken;
     state.setupRequired = result.setupRequired;
     state.parcName = result.parcName;
+    if (result.branding) state.branding = { ...state.branding, ...result.branding };
     if (state.setupRequired) return renderSetup();
     await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
     renderApp();

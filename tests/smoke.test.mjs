@@ -32,6 +32,9 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
 
   const anonymousBeds = await request(baseUrl, "/api/beds");
   assert.equal(anonymousBeds.response.status, 401);
+  const initialBranding = await request(baseUrl, "/api/public/branding");
+  assert.equal(initialBranding.response.status, 200);
+  assert.deepEqual(initialBranding.body.branding, { login: null, today: null, event: null });
   const home = await fetch(`${baseUrl}/`);
   assert.equal(home.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
   assert.match(home.headers.get("content-security-policy"), /frame-src .*youtube-nocookie\.com/);
@@ -237,6 +240,34 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.ok(notesDetail.body.notes.some((note) => note.type === "harvest" && note.body === "Cueillir les fruits rouges." && note.memberName === "Administrateur ParcOS" && note.createdAt));
 
   const png = readFileSync(new URL("../assets/potager-kale.jpg", import.meta.url)).toString("base64");
+  const memberBranding = await request(baseUrl, "/api/branding/login", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ dataUrl: `data:image/jpeg;base64,${png}` }),
+  });
+  assert.equal(memberBranding.response.status, 403);
+
+  const brandingUpload = await request(baseUrl, "/api/branding/today", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ dataUrl: `data:image/jpeg;base64,${png}` }),
+  });
+  assert.equal(brandingUpload.response.status, 200);
+  assert.match(brandingUpload.body.branding.today, /^\/branding\/today\?v=/);
+  const publicBranding = await request(baseUrl, "/api/public/branding");
+  assert.equal(publicBranding.body.branding.today, brandingUpload.body.branding.today);
+  const brandingPhoto = await fetch(`${baseUrl}${brandingUpload.body.branding.today}`);
+  assert.equal(brandingPhoto.status, 200);
+  assert.equal(brandingPhoto.headers.get("content-type"), "image/jpeg");
+  const brandingReset = await request(baseUrl, "/api/branding/today", {
+    method: "DELETE",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: "{}",
+  });
+  assert.equal(brandingReset.response.status, 200);
+  assert.equal(brandingReset.body.branding.today, null);
+  assert.equal((await fetch(`${baseUrl}${brandingUpload.body.branding.today}`)).status, 404);
+
   const photo = await request(baseUrl, "/api/beds/1/photos", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 - 2026-07-13
+
+- Added administrator-configurable images for welcome and sign-in screens, the
+  Today dashboard, and events, with neutral fallbacks and reset controls.
+- Stored configured application images in the persistent ParcOS data volume so
+  they survive container upgrades.
+- Fixed recent activity loading immediately after sign-in, setup, and account
+  recovery.
+
 ## 1.1.0 - 2026-07-11
 
 - Added a mobile Quick Log for work, observations, problems, harvests, and
