@@ -24,7 +24,7 @@ docker compose up -d
 
 Open `http://YOUR-SERVER:8080`, sign in as the administrator, and complete the
 one-time setup wizard. It asks for the park name and the areas you want to
-manage. The image is available as `ghcr.io/louisberghmans/parcos:1.1.1` and
+manage. The image is available as `ghcr.io/louisberghmans/parcos:1.2.0` and
 `ghcr.io/louisberghmans/parcos:latest` for amd64 and arm64.
 
 Administrators can configure the welcome, Today, and event images from

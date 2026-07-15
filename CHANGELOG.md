@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0 - 2026-07-15
+
+- Completed French, Dutch, and English interface support so the language badge
+  always identifies the active language and navigation stays consistent.
+- Added source-language and revision tracking for user-authored areas, beds,
+  events, notes, activities, harvests, tutorials, and photo captions.
+- Added an administrator workflow to export missing or stale translations as a
+  timestamped JSON file, translate it manually with ChatGPT, and safely import
+  it without overwriting newer source content.
+- Localized member and public API responses, public event pages, and calendar
+  exports, with safe fallback to the original source text.
+- Added pull-request CI for server syntax, browser JavaScript syntax, and the
+  complete automated test suite.
+
 ## 1.1.1 - 2026-07-13
 
 - Added administrator-configurable images for welcome and sign-in screens, the
