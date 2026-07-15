@@ -31,6 +31,11 @@ Administrators can configure the welcome, Today, and event images from
 **Profile > App images**. These images are stored in the persistent data volume
 and can be replaced or reset to ParcOS's neutral artwork at any time.
 
+Menus and user-authored content support French, Dutch, and English. Until an
+automated translator is configured, administrators can use the timestamped
+JSON export/import flow described in
+[docs/multilingual-content-workflow.md](docs/multilingual-content-workflow.md).
+
 To build locally instead:
 
 ```sh

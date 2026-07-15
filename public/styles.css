@@ -397,6 +397,9 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .toast { max-width: calc(100vw - 30px); padding: 13px 18px; position: fixed; z-index: 100; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); border-radius: 13px; background: var(--forest-950); color: white; box-shadow: var(--shadow); font-size: 13px; font-weight: 750; transform: translateX(-50%); }
+.translation-actions { display: grid; gap: 14px; margin-top: 16px; }
+.translation-actions > .button { justify-self: start; }
+.translation-panel code { padding: 1px 5px; border-radius: 5px; background: var(--forest-100); font-size: .92em; }
 
 @media (max-width: 720px) {
   .auth-page { display: block; background: var(--paper); }
