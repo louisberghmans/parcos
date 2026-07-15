@@ -159,17 +159,333 @@ const uiTranslations = {
   },
 };
 
+Object.assign(uiTranslations.en, {
+  "Notre potager, ensemble": "Our garden, together",
+  "Bienvenue dans votre espace ParcOS.": "Welcome to your ParcOS space.",
+  "L’espace privé des membres pour observer, cultiver et partager.": "The private member space to observe, grow and share.",
+  "Espace membres": "Member area",
+  "Utilisez le nom d’utilisateur reçu lors de votre invitation.": "Use the username from your invitation.",
+  "Pas encore de profil ? Un coordinateur peut vous remettre une invitation ParcOS.": "No profile yet? A coordinator can give you a ParcOS invitation.",
+  "À venir": "Upcoming",
+  "Mon compte": "My account",
+  "Vous n’êtes inscrit à aucun événement à venir.": "You are not registered for any upcoming events.",
+  "Nouvel accès": "New access",
+  "Administration": "Administration",
+  "Fichier CSV": "CSV file",
+  "Traductions du contenu": "Content translations",
+  "Exporter les textes à traduire": "Export text to translate",
+  "Réimporter les traductions": "Import translations",
+  "Fichier JSON traduit": "Translated JSON file",
+  "Télécharger le fichier horodaté": "Download timestamped file",
+  "Les traductions ont été importées.": "Translations were imported.",
+  "Changer de langue": "Change language",
+  "Ouvrir mon profil": "Open my profile",
+  "Navigation principale": "Main navigation",
+  "Le journal": "The log",
+  "Activité récente": "Recent activity",
+  "Rien de consigné pour le moment": "Nothing logged yet",
+  "Accueil et connexion": "Welcome and sign-in",
+  "Page Aujourd’hui": "Today page",
+  "Événements": "Events",
+  "Identité du jardin": "Garden identity",
+  "Images de l’application": "App images",
+  "Image neutre": "Neutral image",
+  "Remplacer": "Replace",
+  "Choisir une photo": "Choose photo",
+  "Utiliser l’image neutre": "Use neutral image",
+  "Appuyez sur l'appareil photo pour ajouter ou changer votre photo.": "Tap the camera to add or change your photo.",
+  "Votre rôle ou ce que vous aimez faire au potager…": "Your role or what you enjoy doing in the garden...",
+  "Mot de passe actuel": "Current password",
+  "Créer un lien valable 7 jours et partagez-le par votre canal habituel.": "Create a link valid for 7 days and share it through your usual channel.",
+  "Profils": "Profiles",
+  "Importer le fichier": "Import file",
+  "Fichier de traduction JSON": "Translation JSON file",
+});
+
+uiTranslations.nl = {
+  "Aujourd’hui": "Vandaag",
+  "Agenda": "Agenda",
+  "Potager": "Moestuin",
+  "Profil": "Profiel",
+  "Se connecter": "Aanmelden",
+  "Nom d’utilisateur": "Gebruikersnaam",
+  "Mot de passe": "Wachtwoord",
+  "Entrer dans le potager": "Naar de moestuin",
+  "Créer mon profil": "Mijn profiel aanmaken",
+  "Nouveau mot de passe": "Nieuw wachtwoord",
+  "Enregistrer mon profil": "Mijn profiel opslaan",
+  "Mes inscriptions": "Mijn inschrijvingen",
+  "Mon profil": "Mijn profiel",
+  "Inviter un membre": "Een lid uitnodigen",
+  "Les membres": "Leden",
+  "Se déconnecter": "Afmelden",
+  "Tous les événements": "Alle activiteiten",
+  "Jour": "Dag",
+  "Semaine": "Week",
+  "Mois": "Maand",
+  "Créer une invitation": "Uitnodiging aanmaken",
+  "Je participe": "Ik neem deel",
+  "Me désinscrire": "Mijn inschrijving annuleren",
+  "Ajouter au calendrier": "Aan agenda toevoegen",
+  "Partager le rendez-vous": "Activiteit delen",
+  "Modifier l’événement": "Activiteit bewerken",
+  "Qui vient avec vous ?": "Wie komt er mee?",
+  "Adultes": "Volwassenen",
+  "Ados": "Tieners",
+  "Enfants": "Kinderen",
+  "Petits": "Kleintjes",
+  "Confirmer": "Bevestigen",
+  "Retour": "Terug",
+  "Annuler": "Annuleren",
+  "Publier": "Publiceren",
+  "Enregistrer": "Opslaan",
+  "Nouveau rendez-vous": "Nieuwe activiteit",
+  "Titre": "Titel",
+  "Début": "Begin",
+  "Fin": "Einde",
+  "Type": "Type",
+  "Capacité": "Capaciteit",
+  "Lieu": "Locatie",
+  "Description": "Beschrijving",
+  "Visibilité": "Zichtbaarheid",
+  "État": "Status",
+  "Tous les membres": "Alle leden",
+  "Coordinateurs": "Coördinatoren",
+  "Public avec lien": "Openbaar via link",
+  "Importer des données": "Gegevens importeren",
+  "Importer le fichier": "Bestand importeren",
+  "Participants": "Deelnemers",
+  "Aucune inscription pour le moment.": "Nog geen inschrijvingen.",
+  "Inscrit": "Ingeschreven",
+  "En attente": "Op de wachtlijst",
+  "Attente": "Wachtlijst",
+  "Membre": "Lid",
+  "Coordinateur": "Coördinator",
+  "Administrateur": "Beheerder",
+  "Bonjour": "Hallo",
+  "Que se passe-t-il au potager ?": "Wat gebeurt er in de moestuin?",
+  "Le potager aujourd’hui": "De moestuin vandaag",
+  "Voir les planches": "Bedden bekijken",
+  "Prochain rendez-vous": "Volgende activiteit",
+  "À l’agenda": "Op de agenda",
+  "Tout voir": "Alles bekijken",
+  "Rien de prévu pour le moment": "Momenteel niets gepland",
+  "Les prochains rendez-vous apparaîtront ici.": "Komende activiteiten verschijnen hier.",
+  "En un coup d’œil": "In één oogopslag",
+  "État du potager": "Status van de moestuin",
+  "Disponibles": "Beschikbaar",
+  "Sans photo": "Zonder foto",
+  "Récolte ouverte": "Oogst beschikbaar",
+  "Prêt maintenant": "Nu klaar",
+  "Aucun inscrit": "Geen inschrijvingen",
+  "Cultiver ensemble": "Samen tuinieren",
+  "Chantiers, ateliers et moments partagés au potager.": "Werkdagen, workshops en gedeelde momenten in de moestuin.",
+  "Créer un événement": "Activiteit aanmaken",
+  "Mois précédent": "Vorige maand",
+  "Mois suivant": "Volgende maand",
+  "Période affichée": "Getoonde periode",
+  "Événements affichés": "Getoonde activiteiten",
+  "Aucun rendez-vous pour cette période": "Geen activiteiten in deze periode",
+  "Choisissez un autre jour, une autre semaine ou un autre mois.": "Kies een andere dag, week of maand.",
+  "Se repérer sur place": "De weg vinden",
+  "Les potagers": "Moestuinen",
+  "Chaque lieu, ses accès et ses planches.": "Elke plek met haar toegang en bedden.",
+  "Gérer les lieux": "Locaties beheren",
+  "Accessible aux membres": "Toegankelijk voor leden",
+  "Accès coordinateurs": "Toegang voor coördinatoren",
+  "Lieu du potager partagé.": "Plek in de gedeelde moestuin.",
+  "Ajouter une planche": "Bed toevoegen",
+  "Numéro, culture ou emplacement…": "Nummer, gewas of locatie...",
+  "Rechercher une planche": "Bed zoeken",
+  "Toutes": "Alle",
+  "Aucune planche trouvée": "Geen bedden gevonden",
+  "Ajoutez une première planche ou changez de filtre.": "Voeg een eerste bed toe of wijzig het filter.",
+  "Essayez un autre filtre ou terme de recherche.": "Probeer een ander filter of zoekwoord.",
+  "Planche disponible": "Beschikbaar bed",
+  "Culture à préciser": "Gewas nog te bepalen",
+  "Mis à jour": "Bijgewerkt",
+  "Photo à ajouter": "Foto toevoegen",
+  "Nom affiché": "Weergavenaam",
+  "À propos": "Over mij",
+  "Langue": "Taal",
+  "Mot de passe actuel": "Huidig wachtwoord",
+  "facultatif": "optioneel",
+  "requis pour le modifier": "vereist om het te wijzigen",
+  "Notre potager, ensemble": "Onze moestuin, samen",
+  "Bienvenue dans votre espace ParcOS.": "Welkom in je ParcOS-omgeving.",
+  "L’espace privé des membres pour observer, cultiver et partager.": "De privéruimte voor leden om te observeren, tuinieren en delen.",
+  "Espace membres": "Ledenruimte",
+  "Utilisez le nom d’utilisateur reçu lors de votre invitation.": "Gebruik de gebruikersnaam uit je uitnodiging.",
+  "Pas encore de profil ? Un coordinateur peut vous remettre une invitation ParcOS.": "Nog geen profiel? Een coördinator kan je een ParcOS-uitnodiging geven.",
+  "Journal": "Logboek",
+  "Ajouter au journal": "Aan logboek toevoegen",
+  "Le journal": "Het logboek",
+  "Activité récente": "Recente activiteit",
+  "Rien de consigné pour le moment": "Nog niets gelogd",
+  "Travail fait": "Uitgevoerd werk",
+  "À noter": "Opmerking",
+  "Problème": "Probleem",
+  "Récolte": "Oogst",
+  "Photo": "Foto",
+  "À vérifier": "Te controleren",
+  "Disponible": "Beschikbaar",
+  "Ça pousse": "In groei",
+  "À récolter": "Te oogsten",
+  "À nettoyer": "Op te ruimen",
+  "Au repos": "In rust",
+  "Chantier": "Werkdag",
+  "Atelier": "Workshop",
+  "Communauté": "Gemeenschap",
+  "École": "School",
+  "Coordination": "Coördinatie",
+  "Saison": "Seizoen",
+  "Brouillon": "Concept",
+  "Publié": "Gepubliceerd",
+  "Annulé": "Geannuleerd",
+  "Terminé": "Voltooid",
+  "À venir": "Binnenkort",
+  "Mon compte": "Mijn account",
+  "Vous n’êtes inscrit à aucun événement à venir.": "Je bent niet ingeschreven voor komende activiteiten.",
+  "Votre rôle ou ce que vous aimez faire au potager…": "Je rol of wat je graag doet in de moestuin...",
+  "Créer un lien valable 7 jours et partagez-le par votre canal habituel.": "Maak een link die 7 dagen geldig is en deel hem via je gebruikelijke kanaal.",
+  "Profils": "Profielen",
+  "Nouvel accès": "Nieuwe toegang",
+  "Administration": "Beheer",
+  "Fichier CSV": "CSV-bestand",
+  "Traductions du contenu": "Inhoudsvertalingen",
+  "Exporter les textes à traduire": "Te vertalen teksten exporteren",
+  "Réimporter les traductions": "Vertalingen opnieuw importeren",
+  "Fichier JSON traduit": "Vertaald JSON-bestand",
+  "Télécharger le fichier horodaté": "Bestand met tijdstempel downloaden",
+  "Les traductions ont été importées.": "De vertalingen zijn geïmporteerd.",
+  "Changer de langue": "Taal wijzigen",
+  "Ouvrir mon profil": "Mijn profiel openen",
+  "Navigation principale": "Hoofdnavigatie",
+  "Accueil et connexion": "Welkom en aanmelden",
+  "Page Aujourd’hui": "Pagina Vandaag",
+  "Événements": "Activiteiten",
+  "Identité du jardin": "Tuinidentiteit",
+  "Images de l’application": "App-afbeeldingen",
+  "Image neutre": "Neutrale afbeelding",
+  "Remplacer": "Vervangen",
+  "Choisir une photo": "Foto kiezen",
+  "Utiliser l’image neutre": "Neutrale afbeelding gebruiken",
+  "Appuyez sur l'appareil photo pour ajouter ou changer votre photo.": "Tik op de camera om je foto toe te voegen of te wijzigen.",
+};
+
+Object.assign(uiTranslations.nl, {
+  "Bienvenue dans": "Welkom in",
+  "votre espace ParcOS.": "je ParcOS-omgeving.",
+  "Votre place": "Jouw plek",
+  "au potager.": "in de moestuin.",
+  "Un nouvel accès,": "Nieuwe toegang,",
+  "le même profil.": "hetzelfde profiel.",
+  "au potager ?": "in de moestuin?",
+  "Que se passe-t-il": "Wat gebeurt er",
+  "Travail, observation, problème, récolte ou photo": "Werk, observatie, probleem, oogst of foto",
+  "Sur le terrain": "Op het terrein",
+  "Où ?": "Waar?",
+  "En quelques mots": "In een paar woorden",
+  "Qu’avez-vous fait ou vu ?": "Wat heb je gedaan of gezien?",
+  "facultatif sauf pour une entrée Photo": "optioneel, behalve voor een foto-item",
+  "Ajouté au journal.": "Toegevoegd aan het logboek.",
+  "Ajouter cette récolte": "Deze oogst toevoegen",
+  "Ajouter le tuto": "Tutorial toevoegen",
+  "Ajouter une photo": "Foto toevoegen",
+  "Ajoutez une photo.": "Voeg een foto toe.",
+  "Ancienne note": "Oude notitie",
+  "Aucun tuto lié à cette planche.": "Geen tutorial aan dit bed gekoppeld.",
+  "Aucune activité enregistrée.": "Geen activiteit geregistreerd.",
+  "Aucune culture renseignée": "Geen gewas opgegeven",
+  "Aucune note pour le moment.": "Momenteel geen notities.",
+  "Aucune récolte ajoutée pour le moment.": "Nog geen oogst toegevoegd.",
+  "Ce rendez-vous est terminé.": "Deze activiteit is afgelopen.",
+  "Ce rendez-vous n’aura pas lieu.": "Deze activiteit gaat niet door.",
+  "Commentaire": "Opmerking",
+  "Commentaires horodatés": "Notities met tijdstempel",
+  "Consigne de récolte": "Oogstinstructie",
+  "Culture": "Gewas",
+  "Dernière consigne de récolte": "Laatste oogstinstructie",
+  "Emplacement à préciser": "Locatie nog te bepalen",
+  "Ex. 2 paniers de tomates": "Bijv. 2 manden tomaten",
+  "Ex. À partager en priorité aujourd'hui.": "Bijv. Vandaag eerst delen.",
+  "Ex. Désherbage terminé": "Bijv. Wieden voltooid",
+  "Ex. Désherbage terminé, pucerons repérés…": "Bijv. Wieden voltooid, bladluizen gezien...",
+  "Ex. Tailler les tomates": "Bijv. Tomaten snoeien",
+  "Ex. Tomates": "Bijv. Tomaten",
+  "Fermer": "Sluiten",
+  "Fichier de traduction téléchargé.": "Vertaalbestand gedownload.",
+  "Image de l’application enregistrée.": "App-afbeelding opgeslagen.",
+  "Image neutre rétablie.": "Neutrale afbeelding hersteld.",
+  "Image principale du tableau de bord.": "Hoofdafbeelding van het dashboard.",
+  "Image utilisée par défaut dans l’agenda et les événements publics.": "Standaardafbeelding voor de agenda en openbare activiteiten.",
+  "Import des traductions terminé": "Import van vertalingen voltooid",
+  "Impossible d’exporter les traductions.": "De vertalingen konden niet worden geëxporteerd.",
+  "invalides": "ongeldig",
+  "Journal de la planche": "Logboek van het bed",
+  "Lien YouTube": "YouTube-link",
+  "Mise à jour": "Update",
+  "Modifier la planche": "Bed bewerken",
+  "Note": "Notitie",
+  "Note du potager": "Notitie van de moestuin",
+  "Note pour le journal": "Notitie voor het logboek",
+  "Notes": "Notities",
+  "obsolètes refusées": "verouderde geweigerd",
+  "Photo de récolte": "Oogstfoto",
+  "Photos et partages": "Foto's en delen",
+  "Pour la trouver": "Zo vind je het",
+  "Pourquoi cette vidéo est utile ici ?": "Waarom is deze video hier nuttig?",
+  "Quantité récoltée": "Geoogste hoeveelheid",
+  "Récolte partagée": "Gedeelde oogst",
+  "Récoltes": "Oogsten",
+  "Repère sur place": "Herkenningspunt ter plaatse",
+  "Savoir-faire": "Knowhow",
+  "Secteur": "Zone",
+  "traductions importées": "vertalingen geïmporteerd",
+  "Tutos vidéo": "Videotutorials",
+  "Variété": "Variëteit",
+  "vides": "leeg",
+  "Visible avant la connexion et sur les invitations.": "Zichtbaar vóór het aanmelden en op uitnodigingen.",
+  "Visible uniquement par l’équipe de coordination.": "Alleen zichtbaar voor het coördinatieteam.",
+  "Ajouter ou changer ma photo": "Mijn foto toevoegen of wijzigen",
+  "(requis pour le modifier)": "(vereist om het te wijzigen)",
+  "(facultatif)": "(optioneel)",
+  "Créez un lien valable 7 jours et partagez-le par votre canal habituel.": "Maak een link die 7 dagen geldig is en deel hem via je gebruikelijke kanaal.",
+  "Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ": "Download een bestand met tijdstempel met alleen ontbrekende of verouderde teksten. Laat het veld",
+  "dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.": "in ChatGPT invullen zonder de andere velden te wijzigen en importeer daarna hetzelfde bestand opnieuw.",
+  "Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.": "Importeer een CSV-bestand uit Excel. Geldige rijen gebruiken de kolom entity: area, bed, event of member.",
+});
+
+Object.assign(uiTranslations.en, {
+  "Bienvenue dans": "Welcome to",
+  "votre espace ParcOS.": "your ParcOS space.",
+  "Votre place": "Your place",
+  "au potager.": "in the garden.",
+  "Un nouvel accès,": "New access,",
+  "le même profil.": "the same profile.",
+  "Ajouter ou changer ma photo": "Add or change my photo",
+  "(requis pour le modifier)": "(required to change it)",
+  "(facultatif)": "(optional)",
+  "Créez un lien valable 7 jours et partagez-le par votre canal habituel.": "Create a link valid for 7 days and share it through your usual channel.",
+  "Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ": "Download a timestamped file containing only missing or stale text. Have ChatGPT fill the",
+  "dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.": "field without changing the other fields, then import the same file again.",
+  "Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.": "Import a CSV exported from Excel. Accepted rows use the entity column: area, bed, event or member.",
+});
+
 function currentLocale() {
   const preferred = state.member?.preferredLocale || state.locale;
   return supportedLocales.includes(preferred) ? preferred : "fr";
 }
 
 function translationLocale() {
-  return currentLocale() === "en" ? "en" : "fr";
+  return currentLocale();
 }
 
-function t(fr, en) {
-  return translationLocale() === "en" ? en : fr;
+function t(fr, en, nl) {
+  const locale = translationLocale();
+  if (locale === "fr") return fr;
+  if (locale === "en") return en ?? uiTranslations.en?.[fr] ?? fr;
+  return nl ?? uiTranslations.nl?.[fr] ?? fr;
 }
 
 function applyTranslations(root = document) {
@@ -184,11 +500,13 @@ function applyTranslations(root = document) {
     const text = trimmed.replace(/\s+/g, " ");
     if (translations[text]) node.nodeValue = node.nodeValue.replace(trimmed, translations[text]);
   }
-  root.querySelectorAll?.("[placeholder]").forEach((element) => {
-    const key = element.getAttribute("placeholder")?.trim().replace(/\s+/g, " ");
-    const translated = translations[key];
-    if (translated) element.setAttribute("placeholder", translated);
-  });
+  for (const attribute of ["placeholder", "aria-label", "title"]) {
+    root.querySelectorAll?.(`[${attribute}]`).forEach((element) => {
+      const key = element.getAttribute(attribute)?.trim().replace(/\s+/g, " ");
+      const translated = translations[key];
+      if (translated) element.setAttribute(attribute, translated);
+    });
+  }
 }
 
 function dateLocaleTag() {
@@ -201,7 +519,7 @@ function nextLocale() {
 }
 
 function languageToggleLabel() {
-  return localeLabels[nextLocale()];
+  return localeLabels[currentLocale()];
 }
 
 function genericPerson() {
@@ -341,12 +659,16 @@ function datetimeLocalValue(value) {
 }
 
 function relativeDate(value) {
-  if (!value) return currentLocale() === "en" ? "Never" : "Jamais";
+  if (!value) return { fr: "Jamais", nl: "Nooit", en: "Never" }[currentLocale()];
   const days = Math.floor((Date.now() - new Date(value).getTime()) / 86400_000);
   if (currentLocale() === "en") {
     if (days <= 0) return "Today";
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
+  } else if (currentLocale() === "nl") {
+    if (days <= 0) return "Vandaag";
+    if (days === 1) return "Gisteren";
+    if (days < 7) return `${days} dagen geleden`;
   } else {
     if (days <= 0) return "Aujourd’hui";
     if (days === 1) return "Hier";
@@ -370,7 +692,7 @@ function isCoordinator() {
 }
 
 async function api(path, options = {}) {
-  const headers = { ...(options.headers || {}) };
+  const headers = { "X-Parcos-Locale": currentLocale(), ...(options.headers || {}) };
   if (options.body && !(options.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (state.csrfToken && !["GET", "HEAD"].includes(options.method || "GET")) headers["X-CSRF-Token"] = state.csrfToken;
   const response = await fetch(path, { ...options, headers, credentials: "same-origin" });
@@ -567,6 +889,7 @@ async function renderPublicEvent(id, error = "") {
   document.querySelector("#public-language-toggle").addEventListener("click", () => {
     state.locale = nextLocale();
     localStorage.setItem("parcos_locale", state.locale);
+    state.publicEvent = null;
     renderPublicEvent(id);
   });
   document.querySelector("#public-registration-form").addEventListener("submit", async (submitEvent) => {
@@ -619,11 +942,11 @@ function renderToday() {
   const noPhoto = state.beds.filter((bed) => !bed.photoUrl).length;
   const nextEvent = state.events.find((event) => new Date(event.endsAt) >= new Date() && event.state === "published");
   const locale = dateLocaleTag();
-  const bedWord = (count) => t(`planche${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "s"}`);
-  const zoneWord = (count) => t(`zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`);
+  const bedWord = (count) => t(`planche${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "den"}`);
+  const zoneWord = (count) => t(`zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`);
   return `<section class="page today-page">
     <div class="welcome-row"><div><p class="eyebrow">${t("Bonjour", "Hello")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Que se passe-t-il", "What is happening")}<br>${t("au potager ?", "in the garden?")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
-    <article class="hero-card">${brandingImage("today", "hero-card-image")}<div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
+    <article class="hero-card">${brandingImage("today", "hero-card-image")}<div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest", "te oogsten")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`, `${attention.length === 1 ? "heeft" : "hebben"} aandacht nodig.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
     <button class="quick-log-card" id="today-quick-log" type="button"><span>+</span><strong>${t("Ajouter au journal", "Add to log")}</strong><small>${t("Travail, observation, problème, récolte ou photo", "Work, observation, problem, harvest or photo")}</small></button>
     <div class="section-heading"><div><p class="eyebrow">Prochain rendez-vous</p><h2>À l’agenda</h2></div><button class="text-link" data-page="agenda">Tout voir</button></div>
     ${nextEvent ? compactEventCard(nextEvent) : '<div class="empty-state"><strong>Rien de prévu pour le moment</strong><p>Les prochains rendez-vous apparaîtront ici.</p></div>'}
@@ -775,8 +1098,8 @@ function eventCard(event) {
   const coverUrl = eventCoverUrl(event);
   const registration = event.registration;
   const capacity = event.capacity === null
-    ? t(`${event.attendeeCount} inscrit${event.attendeeCount === 1 ? "" : "s"}`, `${event.attendeeCount} registration${event.attendeeCount === 1 ? "" : "s"}`)
-    : t(`${event.attendeeCount}/${event.capacity} participants`, `${event.attendeeCount}/${event.capacity} participants`);
+    ? t(`${event.attendeeCount} inscrit${event.attendeeCount === 1 ? "" : "s"}`, `${event.attendeeCount} registration${event.attendeeCount === 1 ? "" : "s"}`, `${event.attendeeCount} inschrijving${event.attendeeCount === 1 ? "" : "en"}`)
+    : t(`${event.attendeeCount}/${event.capacity} participants`, `${event.attendeeCount}/${event.capacity} participants`, `${event.attendeeCount}/${event.capacity} deelnemers`);
   const attendees = event.attendeeNames?.length ? `${event.attendeeNames.join(", ")}${event.attendeeOverflow ? ` +${event.attendeeOverflow}` : ""}` : t("Aucun inscrit", "No registrations");
   return `<button class="agenda-event-card type-${event.type} ${event.state === "cancelled" ? "cancelled" : ""}" data-event-id="${event.id}">
     ${coverUrl ? `<span class="event-card-thumb"><img src="${coverUrl}" alt="" loading="lazy"></span>` : `<span class="event-icon">${meta.icon}</span>`}<span class="event-card-copy"><small>${escapeHtml(formatTime(event.startsAt))}–${escapeHtml(formatTime(event.endsAt))} · ${escapeHtml(meta.label)}</small><strong>${escapeHtml(event.title)}</strong><span>⌖ ${escapeHtml(event.location)} · ${escapeHtml(capacity)}</span><em class="attendee-preview">${escapeHtml(attendees)}</em></span>
@@ -838,7 +1161,7 @@ function renderGarden() {
   const beds = filteredBeds();
   const area = state.areas.find((item) => item.id === state.selectedAreaId) || state.areas[0];
   const groups = [...new Set(beds.map((bed) => bed.section))];
-  const bedCountLabel = (count) => t(`${count} planche${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "s"}`);
+  const bedCountLabel = (count) => t(`${count} planche${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "den"}`);
   return `<section class="page garden-page">
     <div class="page-title"><div><p class="eyebrow">Se repérer sur place</p><h1>Les potagers</h1><p class="lede">Chaque lieu, ses accès et ses planches.</p></div>${isCoordinator() ? '<button class="round-add" id="manage-areas" aria-label="Gérer les lieux">⚙</button>' : ""}</div>
     <div class="area-switcher">${state.areas.map((item) => `<button data-area-id="${item.id}" class="${item.id === area?.id ? "active" : ""}"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(bedCountLabel(item.bedCount))}</small></span>${!item.membersCanAccess ? `<em>${t("Coordination", "Coordination")}</em>` : ""}</button>`).join("")}</div>
@@ -887,6 +1210,7 @@ function renderProfile() {
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? brandingSettings() : ""}
+    ${state.member.role === "admin" ? `<section class="panel translation-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Traductions du contenu</h2></div></div><p class="muted">Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ <code>translation</code> dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.</p><div class="translation-actions"><button class="button secondary" type="button" id="translation-export">Télécharger le fichier horodaté</button><form id="translation-import-form" class="form-stack compact-form"><label>Fichier JSON traduit<input id="translation-file" type="file" accept=".json,application/json" required></label><button class="button secondary" type="submit">Réimporter les traductions</button></form></div><div id="translation-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
@@ -960,6 +1284,8 @@ function bindShell() {
   document.querySelectorAll("[data-branding-reset]").forEach((button) => button.addEventListener("click", () => resetBrandingImage(button.dataset.brandingReset)));
   document.querySelector("#invite-create-form")?.addEventListener("submit", createInvite);
   document.querySelector("#import-form")?.addEventListener("submit", importData);
+  document.querySelector("#translation-export")?.addEventListener("click", exportTranslations);
+  document.querySelector("#translation-import-form")?.addEventListener("submit", importTranslationsFile);
   document.querySelectorAll("[data-reset-member]").forEach((button) => button.addEventListener("click", () => createResetLink(Number(button.dataset.resetMember))));
   document.querySelector("#logout-button")?.addEventListener("click", logout);
 }
@@ -980,6 +1306,8 @@ async function toggleLanguage() {
       showToast(error.message);
     }
   }
+  await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities()]);
+  if (state.selectedBed) state.selectedBed = await api(`/api/beds/${state.selectedBed.bed.id}`);
   renderApp();
 }
 
@@ -1553,8 +1881,11 @@ async function saveProfile(event) {
   try {
     const result = await api("/api/profile", { method: "PATCH", body: JSON.stringify(data) });
     state.member = result.member;
+    state.locale = result.member.preferredLocale;
+    localStorage.setItem("parcos_locale", state.locale);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities()]);
     renderApp();
-    showToast("Profil enregistré.");
+    showToast(t("Profil enregistré.", "Profile saved."));
   } catch (error) {
     showToast(error.message);
   }
@@ -1608,6 +1939,57 @@ function parseDelimited(text) {
   if (rows.length < 2) throw new Error("Le fichier doit contenir une ligne d’en-têtes et au moins une ligne de données.");
   const headers = rows[0].map((header) => header.trim());
   return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
+}
+
+async function exportTranslations() {
+  const button = document.querySelector("#translation-export");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/translations/export", {
+      headers: { "X-Parcos-Locale": currentLocale() },
+      credentials: "same-origin",
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || t("Impossible d’exporter les traductions.", "Could not export translations."));
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") || "";
+    const filename = /filename=([^;]+)/i.exec(disposition)?.[1]?.replace(/^"|"$/g, "") || `parcos-translations-${new Date().toISOString()}.json`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast(t("Fichier de traduction téléchargé.", "Translation file downloaded."));
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function importTranslationsFile(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  const resultBox = document.querySelector("#translation-result");
+  const file = form.elements[0].files[0];
+  if (!file) return;
+  button.disabled = true;
+  try {
+    const payload = JSON.parse(await file.text());
+    const result = await api("/api/translations/import", { method: "POST", body: JSON.stringify(payload) });
+    resultBox.innerHTML = `<div class="invite-result"><small>${t("Import des traductions terminé", "Translation import complete")}</small><p>${result.imported} ${t("traductions importées", "translations imported")}; ${result.empty} ${t("vides", "empty")}; ${result.stale} ${t("obsolètes refusées", "stale rejected")}; ${result.invalid} ${t("invalides", "invalid")}.</p></div>`;
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities()]);
+    renderApp();
+    showToast(t("Les traductions ont été importées.", "Translations were imported."));
+  } catch (error) {
+    resultBox.innerHTML = `<div class="form-error">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function importData(event) {

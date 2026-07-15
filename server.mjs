@@ -21,6 +21,20 @@ const SESSION_DAYS = 30;
 const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const PHOTO_BYTES = 6 * 1024 * 1024;
 const AVATAR_BYTES = 2 * 1024 * 1024;
+const SUPPORTED_LOCALES = ["fr", "nl", "en"];
+const DEFAULT_CONTENT_LOCALE = "fr";
+
+const localizedEntities = {
+  area: { table: "garden_areas", fields: ["name", "description", "location_hint"] },
+  bed: { table: "beds", fields: ["section", "location_hint", "crop", "variety", "note", "harvest_note"] },
+  event: { table: "events", fields: ["title", "description", "location", "accessibility_note", "preparation_note"] },
+  bed_note: { table: "bed_notes", fields: ["body"] },
+  activity: { table: "activities", fields: ["note"] },
+  harvest: { table: "harvests", fields: ["quantity", "note"] },
+  how_to: { table: "how_to_videos", fields: ["title", "note"] },
+  bed_photo: { table: "bed_photos", fields: ["caption"] },
+  harvest_photo: { table: "harvest_photos", fields: ["caption"] },
+};
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -496,6 +510,35 @@ function createSchema(db) {
       value text not null,
       updated_at text not null
     );
+
+    create table if not exists localized_content (
+      entity_type text not null,
+      entity_id integer not null,
+      field text not null,
+      source_locale text not null check (source_locale in ('fr', 'nl', 'en')),
+      source_revision integer not null default 1 check (source_revision > 0),
+      created_at text not null,
+      updated_at text not null,
+      primary key (entity_type, entity_id, field)
+    );
+    create index if not exists localized_content_pending_idx
+      on localized_content(source_locale, entity_type, entity_id);
+
+    create table if not exists content_translations (
+      entity_type text not null,
+      entity_id integer not null,
+      field text not null,
+      locale text not null check (locale in ('fr', 'nl', 'en')),
+      value text not null,
+      source_revision integer not null check (source_revision > 0),
+      created_at text not null,
+      updated_at text not null,
+      primary key (entity_type, entity_id, field, locale),
+      foreign key (entity_type, entity_id, field)
+        references localized_content(entity_type, entity_id, field) on delete cascade
+    );
+    create index if not exists content_translations_revision_idx
+      on content_translations(entity_type, entity_id, field, source_revision);
   `);
 
   const bedColumns = db.prepare("pragma table_info(beds)").all();
@@ -540,6 +583,204 @@ function createSchema(db) {
   }
   db.exec("create index if not exists events_starts_idx on events(starts_at, state)");
 }
+
+function localeValue(value, fallback = DEFAULT_CONTENT_LOCALE) {
+  const locale = String(value ?? "").trim().toLowerCase().split(/[-_]/)[0];
+  return SUPPORTED_LOCALES.includes(locale) ? locale : fallback;
+}
+
+function localeText(locale, fr, nl, en) {
+  return { fr, nl, en }[localeValue(locale)] ?? fr;
+}
+
+function requestLocale(req, url) {
+  return localeValue(req.headers["x-parcos-locale"] ?? url.searchParams.get("lang") ?? req.headers["accept-language"]);
+}
+
+function cleanLocalizedValue(value) {
+  return value === null || value === undefined ? null : String(value);
+}
+
+function registerLocalizedEntity(db, entityType, entityId, values, sourceLocale, timestamp = now()) {
+  const config = localizedEntities[entityType];
+  if (!config) throw new Error(`Unknown localized entity type: ${entityType}`);
+  const locale = localeValue(sourceLocale);
+  const insert = db.prepare(`insert into localized_content
+    (entity_type, entity_id, field, source_locale, source_revision, created_at, updated_at)
+    values (?, ?, ?, ?, 1, ?, ?) on conflict(entity_type, entity_id, field) do nothing`);
+  for (const field of config.fields) {
+    const value = cleanLocalizedValue(values[field]);
+    if (value !== null && value.trim()) insert.run(entityType, entityId, field, locale, timestamp, timestamp);
+  }
+}
+
+function backfillLocalizedContent(db) {
+  const timestamp = now();
+  db.exec("begin immediate");
+  try {
+    for (const [entityType, config] of Object.entries(localizedEntities)) {
+      const rows = db.prepare(`select id, ${config.fields.join(", ")} from ${config.table}`).all();
+      for (const row of rows) registerLocalizedEntity(db, entityType, row.id, row, DEFAULT_CONTENT_LOCALE, timestamp);
+    }
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+    throw error;
+  }
+}
+
+function localizedRow(db, entityType, row, locale) {
+  if (!row) return row;
+  const config = localizedEntities[entityType];
+  if (!config) return row;
+  const targetLocale = localeValue(locale);
+  const result = { ...row };
+  const metadata = db.prepare(`select field, source_locale, source_revision from localized_content
+    where entity_type = ? and entity_id = ?`).all(entityType, row.id);
+  const translations = db.prepare(`select field, value, source_revision from content_translations
+    where entity_type = ? and entity_id = ? and locale = ?`).all(entityType, row.id, targetLocale);
+  const translatedByField = new Map(translations.map((item) => [item.field, item]));
+  for (const item of metadata) {
+    if (item.source_locale === targetLocale) continue;
+    const translation = translatedByField.get(item.field);
+    if (translation?.source_revision === item.source_revision) result[item.field] = translation.value;
+  }
+  return result;
+}
+
+function localizedUpdateValues(db, entityType, entityId, baseRow, submitted, locale, timestamp = now()) {
+  const config = localizedEntities[entityType];
+  if (!config) throw new Error(`Unknown localized entity type: ${entityType}`);
+  const targetLocale = localeValue(locale);
+  registerLocalizedEntity(db, entityType, entityId, baseRow, DEFAULT_CONTENT_LOCALE, timestamp);
+  const canonical = {};
+  const selectMeta = db.prepare(`select source_locale, source_revision from localized_content
+    where entity_type = ? and entity_id = ? and field = ?`);
+  const updateSource = db.prepare(`update localized_content set source_revision = source_revision + 1, updated_at = ?
+    where entity_type = ? and entity_id = ? and field = ?`);
+  const upsertTranslation = db.prepare(`insert into content_translations
+    (entity_type, entity_id, field, locale, value, source_revision, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(entity_type, entity_id, field, locale) do update set
+      value = excluded.value, source_revision = excluded.source_revision, updated_at = excluded.updated_at`);
+
+  for (const field of config.fields) {
+    if (!(field in submitted)) continue;
+    const nextValue = cleanLocalizedValue(submitted[field]);
+    const baseValue = cleanLocalizedValue(baseRow[field]);
+    const meta = selectMeta.get(entityType, entityId, field);
+    if (!meta) {
+      canonical[field] = nextValue;
+      if (nextValue !== null && nextValue.trim()) registerLocalizedEntity(db, entityType, entityId, { [field]: nextValue }, targetLocale, timestamp);
+      continue;
+    }
+    if (meta.source_locale === targetLocale) {
+      canonical[field] = nextValue;
+      if (nextValue !== baseValue) updateSource.run(timestamp, entityType, entityId, field);
+      continue;
+    }
+    canonical[field] = baseValue;
+    const existing = db.prepare(`select value, source_revision from content_translations
+      where entity_type = ? and entity_id = ? and field = ? and locale = ?`).get(entityType, entityId, field, targetLocale);
+    if (existing || nextValue !== baseValue) {
+      upsertTranslation.run(entityType, entityId, field, targetLocale, nextValue ?? "", meta.source_revision, timestamp, timestamp);
+    }
+  }
+  return canonical;
+}
+
+function pendingTranslationExport(db) {
+  const exportedAt = now();
+  const items = [];
+  const fields = db.prepare(`select * from localized_content order by entity_type, entity_id, field`).all();
+  const sourceValue = new Map();
+  for (const [entityType, config] of Object.entries(localizedEntities)) {
+    const rows = db.prepare(`select id, ${config.fields.join(", ")} from ${config.table}`).all();
+    for (const row of rows) for (const field of config.fields) sourceValue.set(`${entityType}:${row.id}:${field}`, row[field]);
+  }
+  const findTranslation = db.prepare(`select value, source_revision from content_translations
+    where entity_type = ? and entity_id = ? and field = ? and locale = ?`);
+  for (const field of fields) {
+    for (const targetLocale of SUPPORTED_LOCALES) {
+      if (targetLocale === field.source_locale) continue;
+      const translation = findTranslation.get(field.entity_type, field.entity_id, field.field, targetLocale);
+      if (translation?.source_revision === field.source_revision) continue;
+      items.push({
+        entityType: field.entity_type,
+        entityId: field.entity_id,
+        field: field.field,
+        sourceLocale: field.source_locale,
+        targetLocale,
+        sourceRevision: field.source_revision,
+        sourceText: sourceValue.get(`${field.entity_type}:${field.entity_id}:${field.field}`) ?? "",
+        translation: translation?.value ?? "",
+        status: translation ? "stale" : "missing",
+      });
+    }
+  }
+  const payload = { format: "parcos-translations-v1", exportedAt, items };
+  payload.exportId = sha256(JSON.stringify(payload));
+  return payload;
+}
+
+function importTranslations(db, payload) {
+  if (payload?.format !== "parcos-translations-v1" || !Array.isArray(payload.items)) {
+    throw new HttpError(400, "Fichier de traduction parcOS invalide.");
+  }
+  if (payload.items.length > 10000) throw new HttpError(400, "Le fichier contient trop de traductions.");
+  const timestamp = now();
+  const result = { imported: 0, empty: 0, stale: 0, invalid: 0 };
+  const selectMeta = db.prepare(`select source_locale, source_revision from localized_content
+    where entity_type = ? and entity_id = ? and field = ?`);
+  const upsert = db.prepare(`insert into content_translations
+    (entity_type, entity_id, field, locale, value, source_revision, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(entity_type, entity_id, field, locale) do update set
+      value = excluded.value, source_revision = excluded.source_revision, updated_at = excluded.updated_at`);
+  db.exec("begin immediate");
+  try {
+    for (const item of payload.items) {
+      const translation = String(item?.translation ?? "").trim();
+      if (!translation) { result.empty += 1; continue; }
+      const targetLocale = localeValue(item.targetLocale, "");
+      const meta = selectMeta.get(String(item.entityType ?? ""), Number(item.entityId), String(item.field ?? ""));
+      if (!meta || !targetLocale || targetLocale === meta.source_locale) { result.invalid += 1; continue; }
+      if (Number(item.sourceRevision) !== meta.source_revision || String(item.sourceLocale) !== meta.source_locale) {
+        result.stale += 1;
+        continue;
+      }
+      upsert.run(item.entityType, Number(item.entityId), item.field, targetLocale, translation, meta.source_revision, timestamp, timestamp);
+      result.imported += 1;
+    }
+    db.exec("commit");
+    return result;
+  } catch (error) {
+    db.exec("rollback");
+    throw error;
+  }
+}
+
+function localizedAreaJson(db, row, locale) { return areaJson(localizedRow(db, "area", row, locale)); }
+function localizedBedJson(db, row, locale) {
+  const localized = localizedRow(db, "bed", row, locale);
+  if (localized.area_id) {
+    const area = db.prepare("select id, name from garden_areas where id = ?").get(localized.area_id);
+    if (area) localized.garden = localizedRow(db, "area", area, locale).name;
+  }
+  return bedJson(localized);
+}
+function localizedEventJson(db, row, attendees, locale) { return eventJson(localizedRow(db, "event", row, locale), attendees); }
+function localizedActivityJson(db, row, locale) {
+  const localized = localizedRow(db, "activity", row, locale);
+  if (localized.bed_id && localized.bed_crop) {
+    const bed = localizedRow(db, "bed", { id: localized.bed_id, crop: localized.bed_crop }, locale);
+    localized.bed_crop = bed.crop;
+  }
+  return activityJson(localized);
+}
+function localizedBedNoteJson(db, row, locale) { return bedNoteJson(localizedRow(db, "bed_note", row, locale)); }
+function localizedHarvestJson(db, row, locale) { return harvestJson(localizedRow(db, "harvest", row, locale)); }
+function localizedHowToJson(db, row, locale) { return howToVideoJson(localizedRow(db, "how_to", row, locale)); }
 
 const seedBeds = [
   [1, "Tomates", "Noire de Crimée", "growing"],
@@ -793,11 +1034,13 @@ function youtubeVideoId(value) {
   return candidate;
 }
 
-function insertBedNote(db, bedId, memberId, type, body, timestamp = now()) {
+function insertBedNote(db, bedId, memberId, type, body, timestamp = now(), locale = DEFAULT_CONTENT_LOCALE) {
   const cleanBody = String(body ?? "").trim().slice(0, 1000);
   if (!cleanBody) return null;
-  return db.prepare(`insert into bed_notes (bed_id, member_id, note_type, body, created_at, updated_at)
+  const result = db.prepare(`insert into bed_notes (bed_id, member_id, note_type, body, created_at, updated_at)
     values (?, ?, ?, ?, ?, ?)`).run(bedId, memberId ?? null, type, cleanBody, timestamp, timestamp);
+  registerLocalizedEntity(db, "bed_note", Number(result.lastInsertRowid), { body: cleanBody }, locale, timestamp);
+  return result;
 }
 
 function backfillBedNotes(db) {
@@ -1003,7 +1246,7 @@ function booleanImportValue(value, fallback = true) {
   return ["1", "true", "yes", "y", "oui", "o"].includes(textValue);
 }
 
-function importRows(db, rows, adminId) {
+function importRows(db, rows, adminId, contentLocale = DEFAULT_CONTENT_LOCALE) {
   if (!Array.isArray(rows) || rows.length < 1 || rows.length > 500) {
     throw new HttpError(400, "Importez entre 1 et 500 lignes.");
   }
@@ -1026,10 +1269,13 @@ function importRows(db, rows, adminId) {
             membersCanAccess: booleanImportValue(row.membersCanAccess, true),
           });
           const sortOrder = Number(db.prepare("select coalesce(max(sort_order), 0) + 1 as next from garden_areas").get().next);
-          db.prepare(`insert into garden_areas
+          const createdArea = db.prepare(`insert into garden_areas
             (name, slug, code_prefix, description, location_hint, members_can_access, sort_order, created_at, updated_at)
             values (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(values.name, values.slug, values.codePrefix, values.description, values.locationHint, values.membersCanAccess ? 1 : 0, sortOrder, timestamp, timestamp);
+          registerLocalizedEntity(db, "area", Number(createdArea.lastInsertRowid), {
+            name: values.name, description: values.description, location_hint: values.locationHint,
+          }, contentLocale, timestamp);
           result.imported.areas += 1;
         } else if (entity === "bed") {
           const areaCode = String(row.areaCodePrefix ?? row.codePrefix ?? "").trim().toUpperCase();
@@ -1049,8 +1295,12 @@ function importRows(db, rows, adminId) {
             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(area.id, code, number, area.name, value("section", 120) || area.name, value("locationHint", 240), sortOrder,
               value("crop", 120), value("variety", 120), status, value("note", 1000), value("harvestNote", 1000), timestamp);
-          insertBedNote(db, Number(createdBed.lastInsertRowid), adminId, "garden", row.note, timestamp);
-          insertBedNote(db, Number(createdBed.lastInsertRowid), adminId, "harvest", row.harvestNote, timestamp);
+          registerLocalizedEntity(db, "bed", Number(createdBed.lastInsertRowid), {
+            section: value("section", 120) || area.name, location_hint: value("locationHint", 240), crop: value("crop", 120),
+            variety: value("variety", 120), note: value("note", 1000), harvest_note: value("harvestNote", 1000),
+          }, contentLocale, timestamp);
+          insertBedNote(db, Number(createdBed.lastInsertRowid), adminId, "garden", row.note, timestamp, contentLocale);
+          insertBedNote(db, Number(createdBed.lastInsertRowid), adminId, "harvest", row.harvestNote, timestamp, contentLocale);
           result.imported.beds += 1;
         } else if (entity === "event") {
           const values = eventInput({
@@ -1066,11 +1316,15 @@ function importRows(db, rows, adminId) {
             accessibilityNote: row.accessibilityNote,
             preparationNote: row.preparationNote,
           });
-          db.prepare(`insert into events
+          const createdEvent = db.prepare(`insert into events
             (title, description, location, event_type, state, audience, starts_at, ends_at, capacity, accessibility_note, preparation_note, created_by, created_at, updated_at)
             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(values.title, values.description, values.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
               values.capacity, values.accessibilityNote, values.preparationNote, adminId, timestamp, timestamp);
+          registerLocalizedEntity(db, "event", Number(createdEvent.lastInsertRowid), {
+            title: values.title, description: values.description, location: values.location,
+            accessibility_note: values.accessibilityNote, preparation_note: values.preparationNote,
+          }, contentLocale, timestamp);
           result.imported.events += 1;
         } else if (entity === "member") {
           const username = cleanUsername(row.username);
@@ -1188,6 +1442,7 @@ export function createApp(options = {}) {
   seedDatabase(db, options.adminUsername ?? env.PARCOS_ADMIN_USERNAME, options.adminPassword ?? env.PARCOS_ADMIN_PASSWORD,
     options.seedDemoData ?? env.PARCOS_SEED_DEMO === "true");
   backfillBedNotes(db);
+  backfillLocalizedContent(db);
   db.prepare("delete from sessions where expires_at <= ?").run(now());
 
   const loginAttempts = new Map();
@@ -1196,6 +1451,7 @@ export function createApp(options = {}) {
     try {
       const url = new URL(req.url, "http://parcos.local");
       const path = decodeURIComponent(url.pathname);
+      const locale = requestLocale(req, url);
 
       if (req.method === "GET" && path === "/health") {
         return json(res, 200, { status: "ok" });
@@ -1281,7 +1537,7 @@ export function createApp(options = {}) {
           const eventId = Number(publicEventMatch[1]);
           const event = findPublicEvent(db, eventId);
           const attendees = eventAttendees(db, eventId);
-          return json(res, 200, { event: eventJson(event, attendees), registrations: attendees });
+          return json(res, 200, { event: localizedEventJson(db, event, attendees, locale), registrations: attendees });
         }
 
         if (req.method === "GET" && path === "/api/public/branding") {
@@ -1290,7 +1546,7 @@ export function createApp(options = {}) {
 
         const publicEventCalendarMatch = /^\/api\/public\/events\/(\d+)\/calendar\.ics$/.exec(path);
         if (publicEventCalendarMatch && req.method === "GET") {
-          const event = findPublicEvent(db, Number(publicEventCalendarMatch[1]));
+          const event = localizedRow(db, "event", findPublicEvent(db, Number(publicEventCalendarMatch[1])), locale);
           const body = eventCalendar(event, requestOrigin(req, baseUrl, trustProxy));
           return text(res, 200, body, "text/calendar; charset=utf-8", { "Content-Disposition": `attachment; filename=parcos-public-${event.id}.ics` });
         }
@@ -1310,7 +1566,7 @@ export function createApp(options = {}) {
           rebalanceWaitlist(db, eventId);
           return json(res, 201, {
             registrationId: result.lastInsertRowid,
-            event: eventJson(findPublicEvent(db, eventId), eventAttendees(db, eventId)),
+            event: localizedEventJson(db, findPublicEvent(db, eventId), eventAttendees(db, eventId), locale),
             status,
           });
         }
@@ -1369,8 +1625,13 @@ export function createApp(options = {}) {
             const insert = db.prepare(`insert into garden_areas
               (name, slug, code_prefix, description, location_hint, members_can_access, sort_order, created_at, updated_at)
               values (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-            areas.forEach((area, index) => insert.run(area.name, area.slug, area.codePrefix, area.description, area.locationHint,
-              area.membersCanAccess ? 1 : 0, index + 1, timestamp, timestamp));
+            areas.forEach((area, index) => {
+              const created = insert.run(area.name, area.slug, area.codePrefix, area.description, area.locationHint,
+                area.membersCanAccess ? 1 : 0, index + 1, timestamp, timestamp);
+              registerLocalizedEntity(db, "area", Number(created.lastInsertRowid), {
+                name: area.name, description: area.description, location_hint: area.locationHint,
+              }, locale, timestamp);
+            });
             db.prepare(`insert into app_meta (key, value, updated_at) values ('parc_name', ?, ?)
               on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(parcName, timestamp);
             db.exec("commit");
@@ -1437,11 +1698,27 @@ export function createApp(options = {}) {
           return json(res, 200, { members: rows.map(memberJson) });
         }
 
+        if (req.method === "GET" && path === "/api/translations/export") {
+          requireCoordinator(session);
+          const payload = pendingTranslationExport(db);
+          const body = `${JSON.stringify(payload, null, 2)}\n`;
+          const stamp = payload.exportedAt.replace(/[:.]/g, "-");
+          return text(res, 200, body, "application/json; charset=utf-8", {
+            "Content-Disposition": `attachment; filename=parcos-translations-${stamp}.json`,
+          });
+        }
+
+        if (req.method === "POST" && path === "/api/translations/import") {
+          requireCsrf(req, session);
+          requireCoordinator(session);
+          return json(res, 200, importTranslations(db, await readJson(req)));
+        }
+
         if (req.method === "POST" && path === "/api/import") {
           requireCsrf(req, session);
           if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
           const body = await readJson(req);
-          return json(res, 200, importRows(db, body.rows, session.member.id));
+          return json(res, 200, importRows(db, body.rows, session.member.id, locale));
         }
 
         if (req.method === "POST" && path === "/api/invites") {
@@ -1477,7 +1754,7 @@ export function createApp(options = {}) {
           const events = eventSelect(db, session.member.id)
             .filter((event) => coordinator || (event.state !== "draft" && ["members", "public"].includes(event.audience)))
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-            .map((event) => eventJson(event, eventAttendees(db, event.id)));
+            .map((event) => localizedEventJson(db, event, eventAttendees(db, event.id), locale));
           return json(res, 200, { events });
         }
 
@@ -1492,12 +1769,16 @@ export function createApp(options = {}) {
             .run(values.title, values.description, values.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
               values.capacity, values.accessibilityNote, values.preparationNote, session.member.id, timestamp, timestamp);
           const eventId = Number(result.lastInsertRowid);
-          return json(res, 201, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
+          registerLocalizedEntity(db, "event", eventId, {
+            title: values.title, description: values.description, location: values.location,
+            accessibility_note: values.accessibilityNote, preparation_note: values.preparationNote,
+          }, locale, timestamp);
+          return json(res, 201, { event: localizedEventJson(db, findEvent(db, eventId, session.member.id), eventAttendees(db, eventId), locale) });
         }
 
         const eventCalendarMatch = /^\/api\/events\/(\d+)\/calendar\.ics$/.exec(path);
         if (eventCalendarMatch && req.method === "GET") {
-          const event = findEvent(db, Number(eventCalendarMatch[1]), session.member.id);
+          const event = localizedRow(db, "event", findEvent(db, Number(eventCalendarMatch[1]), session.member.id), locale);
           if ((event.state === "draft" || event.audience === "coordinators") && !["coordinator", "admin"].includes(session.member.role)) throw new HttpError(404, "Événement introuvable.");
           const body = eventCalendar(event, requestOrigin(req, baseUrl, trustProxy));
           return text(res, 200, body, "text/calendar; charset=utf-8", { "Content-Disposition": `attachment; filename=parcos-${event.id}.ics` });
@@ -1521,7 +1802,7 @@ export function createApp(options = {}) {
               children = excluded.children, young_children = excluded.young_children, status = excluded.status, updated_at = excluded.updated_at`)
             .run(eventId, session.member.id, counts.adults, counts.teenagers, counts.children, counts.youngChildren, status, timestamp, timestamp);
           rebalanceWaitlist(db, eventId);
-          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
+          return json(res, 200, { event: localizedEventJson(db, findEvent(db, eventId, session.member.id), eventAttendees(db, eventId), locale) });
         }
 
         if (eventRegistrationMatch && req.method === "DELETE") {
@@ -1531,7 +1812,7 @@ export function createApp(options = {}) {
           db.prepare("update event_registrations set status = 'cancelled', updated_at = ? where event_id = ? and member_id = ?")
             .run(now(), eventId, session.member.id);
           rebalanceWaitlist(db, eventId);
-          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
+          return json(res, 200, { event: localizedEventJson(db, findEvent(db, eventId, session.member.id), eventAttendees(db, eventId), locale) });
         }
 
         const eventMatch = /^\/api\/events\/(\d+)$/.exec(path);
@@ -1541,7 +1822,7 @@ export function createApp(options = {}) {
           const coordinator = ["coordinator", "admin"].includes(session.member.role);
           if (!coordinator && (event.state === "draft" || event.audience === "coordinators")) throw new HttpError(404, "Événement introuvable.");
           const registrations = eventAttendees(db, eventId);
-          return json(res, 200, { event: eventJson(event, registrations), registrations });
+          return json(res, 200, { event: localizedEventJson(db, event, registrations, locale), registrations });
         }
 
         if (eventMatch && req.method === "PATCH") {
@@ -1549,20 +1830,33 @@ export function createApp(options = {}) {
           requireCoordinator(session);
           const eventId = Number(eventMatch[1]);
           const before = findEvent(db, eventId, session.member.id);
-          const values = eventInput(await readJson(req), before);
-          db.prepare(`update events set title = ?, description = ?, location = ?, event_type = ?, state = ?, audience = ?,
-            starts_at = ?, ends_at = ?, capacity = ?, accessibility_note = ?, preparation_note = ?, updated_at = ? where id = ?`)
-            .run(values.title, values.description, values.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
-              values.capacity, values.accessibilityNote, values.preparationNote, now(), eventId);
+          const values = eventInput(await readJson(req), localizedRow(db, "event", before, locale));
+          const timestamp = now();
+          const submitted = {
+            title: values.title, description: values.description, location: values.location,
+            accessibility_note: values.accessibilityNote, preparation_note: values.preparationNote,
+          };
+          db.exec("begin immediate");
+          try {
+            const canonical = localizedUpdateValues(db, "event", eventId, before, submitted, locale, timestamp);
+            db.prepare(`update events set title = ?, description = ?, location = ?, event_type = ?, state = ?, audience = ?,
+              starts_at = ?, ends_at = ?, capacity = ?, accessibility_note = ?, preparation_note = ?, updated_at = ? where id = ?`)
+              .run(canonical.title, canonical.description, canonical.location, values.type, values.state, values.audience, values.startsAt, values.endsAt,
+                values.capacity, canonical.accessibility_note, canonical.preparation_note, timestamp, eventId);
+            db.exec("commit");
+          } catch (error) {
+            db.exec("rollback");
+            throw error;
+          }
           rebalanceWaitlist(db, eventId);
-          return json(res, 200, { event: eventJson(findEvent(db, eventId, session.member.id), eventAttendees(db, eventId)) });
+          return json(res, 200, { event: localizedEventJson(db, findEvent(db, eventId, session.member.id), eventAttendees(db, eventId), locale) });
         }
 
         if (req.method === "GET" && path === "/api/areas") {
           const coordinator = ["coordinator", "admin"].includes(session.member.role);
           const rows = db.prepare(`select a.*, (select count(*) from beds b where b.area_id = a.id) as bed_count
             from garden_areas a where ? = 1 or a.members_can_access = 1 order by a.sort_order, a.name collate nocase`).all(coordinator ? 1 : 0);
-          return json(res, 200, { areas: rows.map(areaJson) });
+          return json(res, 200, { areas: rows.map((row) => localizedAreaJson(db, row, locale)) });
         }
 
         if (req.method === "POST" && path === "/api/areas") {
@@ -1576,7 +1870,11 @@ export function createApp(options = {}) {
               (name, slug, code_prefix, description, location_hint, members_can_access, sort_order, created_at, updated_at)
               values (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
               .run(values.name, values.slug, values.codePrefix, values.description, values.locationHint, values.membersCanAccess ? 1 : 0, sortOrder, timestamp, timestamp);
-            return json(res, 201, { area: areaJson(findArea(db, Number(result.lastInsertRowid))) });
+            const areaId = Number(result.lastInsertRowid);
+            registerLocalizedEntity(db, "area", areaId, {
+              name: values.name, description: values.description, location_hint: values.locationHint,
+            }, locale, timestamp);
+            return json(res, 201, { area: localizedAreaJson(db, findArea(db, areaId), locale) });
           } catch (error) {
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Ce nom ou ce préfixe est déjà utilisé.");
             throw error;
@@ -1589,21 +1887,27 @@ export function createApp(options = {}) {
           requireCoordinator(session);
           const areaId = Number(areaMatch[1]);
           const before = findArea(db, areaId);
-          const values = areaInput(await readJson(req), before);
+          const values = areaInput(await readJson(req), localizedRow(db, "area", before, locale));
           const timestamp = now();
           db.exec("begin immediate");
           try {
+            const canonical = localizedUpdateValues(db, "area", areaId, before, {
+              name: values.name, description: values.description, location_hint: values.locationHint,
+            }, locale, timestamp);
+            const sourceEdit = localeValue(locale) === db.prepare(`select source_locale from localized_content
+              where entity_type = 'area' and entity_id = ? and field = 'name'`).get(areaId)?.source_locale;
             db.prepare(`update garden_areas set name = ?, slug = ?, code_prefix = ?, description = ?, location_hint = ?,
               members_can_access = ?, updated_at = ? where id = ?`)
-              .run(values.name, values.slug, values.codePrefix, values.description, values.locationHint, values.membersCanAccess ? 1 : 0, timestamp, areaId);
-            if (values.name !== before.name) db.prepare("update beds set garden = ?, updated_at = ? where area_id = ?").run(values.name, timestamp, areaId);
+              .run(canonical.name, sourceEdit ? values.slug : before.slug, values.codePrefix, canonical.description, canonical.location_hint,
+                values.membersCanAccess ? 1 : 0, timestamp, areaId);
+            if (canonical.name !== before.name) db.prepare("update beds set garden = ?, updated_at = ? where area_id = ?").run(canonical.name, timestamp, areaId);
             db.exec("commit");
           } catch (error) {
             db.exec("rollback");
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Ce nom ou ce préfixe est déjà utilisé.");
             throw error;
           }
-          return json(res, 200, { area: areaJson(findArea(db, areaId)) });
+          return json(res, 200, { area: localizedAreaJson(db, findArea(db, areaId), locale) });
         }
 
         const areaBedsMatch = /^\/api\/areas\/(\d+)\/beds$/.exec(path);
@@ -1629,9 +1933,13 @@ export function createApp(options = {}) {
               .run(areaId, code, number, area.name, value("section", 120) || area.name, value("locationHint", 240), sortOrder,
                 value("crop", 120), value("variety", 120), status, value("note", 1000), value("harvestNote", 1000), timestamp);
             const bedId = Number(result.lastInsertRowid);
-            insertBedNote(db, bedId, session.member.id, "garden", body.note, timestamp);
-            insertBedNote(db, bedId, session.member.id, "harvest", body.harvestNote, timestamp);
-            return json(res, 201, { bed: bedJson(findBed(db, bedId)) });
+            insertBedNote(db, bedId, session.member.id, "garden", body.note, timestamp, locale);
+            insertBedNote(db, bedId, session.member.id, "harvest", body.harvestNote, timestamp, locale);
+            registerLocalizedEntity(db, "bed", bedId, {
+              section: value("section", 120) || area.name, location_hint: value("locationHint", 240), crop: value("crop", 120),
+              variety: value("variety", 120), note: value("note", 1000), harvest_note: value("harvestNote", 1000),
+            }, locale, timestamp);
+            return json(res, 201, { bed: localizedBedJson(db, findBed(db, bedId), locale) });
           } catch (error) {
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Ce numéro ou ce code de planche existe déjà dans ce lieu.");
             throw error;
@@ -1644,7 +1952,7 @@ export function createApp(options = {}) {
             join garden_areas a on a.id = b.area_id
             left join bed_photos p on p.bed_id = b.id and p.is_cover = 1
             where ? = 1 or a.members_can_access = 1 order by a.sort_order, b.sort_order, b.display_number`).all(coordinator ? 1 : 0);
-          return json(res, 200, { beds: rows.map(bedJson) });
+          return json(res, 200, { beds: rows.map((row) => localizedBedJson(db, row, locale)) });
         }
 
         if (req.method === "GET" && path === "/api/activities") {
@@ -1657,7 +1965,7 @@ export function createApp(options = {}) {
             left join members member on member.id = activity.member_id
             where ? = 1 or area.members_can_access = 1
             order by activity.created_at desc, activity.id desc limit 20`).all(coordinator ? 1 : 0);
-          return json(res, 200, { activities: rows.map(activityJson) });
+          return json(res, 200, { activities: rows.map((row) => localizedActivityJson(db, row, locale)) });
         }
 
         const bedMatch = /^\/api\/beds\/(\d+)$/.exec(path);
@@ -1665,20 +1973,26 @@ export function createApp(options = {}) {
           const bedId = Number(bedMatch[1]);
           const bed = requireBedAccess(findBed(db, bedId), session);
           const photos = db.prepare("select id, path, caption, created_at from bed_photos where bed_id = ? order by is_cover desc, created_at desc").all(bedId)
-            .map((photo) => ({ id: photo.id, url: `/media/${photo.path}`, caption: photo.caption, createdAt: photo.created_at }));
+            .map((photo) => {
+              const localized = localizedRow(db, "bed_photo", photo, locale);
+              return { id: localized.id, url: `/media/${localized.path}`, caption: localized.caption, createdAt: localized.created_at };
+            });
           const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
             from harvests h
             left join harvest_photos hp on hp.harvest_id = h.id
             left join members m on m.id = h.member_id
-            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map(harvestJson);
+            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map((row) => localizedHarvestJson(db, row, locale));
           const notes = db.prepare(`select n.*, m.display_name as member_name
             from bed_notes n left join members m on m.id = n.member_id
-            where n.bed_id = ? order by n.created_at desc, n.id desc limit 50`).all(bedId).map(bedNoteJson);
-          const howToVideos = db.prepare("select * from how_to_videos where bed_id = ? order by created_at desc, id desc").all(bedId).map(howToVideoJson);
+            where n.bed_id = ? order by n.created_at desc, n.id desc limit 50`).all(bedId).map((row) => localizedBedNoteJson(db, row, locale));
+          const howToVideos = db.prepare("select * from how_to_videos where bed_id = ? order by created_at desc, id desc").all(bedId).map((row) => localizedHowToJson(db, row, locale));
           const activities = db.prepare(`select a.id, a.activity_type, a.note, a.created_at, m.display_name
             from activities a left join members m on m.id = a.member_id where a.bed_id = ? order by a.created_at desc limit 30`).all(bedId)
-            .map((activity) => ({ id: activity.id, type: activity.activity_type, note: activity.note, createdAt: activity.created_at, memberName: activity.display_name }));
-          return json(res, 200, { bed: bedJson(bed), photos, notes, harvests, howToVideos, activities });
+            .map((activity) => {
+              const localized = localizedRow(db, "activity", activity, locale);
+              return { id: localized.id, type: localized.activity_type, note: localized.note, createdAt: localized.created_at, memberName: localized.display_name };
+            });
+          return json(res, 200, { bed: localizedBedJson(db, bed, locale), photos, notes, harvests, howToVideos, activities });
         }
 
         if (bedMatch && req.method === "PATCH") {
@@ -1686,35 +2000,42 @@ export function createApp(options = {}) {
           requireCoordinator(session);
           const bedId = Number(bedMatch[1]);
           const before = findBed(db, bedId);
+          const displayedBefore = localizedRow(db, "bed", before, locale);
           const body = await readJson(req);
           const status = ["unknown", "ready", "growing", "harvest", "clear", "winter"].includes(body.status) ? body.status : before.status;
           const value = (key, fallback, max = 500) => body[key] === undefined ? fallback : (String(body[key] ?? "").trim().slice(0, max) || null);
           const after = {
-            crop: value("crop", before.crop, 120),
-            variety: value("variety", before.variety, 120),
+            crop: value("crop", displayedBefore.crop, 120),
+            variety: value("variety", displayedBefore.variety, 120),
             status,
-            note: value("note", before.note, 1000),
-            harvestNote: value("harvestNote", before.harvest_note, 1000),
-            section: value("section", before.section, 120) || before.section,
-            locationHint: value("locationHint", before.location_hint, 240),
+            note: value("note", displayedBefore.note, 1000),
+            harvestNote: value("harvestNote", displayedBefore.harvest_note, 1000),
+            section: value("section", displayedBefore.section, 120) || displayedBefore.section,
+            locationHint: value("locationHint", displayedBefore.location_hint, 240),
           };
           const timestamp = now();
           db.exec("begin immediate");
           try {
+            const canonical = localizedUpdateValues(db, "bed", bedId, before, {
+              crop: after.crop, variety: after.variety, note: after.note, harvest_note: after.harvestNote,
+              section: after.section, location_hint: after.locationHint,
+            }, locale, timestamp);
             db.prepare(`update beds set crop = ?, variety = ?, status = ?, note = ?, harvest_note = ?, section = ?, location_hint = ?, updated_at = ? where id = ?`)
-              .run(after.crop, after.variety, after.status, after.note, after.harvestNote, after.section, after.locationHint, timestamp, bedId);
-            if (after.note && after.note !== before.note) insertBedNote(db, bedId, session.member.id, "garden", after.note, timestamp);
-            if (after.harvestNote && after.harvestNote !== before.harvest_note) insertBedNote(db, bedId, session.member.id, "harvest", after.harvestNote, timestamp);
-            const summary = String(body.activityNote ?? "").trim().slice(0, 500) || `Mise à jour de ${before.code}`;
-            db.prepare(`insert into activities (bed_id, member_id, activity_type, note, before_json, after_json, created_at)
+              .run(canonical.crop, canonical.variety, after.status, canonical.note, canonical.harvest_note, canonical.section, canonical.location_hint, timestamp, bedId);
+            if (canonical.note && canonical.note !== before.note) insertBedNote(db, bedId, session.member.id, "garden", canonical.note, timestamp, locale);
+            if (canonical.harvest_note && canonical.harvest_note !== before.harvest_note) insertBedNote(db, bedId, session.member.id, "harvest", canonical.harvest_note, timestamp, locale);
+            const summary = String(body.activityNote ?? "").trim().slice(0, 500)
+              || localeText(locale, `Mise à jour de ${before.code}`, `Update van ${before.code}`, `Update to ${before.code}`);
+            const activity = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, before_json, after_json, created_at)
               values (?, ?, 'bed_updated', ?, ?, ?, ?)`)
               .run(bedId, session.member.id, summary, JSON.stringify(bedJson(before)), JSON.stringify(after), timestamp);
+            registerLocalizedEntity(db, "activity", Number(activity.lastInsertRowid), { note: summary }, locale, timestamp);
             db.exec("commit");
           } catch (error) {
             db.exec("rollback");
             throw error;
           }
-          return json(res, 200, { bed: bedJson(findBed(db, bedId)) });
+          return json(res, 200, { bed: localizedBedJson(db, findBed(db, bedId), locale) });
         }
 
         const logMatch = /^\/api\/beds\/(\d+)\/logs$/.exec(path);
@@ -1744,13 +2065,18 @@ export function createApp(options = {}) {
             }
             const result = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
               values (?, ?, ?, ?, ?)`).run(bedId, session.member.id, `log_${type}`, note, timestamp);
+            registerLocalizedEntity(db, "activity", Number(result.lastInsertRowid), { note }, locale, timestamp);
+            if (photo) {
+              const photoRow = db.prepare("select id from bed_photos where path = ?").get(filename);
+              if (photoRow) registerLocalizedEntity(db, "bed_photo", photoRow.id, { caption: note.slice(0, 200) }, locale, timestamp);
+            }
             db.prepare("update beds set updated_at = ? where id = ?").run(timestamp, bedId);
             db.exec("commit");
             const activity = db.prepare(`select activity.*, member.display_name as member_name,
               bed.code as bed_code, bed.crop as bed_crop
               from activities activity join beds bed on bed.id = activity.bed_id
               left join members member on member.id = activity.member_id where activity.id = ?`).get(result.lastInsertRowid);
-            return json(res, 201, { activity: activityJson(activity), bed: bedJson(findBed(db, bedId)) });
+            return json(res, 201, { activity: localizedActivityJson(db, activity, locale), bed: localizedBedJson(db, findBed(db, bedId), locale) });
           } catch (error) {
             db.exec("rollback");
             if (filePath) rmSync(filePath, { force: true });
@@ -1773,20 +2099,23 @@ export function createApp(options = {}) {
           try {
             db.exec("begin immediate");
             db.prepare("update bed_photos set is_cover = 0 where bed_id = ?").run(bedId);
-            db.prepare(`insert into bed_photos (bed_id, path, content_type, caption, uploaded_by, is_cover, created_at)
+            const photoResult = db.prepare(`insert into bed_photos (bed_id, path, content_type, caption, uploaded_by, is_cover, created_at)
               values (?, ?, ?, ?, ?, 1, ?)`)
               .run(bedId, filename, photo.contentType, String(body.caption ?? "").trim().slice(0, 200) || null, session.member.id, timestamp);
+            registerLocalizedEntity(db, "bed_photo", Number(photoResult.lastInsertRowid), { caption: String(body.caption ?? "").trim().slice(0, 200) || null }, locale, timestamp);
             db.prepare("update beds set updated_at = ? where id = ?").run(timestamp, bedId);
-            db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
+            const activityNote = localeText(locale, `Nouvelle photo pour ${bed.code}`, `Nieuwe foto voor ${bed.code}`, `New photo for ${bed.code}`);
+            const activity = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
               values (?, ?, 'photo_added', ?, ?)`)
-              .run(bedId, session.member.id, `Nouvelle photo pour ${bed.code}`, timestamp);
+              .run(bedId, session.member.id, activityNote, timestamp);
+            registerLocalizedEntity(db, "activity", Number(activity.lastInsertRowid), { note: activityNote }, locale, timestamp);
             db.exec("commit");
           } catch (error) {
             db.exec("rollback");
             rmSync(filePath, { force: true });
             throw error;
           }
-          return json(res, 201, { bed: bedJson(findBed(db, bedId)) });
+          return json(res, 201, { bed: localizedBedJson(db, findBed(db, bedId), locale) });
         }
 
         const harvestMatch = /^\/api\/beds\/(\d+)\/harvests$/.exec(path);
@@ -1806,13 +2135,22 @@ export function createApp(options = {}) {
               values (?, ?, ?, ?, ?, ?)`)
               .run(bedId, session.member.id, String(body.quantity ?? "").trim().slice(0, 120) || null,
                 String(body.note ?? "").trim().slice(0, 600) || null, timestamp, timestamp);
-            db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
+            registerLocalizedEntity(db, "harvest", Number(result.lastInsertRowid), {
+              quantity: String(body.quantity ?? "").trim().slice(0, 120) || null,
+              note: String(body.note ?? "").trim().slice(0, 600) || null,
+            }, locale, timestamp);
+            const harvestPhoto = db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
               values (?, ?, ?, ?, ?, ?)`)
               .run(result.lastInsertRowid, filename, photo.contentType, String(body.caption ?? "").trim().slice(0, 200) || null, session.member.id, timestamp);
+            registerLocalizedEntity(db, "harvest_photo", Number(harvestPhoto.lastInsertRowid), {
+              caption: String(body.caption ?? "").trim().slice(0, 200) || null,
+            }, locale, timestamp);
             db.prepare("update beds set status = 'harvest', updated_at = ? where id = ?").run(timestamp, bedId);
-            db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
+            const activityNote = localeText(locale, `Récolte ajoutée pour ${bed.code}`, `Oogst toegevoegd voor ${bed.code}`, `Harvest added for ${bed.code}`);
+            const activity = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
               values (?, ?, 'harvest_added', ?, ?)`)
-              .run(bedId, session.member.id, `Recolte ajoutee pour ${bed.code}`, timestamp);
+              .run(bedId, session.member.id, activityNote, timestamp);
+            registerLocalizedEntity(db, "activity", Number(activity.lastInsertRowid), { note: activityNote }, locale, timestamp);
             db.exec("commit");
           } catch (error) {
             db.exec("rollback");
@@ -1824,8 +2162,8 @@ export function createApp(options = {}) {
             from harvests h
             left join harvest_photos hp on hp.harvest_id = h.id
             left join members m on m.id = h.member_id
-            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map(harvestJson);
-          return json(res, 201, { bed: bedJson(findBed(db, bedId)), harvests });
+            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map((row) => localizedHarvestJson(db, row, locale));
+          return json(res, 201, { bed: localizedBedJson(db, findBed(db, bedId), locale), harvests });
         }
 
         const howToMatch = /^\/api\/beds\/(\d+)\/how-tos$/.exec(path);
@@ -1841,17 +2179,20 @@ export function createApp(options = {}) {
           const sourceUrl = `https://www.youtube.com/watch?v=${videoId}`;
           const timestamp = now();
           try {
-            db.prepare(`insert into how_to_videos (bed_id, title, youtube_video_id, source_url, note, created_by, created_at, updated_at)
+            const result = db.prepare(`insert into how_to_videos (bed_id, title, youtube_video_id, source_url, note, created_by, created_at, updated_at)
               values (?, ?, ?, ?, ?, ?, ?, ?)`)
               .run(bedId, title, videoId, sourceUrl, note, session.member.id, timestamp, timestamp);
+            registerLocalizedEntity(db, "how_to", Number(result.lastInsertRowid), { title, note }, locale, timestamp);
           } catch (error) {
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Cette video est deja liee a cette planche.");
             throw error;
           }
-          db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
+          const activityNote = localeText(locale, `Tutoriel ajouté pour ${bed.code}`, `Tutorial toegevoegd voor ${bed.code}`, `Tutorial added for ${bed.code}`);
+          const activity = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
             values (?, ?, 'how_to_added', ?, ?)`)
-            .run(bedId, session.member.id, `Tutoriel ajoutÃ© pour ${bed.code}`, timestamp);
-          const howToVideos = db.prepare("select * from how_to_videos where bed_id = ? order by created_at desc, id desc").all(bedId).map(howToVideoJson);
+            .run(bedId, session.member.id, activityNote, timestamp);
+          registerLocalizedEntity(db, "activity", Number(activity.lastInsertRowid), { note: activityNote }, locale, timestamp);
+          const howToVideos = db.prepare("select * from how_to_videos where bed_id = ? order by created_at desc, id desc").all(bedId).map((row) => localizedHowToJson(db, row, locale));
           return json(res, 201, { howToVideos });
         }
 
