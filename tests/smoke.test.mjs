@@ -34,7 +34,9 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(anonymousBeds.response.status, 401);
   const initialBranding = await request(baseUrl, "/api/public/branding");
   assert.equal(initialBranding.response.status, 200);
-  assert.deepEqual(initialBranding.body.branding, { login: null, today: null, event: null });
+  assert.deepEqual(initialBranding.body.branding, { login: null, public: null });
+  const privateByDefaultSite = await request(baseUrl, "/api/public/site");
+  assert.deepEqual(privateByDefaultSite.body, { site: { enabled: false }, events: [] });
   const home = await fetch(`${baseUrl}/`);
   assert.equal(home.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
   assert.match(home.headers.get("content-security-policy"), /frame-src .*youtube-nocookie\.com/);
@@ -51,6 +53,9 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const beds = await request(baseUrl, "/api/beds", { headers: { cookie: adminCookie } });
   assert.equal(beds.body.beds.length, 24);
   assert.equal(beds.body.beds[0].code, "GP-01");
+  assert.equal("locationHint" in beds.body.beds[0], false);
+  assert.equal("section" in beds.body.beds[0], false);
+  assert.equal("garden" in beds.body.beds[0], false);
 
   const areas = await request(baseUrl, "/api/areas", { headers: { cookie: adminCookie } });
   assert.equal(areas.response.status, 200);
@@ -102,6 +107,8 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const publicDetail = await request(baseUrl, `/api/public/events/${publicEventId}`);
   assert.equal(publicDetail.response.status, 200);
   assert.equal(publicDetail.body.event.title, "Portes ouvertes");
+  assert.equal("registrations" in publicDetail.body, false);
+  assert.equal("creatorName" in publicDetail.body.event, false);
   const publicRegistration = await request(baseUrl, `/api/public/events/${publicEventId}/registration`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -110,6 +117,28 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(publicRegistration.response.status, 201);
   assert.equal(publicRegistration.body.status, "going");
   assert.equal(publicRegistration.body.event.attendeeCount, 3);
+  const stillPrivateListing = await request(baseUrl, "/api/public/site");
+  assert.deepEqual(stillPrivateListing.body, { site: { enabled: false }, events: [] });
+  const publicSiteSettings = await request(baseUrl, "/api/public-site-settings", {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken, "x-parcos-locale": "fr" },
+    body: JSON.stringify({
+      enabled: true,
+      locale: "fr",
+      title: "Cultivons le parc ensemble",
+      philosophy: "Un potager accueillant, vivant et partagé.",
+    }),
+  });
+  assert.equal(publicSiteSettings.response.status, 200);
+  assert.equal(publicSiteSettings.body.settings.enabled, true);
+  const publishedSite = await request(baseUrl, "/api/public/site");
+  assert.equal(publishedSite.body.site.title, "Cultivons le parc ensemble");
+  assert.equal(publishedSite.body.events.length, 1);
+  assert.equal(publishedSite.body.events[0].id, publicEventId);
+  assert.equal(JSON.stringify(publishedSite.body).includes("Neighbour Guest"), false);
+  const publicPage = await fetch(`${baseUrl}/public`);
+  assert.equal(publicPage.status, 200);
+  assert.match(publicPage.headers.get("content-type"), /^text\/html/);
 
   const imported = await request(baseUrl, "/api/import", {
     method: "POST",
@@ -160,6 +189,28 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(quickLog.response.status, 201);
   assert.equal(quickLog.body.activity.type, "log_work");
   assert.equal(quickLog.body.activity.memberName, "Test Member");
+  const wateringLog = await request(baseUrl, "/api/beds/1/logs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ type: "watering", note: "Arrosage du matin." }),
+  });
+  const weedingLog = await request(baseUrl, "/api/beds/1/logs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ type: "weeding", note: "Adventices retirées." }),
+  });
+  const clearingLog = await request(baseUrl, "/api/beds/1/logs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ type: "clearing", note: "Fin de culture nettoyée." }),
+  });
+  assert.equal(wateringLog.body.activity.type, "log_watering");
+  assert.equal(weedingLog.body.activity.type, "log_weeding");
+  assert.equal(clearingLog.body.activity.type, "log_clearing");
+  assert.notEqual(weedingLog.body.activity.type, clearingLog.body.activity.type);
+
+  const memberPublicSettings = await request(baseUrl, "/api/public-site-settings", { headers: { cookie: memberCookie } });
+  assert.equal(memberPublicSettings.response.status, 403);
 
   const recentActivity = await request(baseUrl, "/api/activities", { headers: { cookie: memberCookie } });
   assert.equal(recentActivity.response.status, 200);
@@ -255,7 +306,17 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(brandingUpload.response.status, 200);
   assert.match(brandingUpload.body.branding.today, /^\/branding\/today\?v=/);
   const publicBranding = await request(baseUrl, "/api/public/branding");
-  assert.equal(publicBranding.body.branding.today, brandingUpload.body.branding.today);
+  assert.equal(publicBranding.body.branding.today, undefined);
+  assert.equal(publicBranding.body.branding.event, undefined);
+  const publicBrandingUpload = await request(baseUrl, "/api/branding/public", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ dataUrl: `data:image/jpeg;base64,${png}` }),
+  });
+  assert.equal(publicBrandingUpload.response.status, 200);
+  assert.match(publicBrandingUpload.body.branding.public, /^\/branding\/public\?v=/);
+  const explicitPublicBranding = await request(baseUrl, "/api/public/branding");
+  assert.equal(explicitPublicBranding.body.branding.public, publicBrandingUpload.body.branding.public);
   const brandingPhoto = await fetch(`${baseUrl}${brandingUpload.body.branding.today}`);
   assert.equal(brandingPhoto.status, 200);
   assert.equal(brandingPhoto.headers.get("content-type"), "image/jpeg");

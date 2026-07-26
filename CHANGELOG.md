@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Added an administrator-configurable public park page with philosophy text,
+  upcoming public events, guest registration, and a dedicated optional image.
+- Made the public surface private by default and removed attendee names, creator
+  identities, member avatars, and private event imagery from public responses.
+- Defaulted new events to members-only drafts and required an explicit Public
+  plus Published choice before they appear on the public page.
+- Hid bed position fields throughout the bed interface and API.
+- Added dedicated bed actions for watering, weeding, clearing, planting,
+  mulching, and pruning; weeding and clearing are stored as separate activities.
+- Reworked the repository roadmap around daily tasks, event-day operations,
+  planting lifecycles, knowledge, assisted coordination, and privacy principles.
+
 ## 1.2.0 - 2026-07-15
 
 - Completed French, Dutch, and English interface support so the language badge
