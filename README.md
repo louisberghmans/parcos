@@ -86,6 +86,12 @@ npm test
 Node 24.17 or newer is required. Set `PARCOS_SEED_DEMO=true` only when you
 explicitly want the historical demo dataset.
 
+## Roadmap
+
+See the [ParcOS roadmap](docs/roadmap.md) for shipped capabilities, near-term
+priorities, later product phases, and the open decisions where field feedback is
+most useful.
+
 ## Security
 
 Sessions and one-time tokens are stored as hashes, passwords use scrypt,

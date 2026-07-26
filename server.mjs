@@ -112,9 +112,6 @@ function bedJson(row) {
     areaId: row.area_id,
     code: row.code,
     number: row.display_number,
-    garden: row.garden,
-    section: row.section,
-    locationHint: row.location_hint,
     crop: row.crop,
     variety: row.variety,
     status: row.status,
@@ -193,6 +190,26 @@ function eventJson(row, attendees = null) {
     attendeeOverflow: Math.max(0, activeAttendees.length - 4),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function publicEventJson(db, row, locale) {
+  const event = localizedEventJson(db, row, null, locale);
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    location: event.location,
+    type: event.type,
+    state: event.state,
+    audience: event.audience,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    capacity: event.capacity,
+    accessibilityNote: event.accessibilityNote,
+    preparationNote: event.preparationNote,
+    attendeeCount: event.attendeeCount,
+    spotsRemaining: event.spotsRemaining,
   };
 }
 
@@ -1179,7 +1196,7 @@ function eventInput(body, existing = {}) {
     description: textValue("description", existing.description, 3000),
     location: textValue("location", existing.location, 180, true),
     type: allowedTypes.includes(body.type) ? body.type : (existing.event_type ?? "work"),
-    state: allowedStates.includes(body.state) ? body.state : (existing.state ?? "published"),
+    state: allowedStates.includes(body.state) ? body.state : (existing.state ?? "draft"),
     audience: allowedAudiences.includes(body.audience) ? body.audience : (existing.audience ?? "members"),
     startsAt: startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
@@ -1364,13 +1381,13 @@ function icalDate(value) {
   return new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
 
-function eventCalendar(event, origin) {
+function eventCalendar(event, origin, publicPage = false) {
   return [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ParcOS//Agenda//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     "BEGIN:VEVENT", `UID:event-${event.id}@parcos.local`, `DTSTAMP:${icalDate(now())}`,
     `DTSTART:${icalDate(event.starts_at)}`, `DTEND:${icalDate(event.ends_at)}`,
     `SUMMARY:${icalEscape(event.title)}`, `DESCRIPTION:${icalEscape(event.description)}`,
-    `LOCATION:${icalEscape(event.location)}`, `URL:${origin}/?event=${event.id}`,
+    `LOCATION:${icalEscape(event.location)}`, `URL:${origin}/${publicPage ? "public" : ""}?event=${event.id}`,
     `STATUS:${event.state === "cancelled" ? "CANCELLED" : "CONFIRMED"}`, "END:VEVENT", "END:VCALENDAR", "",
   ].join("\r\n");
 }
@@ -1405,7 +1422,56 @@ function setupInfo(db) {
   return { setupRequired: areaCount === 0, parcName };
 }
 
-const brandingKinds = ["login", "today", "event"];
+function appMetaValue(db, key, fallback = "") {
+  return db.prepare("select value from app_meta where key = ?").get(key)?.value ?? fallback;
+}
+
+function setAppMeta(db, key, value, timestamp = now()) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    db.prepare("delete from app_meta where key = ?").run(key);
+    return;
+  }
+  db.prepare(`insert into app_meta (key, value, updated_at) values (?, ?, ?)
+    on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at`)
+    .run(key, normalized, timestamp);
+}
+
+function localizedPublicText(db, key, locale) {
+  const preferred = localeValue(locale);
+  const values = Object.fromEntries(SUPPORTED_LOCALES.map((item) => [item, appMetaValue(db, `${key}_${item}`)]));
+  return values[preferred] || values[DEFAULT_CONTENT_LOCALE] || Object.values(values).find(Boolean) || "";
+}
+
+function publicSiteSettings(db) {
+  return {
+    enabled: appMetaValue(db, "public_site_enabled") === "true",
+    titles: Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, appMetaValue(db, `public_site_title_${locale}`)])),
+    philosophies: Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, appMetaValue(db, `public_site_philosophy_${locale}`)])),
+  };
+}
+
+function publicSiteJson(db, locale) {
+  const enabled = appMetaValue(db, "public_site_enabled") === "true";
+  if (!enabled) return { enabled: false };
+  return {
+    enabled: true,
+    parcName: setupInfo(db).parcName,
+    title: localizedPublicText(db, "public_site_title", locale),
+    philosophy: localizedPublicText(db, "public_site_philosophy", locale),
+    photoUrl: brandingJson(db).public,
+  };
+}
+
+function publicEvents(db, locale) {
+  if (appMetaValue(db, "public_site_enabled") !== "true") return [];
+  return eventSelect(db, null)
+    .filter((event) => event.state === "published" && event.audience === "public" && event.ends_at >= now())
+    .sort((left, right) => left.starts_at.localeCompare(right.starts_at))
+    .map((event) => publicEventJson(db, event, locale));
+}
+
+const brandingKinds = ["login", "today", "event", "public"];
 
 function brandingJson(db) {
   const branding = Object.fromEntries(brandingKinds.map((kind) => [kind, null]));
@@ -1415,6 +1481,11 @@ function brandingJson(db) {
     if (brandingKinds.includes(kind)) branding[kind] = `/branding/${kind}?v=${encodeURIComponent(row.updated_at)}`;
   }
   return branding;
+}
+
+function publicBrandingJson(db) {
+  const branding = brandingJson(db);
+  return { login: branding.login, public: branding.public };
 }
 
 export function createApp(options = {}) {
@@ -1532,22 +1603,25 @@ export function createApp(options = {}) {
           }
         }
 
+        if (req.method === "GET" && path === "/api/public/site") {
+          return json(res, 200, { site: publicSiteJson(db, locale), events: publicEvents(db, locale) });
+        }
+
         const publicEventMatch = /^\/api\/public\/events\/(\d+)$/.exec(path);
         if (publicEventMatch && req.method === "GET") {
           const eventId = Number(publicEventMatch[1]);
           const event = findPublicEvent(db, eventId);
-          const attendees = eventAttendees(db, eventId);
-          return json(res, 200, { event: localizedEventJson(db, event, attendees, locale), registrations: attendees });
+          return json(res, 200, { event: publicEventJson(db, event, locale) });
         }
 
         if (req.method === "GET" && path === "/api/public/branding") {
-          return json(res, 200, { branding: brandingJson(db) });
+          return json(res, 200, { branding: publicBrandingJson(db) });
         }
 
         const publicEventCalendarMatch = /^\/api\/public\/events\/(\d+)\/calendar\.ics$/.exec(path);
         if (publicEventCalendarMatch && req.method === "GET") {
           const event = localizedRow(db, "event", findPublicEvent(db, Number(publicEventCalendarMatch[1])), locale);
-          const body = eventCalendar(event, requestOrigin(req, baseUrl, trustProxy));
+          const body = eventCalendar(event, requestOrigin(req, baseUrl, trustProxy), true);
           return text(res, 200, body, "text/calendar; charset=utf-8", { "Content-Disposition": `attachment; filename=parcos-public-${event.id}.ics` });
         }
 
@@ -1566,7 +1640,7 @@ export function createApp(options = {}) {
           rebalanceWaitlist(db, eventId);
           return json(res, 201, {
             registrationId: result.lastInsertRowid,
-            event: localizedEventJson(db, findPublicEvent(db, eventId), eventAttendees(db, eventId), locale),
+            event: publicEventJson(db, findPublicEvent(db, eventId), locale),
             status,
           });
         }
@@ -1577,7 +1651,29 @@ export function createApp(options = {}) {
           return json(res, 200, { member: session.member, csrfToken: session.csrfToken, branding: brandingJson(db), ...setupInfo(db) });
         }
 
-        const brandingApiMatch = /^\/api\/branding\/(login|today|event)$/.exec(path);
+        if (path === "/api/public-site-settings" && ["GET", "PATCH"].includes(req.method)) {
+          if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
+          if (req.method === "GET") return json(res, 200, { settings: publicSiteSettings(db) });
+          requireCsrf(req, session);
+          const body = await readJson(req);
+          const contentLocale = localeValue(body.locale ?? locale);
+          const title = String(body.title ?? "").trim().slice(0, 180);
+          const philosophy = String(body.philosophy ?? "").trim().slice(0, 5000);
+          const timestamp = now();
+          db.exec("begin immediate");
+          try {
+            setAppMeta(db, "public_site_enabled", body.enabled ? "true" : "false", timestamp);
+            setAppMeta(db, `public_site_title_${contentLocale}`, title, timestamp);
+            setAppMeta(db, `public_site_philosophy_${contentLocale}`, philosophy, timestamp);
+            db.exec("commit");
+          } catch (error) {
+            db.exec("rollback");
+            throw error;
+          }
+          return json(res, 200, { settings: publicSiteSettings(db), site: publicSiteJson(db, contentLocale) });
+        }
+
+        const brandingApiMatch = /^\/api\/branding\/(login|today|event|public)$/.exec(path);
         if (brandingApiMatch && ["POST", "DELETE"].includes(req.method)) {
           requireCsrf(req, session);
           if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
@@ -2045,7 +2141,7 @@ export function createApp(options = {}) {
           const bed = requireBedAccess(findBed(db, bedId), session);
           const body = await readJson(req);
           const type = String(body.type ?? "");
-          if (!["work", "observation", "problem", "harvest", "photo"].includes(type)) {
+          if (!["work", "watering", "weeding", "clearing", "planting", "mulching", "pruning", "observation", "problem", "harvest", "photo"].includes(type)) {
             throw new HttpError(400, "Type de journal invalide.");
           }
           const note = String(body.note ?? "").trim().slice(0, 600);
@@ -2217,7 +2313,7 @@ export function createApp(options = {}) {
         return serveFile(res, uploadsDir, filename, "private, no-store");
       }
 
-      const brandingMediaMatch = /^\/branding\/(login|today|event)$/.exec(path);
+      const brandingMediaMatch = /^\/branding\/(login|today|event|public)$/.exec(path);
       if (brandingMediaMatch && req.method === "GET") {
         const filename = db.prepare("select value from app_meta where key = ?").get(`branding_${brandingMediaMatch[1]}`)?.value;
         if (!filename) throw new HttpError(404, "Image introuvable.");
@@ -2229,7 +2325,7 @@ export function createApp(options = {}) {
       }
 
       if (path === "/icon.svg") return serveFile(res, moduleDir, "icon.svg", "public, max-age=86400");
-      const staticPath = path === "/" ? "index.html" : path.slice(1);
+      const staticPath = ["/", "/public"].includes(path) ? "index.html" : path.slice(1);
       return serveFile(res, publicDir, staticPath, "no-cache");
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;

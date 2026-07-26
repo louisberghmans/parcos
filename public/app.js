@@ -11,7 +11,14 @@ const state = {
   areas: [],
   events: [],
   activities: [],
-  branding: { login: null, today: null, event: null },
+  branding: { login: null, today: null, event: null, public: null },
+  publicSite: {
+    enabled: false,
+    title: "",
+    philosophy: "",
+    titles: { fr: "", nl: "", en: "" },
+    philosophies: { fr: "", nl: "", en: "" },
+  },
   members: [],
   page: "today",
   filter: "all",
@@ -561,11 +568,19 @@ const eventStateLabels = { draft: "Brouillon", published: "Publié", cancelled: 
 
 const logTypeMeta = {
   work: { fr: "Travail fait", en: "Work done", icon: "&#10003;" },
+  watering: { fr: "Arrosage", en: "Watering", nl: "Water geven", icon: "&#128167;" },
+  weeding: { fr: "Désherbage", en: "Weeding", nl: "Wieden", icon: "&#10022;" },
+  clearing: { fr: "Nettoyage", en: "Clearing", nl: "Ruimen", icon: "&#8634;" },
+  planting: { fr: "Plantation", en: "Planting", nl: "Planten", icon: "&#10048;" },
+  mulching: { fr: "Paillage", en: "Mulching", nl: "Mulchen", icon: "&#9782;" },
+  pruning: { fr: "Taille", en: "Pruning", nl: "Snoeien", icon: "&#9986;" },
   observation: { fr: "À noter", en: "Note", icon: "&#9673;" },
   problem: { fr: "Problème", en: "Problem", icon: "!" },
   harvest: { fr: "Récolte", en: "Harvest", icon: "&#10047;" },
   photo: { fr: "Photo", en: "Photo", icon: cameraIcon() },
 };
+
+const bedQuickActionTypes = ["watering", "weeding", "clearing", "planting", "mulching", "pruning"];
 
 const localizedStatusLabels = {
   unknown: { fr: statusMeta.unknown.label, en: "To check" },
@@ -731,6 +746,7 @@ function renderLogin(error = "") {
           <label>Mot de passe<input name="password" type="password" autocomplete="current-password" required></label>
           <button class="button primary" type="submit">Entrer dans le potager</button>
         </form>
+        ${state.publicSite.enabled ? `<a class="button ghost public-site-link" href="/public">${t("Découvrir le parc et les événements publics", "Explore the park and public events", "Ontdek het park en de openbare evenementen")}</a>` : ""}
         <p class="auth-help">Pas encore de profil ? Un coordinateur peut vous remettre une invitation ParcOS.</p>
       </div>
     </section>
@@ -748,7 +764,7 @@ function renderLogin(error = "") {
       state.parcName = result.parcName;
       if (result.branding) state.branding = { ...state.branding, ...result.branding };
       if (state.setupRequired) return renderSetup();
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       const linkedEventId = Number(new URLSearchParams(location.search).get("event"));
       if (linkedEventId) openEvent(linkedEventId);
@@ -791,7 +807,7 @@ function renderSetup(error = "") {
       const result = await api("/api/setup", { method: "POST", body: JSON.stringify({ parcName: new FormData(event.currentTarget).get("parcName"), areas }) });
       state.setupRequired = result.setupRequired;
       state.parcName = result.parcName;
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre espace ParcOS est prêt.");
     } catch (setupError) {
@@ -848,7 +864,7 @@ function renderReset(token, error = "") {
       state.member = result.member;
       state.csrfToken = result.csrfToken;
       history.replaceState({}, "", "/");
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre accès a été renouvelé.");
     } catch (resetError) {
@@ -857,33 +873,102 @@ function renderReset(token, error = "") {
   });
 }
 
+function setPublicEventStructuredData(events) {
+  document.querySelector("#public-event-structured-data")?.remove();
+  if (!events.length) return;
+  const script = document.createElement("script");
+  script.id = "public-event-structured-data";
+  script.type = "application/ld+json";
+  script.textContent = JSON.stringify(events.map((event) => ({
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.title,
+    description: event.description || undefined,
+    startDate: event.startsAt,
+    endDate: event.endsAt,
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: { "@type": "Place", name: event.location },
+    url: new URL(`/public?event=${event.id}`, location.origin).toString(),
+    organizer: { "@type": "Organization", name: state.parcName },
+  })));
+  document.head.append(script);
+}
+
+function publicEventListingCard(event) {
+  const meta = eventTypeMetaFor(event.type);
+  const capacity = event.spotsRemaining === null
+    ? t("Inscription ouverte", "Registration open", "Inschrijving open")
+    : t(`${event.spotsRemaining} place${event.spotsRemaining === 1 ? "" : "s"} restante${event.spotsRemaining === 1 ? "" : "s"}`, `${event.spotsRemaining} spot${event.spotsRemaining === 1 ? "" : "s"} left`, `${event.spotsRemaining} plaats${event.spotsRemaining === 1 ? "" : "en"} vrij`);
+  return `<article class="public-event-card">
+    <div class="public-event-date"><strong>${escapeHtml(formatDate(event.startsAt, { day: "2-digit" }))}</strong><span>${escapeHtml(formatDate(event.startsAt, { month: "short" }))}</span></div>
+    <div><p class="eyebrow">${escapeHtml(meta.label)}</p><h3>${escapeHtml(event.title)}</h3><p>${escapeHtml(formatTime(event.startsAt))} · ${escapeHtml(event.location)}</p><small>${escapeHtml(capacity)}</small></div>
+    <a class="button secondary" href="/public?event=${event.id}">${t("Voir et s’inscrire", "View and register", "Bekijken en inschrijven")}</a>
+  </article>`;
+}
+
+async function renderPublicSite() {
+  const result = await api("/api/public/site");
+  state.publicSite = { ...state.publicSite, ...result.site };
+  if (result.site.parcName) state.parcName = result.site.parcName;
+  const events = result.events || [];
+  if (!result.site.enabled) {
+    document.title = "ParcOS";
+    app.innerHTML = `<main class="public-site unavailable"><section class="public-site-header">${brandMarkup("ParcOS", t("Page publique", "Public page", "Publieke pagina"))}<a class="button ghost" href="/">${t("Espace membres", "Member sign-in", "Ledenlogin")}</a></section><section class="public-empty"><span class="brand-mark">P</span><p class="eyebrow">${t("Publication désactivée", "Publishing is off", "Publicatie uitgeschakeld")}</p><h1>${t("Rien n’est public pour le moment.", "Nothing is public yet.", "Er is nog niets openbaar.")}</h1><p>${t("Les événements, textes et photos restent privés tant qu’un administrateur ne les publie pas explicitement.", "Events, text, and photos stay private until an administrator explicitly publishes them.", "Evenementen, teksten en foto's blijven privé totdat een beheerder ze uitdrukkelijk publiceert.")}</p></section></main>`;
+    applyTranslations(app);
+    return;
+  }
+  document.title = `${result.site.title || result.site.parcName} · ParcOS`;
+  const philosophy = result.site.philosophy
+    ? `<div class="public-philosophy-copy">${escapeHtml(result.site.philosophy).replace(/\r?\n/g, "<br>")}</div>`
+    : `<p class="muted">${t("Notre histoire sera bientôt racontée ici.", "Our story will be shared here soon.", "Ons verhaal verschijnt hier binnenkort.")}</p>`;
+  app.innerHTML = `<main class="public-site">
+    <header class="public-site-header">${brandMarkup("ParcOS", result.site.parcName)}<nav><button class="language-toggle" id="public-language-toggle" type="button">${languageToggleLabel()}</button><a class="button ghost" href="/">${t("Espace membres", "Member sign-in", "Ledenlogin")}</a></nav></header>
+    <section class="public-site-hero ${result.site.photoUrl ? "has-photo" : ""}">${result.site.photoUrl ? `<img src="${escapeHtml(result.site.photoUrl)}" alt="">` : ""}<div><p class="eyebrow light">${t("Parc et potager partagé", "Community park and garden", "Gemeenschappelijk park en moestuin")}</p><h1>${escapeHtml(result.site.title || result.site.parcName)}</h1><a class="button light" href="#events">${t("Découvrir les événements", "Explore events", "Ontdek de evenementen")}</a></div></section>
+    <section class="public-philosophy"><div><p class="eyebrow">${t("Pourquoi nous cultivons", "Why we grow", "Waarom we tuinieren")}</p><h2>${t("Un jardin vivant, ensemble.", "A living garden, together.", "Samen een levende tuin.")}</h2></div>${philosophy}</section>
+    <section class="public-events-section" id="events"><div class="section-heading"><div><p class="eyebrow">${t("Ouvert à toutes et tous", "Open to everyone", "Open voor iedereen")}</p><h2>${t("Prochains événements", "Upcoming events", "Komende evenementen")}</h2></div><span class="count-pill">${events.length}</span></div>
+      <div class="public-event-list">${events.length ? events.map(publicEventListingCard).join("") : `<div class="empty-state"><strong>${t("Aucun événement public à venir", "No upcoming public events", "Geen openbare evenementen gepland")}</strong><p>${t("Revenez bientôt pour découvrir les prochaines rencontres.", "Check back soon for future gatherings.", "Kom binnenkort terug voor nieuwe activiteiten.")}</p></div>`}</div>
+    </section>
+    <footer class="public-site-footer"><span>ParcOS</span><a href="/">${t("Connexion des membres", "Member sign-in", "Ledenlogin")}</a></footer>
+  </main>`;
+  document.querySelector("#public-language-toggle")?.addEventListener("click", () => {
+    state.locale = nextLocale();
+    localStorage.setItem("parcos_locale", state.locale);
+    renderPublicSite();
+  });
+  setPublicEventStructuredData(events);
+  applyTranslations(app);
+}
+
 async function renderPublicEvent(id, error = "") {
   try {
     if (!state.publicEvent || state.publicEvent.event.id !== id) state.publicEvent = await api(`/api/public/events/${id}`);
   } catch (loadError) {
-    app.innerHTML = `<main class="auth-page"><section class="auth-visual">${brandingImage("login", "auth-visual-image")}<div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>Public</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>Événement introuvable.</h1><p>Ce lien est peut-être expiré ou réservé aux membres.</p></div></section><section class="auth-panel"><div class="auth-form-wrap"><button class="button primary" type="button" id="back-login">Retour à ParcOS</button></div></section></main>`;
-    document.querySelector("#back-login").addEventListener("click", () => history.replaceState({}, "", "/") || renderLogin());
+    app.innerHTML = `<main class="auth-page"><section class="auth-visual">${brandingImage("public", "auth-visual-image")}${brandMarkup("ParcOS", t("Page publique", "Public page", "Publieke pagina"))}<div><p class="eyebrow light">${t("Rendez-vous public", "Public event", "Openbaar evenement")}</p><h1>${t("Événement introuvable.", "Event not found.", "Evenement niet gevonden.")}</h1><p>${t("Ce lien est peut-être expiré ou réservé aux membres.", "This link may have expired or be members-only.", "Deze link is mogelijk verlopen of alleen voor leden.")}</p></div></section><section class="auth-panel"><div class="auth-form-wrap"><a class="button primary" href="/public">${t("Retour à la page publique", "Back to public page", "Terug naar de publieke pagina")}</a></div></section></main>`;
     applyTranslations(app);
     return;
   }
-  const { event, registrations = [] } = state.publicEvent;
+  const { event } = state.publicEvent;
   const registration = { adults: 1, teenagers: 0, children: 0, youngChildren: 0 };
   const capacity = event.capacity === null ? `${event.attendeeCount} participant${event.attendeeCount === 1 ? "" : "s"}` : `${event.attendeeCount}/${event.capacity} participants`;
+  document.title = `${event.title} · ${state.parcName}`;
   app.innerHTML = `<main class="auth-page public-event-page">
-    <section class="auth-visual invitation-visual">${brandingImage("event", "auth-visual-image")}<div class="auth-brand"><span class="brand-mark">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></div><div><p class="eyebrow light">Rendez-vous public</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(formatEventDate(event.startsAt))} à ${escapeHtml(formatTime(event.startsAt))} · ${escapeHtml(event.location)}</p></div></section>
+    <section class="auth-visual invitation-visual">${brandingImage("public", "auth-visual-image")}${brandMarkup("ParcOS", state.parcName)}<div><p class="eyebrow light">${t("Rendez-vous public", "Public event", "Openbaar evenement")}</p><h1>${escapeHtml(event.title)}</h1><p><time datetime="${escapeHtml(event.startsAt)}">${escapeHtml(formatEventDate(event.startsAt))} ${t("à", "at", "om")} ${escapeHtml(formatTime(event.startsAt))}</time> · ${escapeHtml(event.location)}</p></div></section>
     <section class="auth-panel"><div class="auth-form-wrap">
-      <div class="public-toolbar"><button class="language-toggle" id="public-language-toggle" type="button">${languageToggleLabel()}</button></div>
-      <p class="eyebrow">Inscription publique</p><h2>Je participe</h2>
-      <p class="muted">${escapeHtml(capacity)}. ${escapeHtml(event.description || "Inscrivez votre groupe pour aider l’équipe à préparer l’accueil.")}</p>
+      <div class="public-toolbar"><a href="/public">${t("Tous les événements", "All events", "Alle evenementen")}</a><button class="language-toggle" id="public-language-toggle" type="button">${languageToggleLabel()}</button></div>
+      <p class="eyebrow">${t("Inscription publique", "Public registration", "Openbare inschrijving")}</p><h2>${t("Je participe", "I will attend", "Ik neem deel")}</h2>
+      <p class="muted">${escapeHtml(capacity)}. ${escapeHtml(event.description || t("Inscrivez votre groupe pour aider l’équipe à préparer l’accueil.", "Register your group to help the team prepare.", "Schrijf je groep in zodat het team zich kan voorbereiden."))}</p>
+      ${event.accessibilityNote ? `<div class="event-note accessibility"><small>${t("Accessibilité", "Accessibility", "Toegankelijkheid")}</small><p>${escapeHtml(event.accessibilityNote)}</p></div>` : ""}
+      ${event.preparationNote ? `<div class="event-note"><small>${t("À prévoir", "What to bring", "Mee te brengen")}</small><p>${escapeHtml(event.preparationNote)}</p></div>` : ""}
       ${error ? `<div class="form-error">${escapeHtml(error)}</div>` : ""}
       <form id="public-registration-form" class="form-stack event-form">
-        <label>Votre nom<input name="guestName" autocomplete="name" required autofocus></label>
-        <label>Contact facultatif<input name="guestContact" autocomplete="email" placeholder="E-mail ou téléphone"></label>
-        <div class="registration-counts">${[["adults", "Adultes", "18 ans et +"], ["teenagers", "Ados", "13–17 ans"], ["children", "Enfants", "6–12 ans"], ["youngChildren", "Petits", "0–5 ans"]].map(([name, label, hint]) => `<label><span>${label}<small>${hint}</small></span><input name="${name}" type="number" min="0" max="20" value="${registration[name]}"></label>`).join("")}</div>
-        <button class="button primary" type="submit">Confirmer</button>
-        <a class="button ghost" href="/api/public/events/${event.id}/calendar.ics" download>Ajouter au calendrier</a>
+        <label>${t("Votre nom", "Your name", "Uw naam")}<input name="guestName" autocomplete="name" required autofocus></label>
+        <label>${t("Contact facultatif", "Optional contact", "Optioneel contact")}<input name="guestContact" autocomplete="email" placeholder="${t("E-mail ou téléphone", "Email or phone", "E-mail of telefoon")}"></label>
+        <div class="registration-counts">${[["adults", t("Adultes", "Adults", "Volwassenen"), "18+"], ["teenagers", t("Ados", "Teenagers", "Tieners"), "13–17"], ["children", t("Enfants", "Children", "Kinderen"), "6–12"], ["youngChildren", t("Petits", "Little ones", "Kleintjes"), "0–5"]].map(([name, label, hint]) => `<label><span>${label}<small>${hint}</small></span><input name="${name}" type="number" min="0" max="20" value="${registration[name]}"></label>`).join("")}</div>
+        <p class="privacy-note">${t("Vos coordonnées servent uniquement à gérer cette inscription. Elles ne sont jamais affichées publiquement.", "Your details are used only to manage this registration and are never displayed publicly.", "Uw gegevens worden alleen gebruikt voor deze inschrijving en nooit openbaar getoond.")}</p>
+        <button class="button primary" type="submit">${t("Confirmer", "Confirm", "Bevestigen")}</button>
+        <a class="button ghost" href="/api/public/events/${event.id}/calendar.ics" download>${t("Ajouter au calendrier", "Add to calendar", "Aan agenda toevoegen")}</a>
       </form>
-      <div class="detail-section attendee-list"><h3>Participants (${registrations.length})</h3>${registrations.length ? registrations.map((entry) => `<div class="attendee-row"><span class="avatar-button">${avatarContent({ displayName: entry.memberName, avatarUrl: entry.avatarUrl })}</span><span><strong>${escapeHtml(entry.memberName)}</strong><small>${entry.partySize} personne${entry.partySize === 1 ? "" : "s"} · ${entry.status === "waitlisted" ? "liste d’attente" : "inscrit"}</small></span></div>`).join("") : '<p class="muted">Aucune inscription pour le moment.</p>'}</div>
     </div></section>
   </main>`;
   document.querySelector("#public-language-toggle").addEventListener("click", () => {
@@ -900,13 +985,14 @@ async function renderPublicEvent(id, error = "") {
     form.querySelector("button[type=submit]").disabled = true;
     try {
       const result = await api(`/api/public/events/${id}/registration`, { method: "POST", body: JSON.stringify(data) });
-      state.publicEvent = { event: result.event, registrations: result.event ? (await api(`/api/public/events/${id}`)).registrations : [] };
-      showToast(result.status === "waitlisted" ? "Inscription placée sur liste d’attente." : "Inscription confirmée.");
+      state.publicEvent = { event: result.event };
+      showToast(result.status === "waitlisted" ? t("Inscription placée sur liste d’attente.", "Added to the waitlist.", "Op de wachtlijst geplaatst.") : t("Inscription confirmée.", "Registration confirmed.", "Inschrijving bevestigd."));
       renderPublicEvent(id);
     } catch (publicError) {
       renderPublicEvent(id, publicError.message);
     }
   });
+  setPublicEventStructuredData([event]);
   applyTranslations(app);
 }
 
@@ -966,7 +1052,7 @@ function renderToday() {
 function recentActivityCard(activity) {
   const type = activity.type.startsWith("log_") ? activity.type.slice(4) : "observation";
   const meta = logTypeMeta[type] || logTypeMeta.observation;
-  return `<button class="recent-activity" data-bed-id="${activity.bedId}"><span class="activity-type-icon">${meta.icon}</span><span><small>${escapeHtml(t(meta.fr, meta.en))} - ${escapeHtml(activity.bedCode || "")}</small><strong>${escapeHtml(activity.note)}</strong><em>${escapeHtml(activity.memberName)} - ${escapeHtml(relativeDate(activity.createdAt))}</em></span></button>`;
+  return `<button class="recent-activity" data-bed-id="${activity.bedId}"><span class="activity-type-icon">${meta.icon}</span><span><small>${escapeHtml(t(meta.fr, meta.en, meta.nl))} - ${escapeHtml(activity.bedCode || "")}</small><strong>${escapeHtml(activity.note)}</strong><em>${escapeHtml(activity.memberName)} - ${escapeHtml(relativeDate(activity.createdAt))}</em></span></button>`;
 }
 
 function compactEventCard(event) {
@@ -1108,7 +1194,7 @@ function eventCard(event) {
 }
 
 function miniBed(bed) {
-  return `<button class="mini-bed" data-bed-id="${bed.id}">${thumbnail(bed)}<span><small>${escapeHtml(bed.code)} · ${escapeHtml(bed.section)}</small><strong>${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</strong></span><b>›</b></button>`;
+  return `<button class="mini-bed" data-bed-id="${bed.id}">${thumbnail(bed)}<span><small>${escapeHtml(bed.code)}</small><strong>${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</strong></span><b>›</b></button>`;
 }
 
 function thumbnail(bed, large = false) {
@@ -1152,7 +1238,7 @@ function filteredBeds() {
   return state.beds.filter((bed) => {
     const areaMatch = state.selectedAreaId === null || bed.areaId === state.selectedAreaId;
     const filterMatch = state.filter === "all" || (state.filter === "no-photo" ? !bed.photoUrl : bed.status === state.filter);
-    const haystack = [bed.code, bed.number, bed.garden, bed.section, bed.locationHint, bed.crop, bed.variety].join(" ").toLocaleLowerCase("fr");
+    const haystack = [bed.code, bed.number, bed.crop, bed.variety].join(" ").toLocaleLowerCase("fr");
     return areaMatch && filterMatch && (!query || haystack.includes(query));
   });
 }
@@ -1160,17 +1246,16 @@ function filteredBeds() {
 function renderGarden() {
   const beds = filteredBeds();
   const area = state.areas.find((item) => item.id === state.selectedAreaId) || state.areas[0];
-  const groups = [...new Set(beds.map((bed) => bed.section))];
   const bedCountLabel = (count) => t(`${count} planche${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "den"}`);
   return `<section class="page garden-page">
-    <div class="page-title"><div><p class="eyebrow">Se repérer sur place</p><h1>Les potagers</h1><p class="lede">Chaque lieu, ses accès et ses planches.</p></div>${isCoordinator() ? '<button class="round-add" id="manage-areas" aria-label="Gérer les lieux">⚙</button>' : ""}</div>
+    <div class="page-title"><div><p class="eyebrow">${t("Cultiver ensemble", "Growing together", "Samen tuinieren")}</p><h1>Les potagers</h1><p class="lede">${t("Les cultures et les travaux de chaque planche.", "Crops and work for every bed.", "Gewassen en werk voor elk bed.")}</p></div>${isCoordinator() ? '<button class="round-add" id="manage-areas" aria-label="Gérer les lieux">⚙</button>' : ""}</div>
     <div class="area-switcher">${state.areas.map((item) => `<button data-area-id="${item.id}" class="${item.id === area?.id ? "active" : ""}"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(bedCountLabel(item.bedCount))}</small></span>${!item.membersCanAccess ? `<em>${t("Coordination", "Coordination")}</em>` : ""}</button>`).join("")}</div>
-    ${area ? `<div class="area-intro"><div><p class="eyebrow">${area.membersCanAccess ? t("Accessible aux membres", "Accessible to members") : t("Accès coordinateurs", "Coordinator access")}</p><h2>${escapeHtml(area.name)}</h2><p>${escapeHtml(area.description || area.locationHint || t("Lieu du potager partagé.", "Shared garden place."))}</p></div>${isCoordinator() ? `<button class="button secondary" id="add-bed">+ ${t("Ajouter une planche", "Add a bed")}</button>` : ""}</div>` : ""}
-    <label class="search-box"><span>⌕</span><input id="bed-search" type="search" value="${escapeHtml(state.search)}" placeholder="${t("Numéro, culture ou emplacement…", "Number, crop or location...")}" aria-label="${t("Rechercher une planche", "Search for a bed")}"></label>
+    ${area ? `<div class="area-intro"><div><p class="eyebrow">${area.membersCanAccess ? t("Accessible aux membres", "Accessible to members") : t("Accès coordinateurs", "Coordinator access")}</p><h2>${escapeHtml(area.name)}</h2><p>${escapeHtml(area.description || t("Lieu du potager partagé.", "Shared garden place."))}</p></div>${isCoordinator() ? `<button class="button secondary" id="add-bed">+ ${t("Ajouter une planche", "Add a bed")}</button>` : ""}</div>` : ""}
+    <label class="search-box"><span>⌕</span><input id="bed-search" type="search" value="${escapeHtml(state.search)}" placeholder="${t("Numéro, culture ou variété…", "Number, crop or variety...", "Nummer, gewas of variëteit...")}" aria-label="${t("Rechercher une planche", "Search for a bed")}"></label>
     <div class="filter-row">
       ${[["all", t("Toutes", "All")], ["harvest", t("À récolter", "To harvest")], ["growing", t("Ça pousse", "Growing")], ["ready", t("Disponibles", "Available")], ["clear", t("À nettoyer", "To clear")], ["no-photo", t("Sans photo", "No photo")]].map(([value, label]) => `<button data-filter="${value}" class="${state.filter === value ? "active" : ""}">${label}</button>`).join("")}
     </div>
-    ${groups.length ? groups.map((group) => `<section class="bed-group"><div class="group-heading"><h2>${escapeHtml(group)}</h2><span>${beds.filter((bed) => bed.section === group).length}</span></div><div class="bed-card-list">${beds.filter((bed) => bed.section === group).map(bedCard).join("")}</div></section>`).join("") : `<div class="empty-state"><strong>${t("Aucune planche trouvée", "No beds found")}</strong><p>${isCoordinator() ? t("Ajoutez une première planche ou changez de filtre.", "Add a first bed or change the filter.") : t("Essayez un autre filtre ou terme de recherche.", "Try another filter or search term.")}</p></div>`}
+    ${beds.length ? `<section class="bed-group"><div class="bed-card-list">${beds.map(bedCard).join("")}</div></section>` : `<div class="empty-state"><strong>${t("Aucune planche trouvée", "No beds found")}</strong><p>${isCoordinator() ? t("Ajoutez une première planche ou changez de filtre.", "Add a first bed or change the filter.") : t("Essayez un autre filtre ou terme de recherche.", "Try another filter or search term.")}</p></div>`}
   </section>`;
 }
 
@@ -1178,7 +1263,7 @@ function bedCard(bed) {
   const status = statusMetaFor(bed.status);
   return `<button class="bed-card" data-bed-id="${bed.id}">
     ${thumbnail(bed)}
-    <span class="bed-card-body"><span class="bed-card-location"><b>${escapeHtml(bed.code)}</b>${escapeHtml(bed.garden)} · ${escapeHtml(bed.section)}</span><strong>${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</strong><small>${escapeHtml(bed.variety || bed.locationHint || t("Culture à préciser", "Crop to specify"))}</small><span class="bed-updated">${t("Mis à jour", "Updated")} ${escapeHtml(relativeDate(bed.updatedAt).toLowerCase())}</span></span>
+    <span class="bed-card-body"><span class="bed-card-location"><b>${escapeHtml(bed.code)}</b></span><strong>${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</strong><small>${escapeHtml(bed.variety || t("Culture à préciser", "Crop to specify"))}</small><span class="bed-updated">${t("Mis à jour", "Updated")} ${escapeHtml(relativeDate(bed.updatedAt).toLowerCase())}</span></span>
     <span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span>
   </button>`;
 }
@@ -1187,9 +1272,27 @@ function brandingSettings() {
   const items = [
     ["login", t("Accueil et connexion", "Welcome and sign-in"), t("Visible avant la connexion et sur les invitations.", "Shown before sign-in and on invitations.")],
     ["today", t("Page Aujourd’hui", "Today page"), t("Image principale du tableau de bord.", "Main dashboard image.")],
-    ["event", t("Événements", "Events"), t("Image utilisée par défaut dans l’agenda et les événements publics.", "Default image for the agenda and public events.")],
+    ["event", t("Événements privés", "Private events"), t("Image utilisée dans l’agenda des membres uniquement.", "Used only in the member event calendar.")],
+    ["public", t("Page publique", "Public page"), t("Photo publiée uniquement lorsque vous la choisissez ici.", "Published only when you explicitly choose it here.")],
   ];
   return `<section class="panel branding-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Identité du jardin", "Garden identity")}</p><h2>${t("Images de l’application", "App images")}</h2></div></div><div class="branding-list">${items.map(([kind, title, description]) => `<div class="branding-setting" data-branding-kind="${kind}"><div class="branding-preview ${kind} ${state.branding[kind] ? "has-image" : ""}">${state.branding[kind] ? `<img src="${escapeHtml(state.branding[kind])}" alt="">` : `<span>${t("Image neutre", "Neutral image")}</span>`}</div><div class="branding-setting-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(description)}</small><div class="branding-actions"><label class="button secondary file-button">${cameraIcon()}<span>${state.branding[kind] ? t("Remplacer", "Replace") : t("Choisir une photo", "Choose photo")}</span><input data-branding-input="${kind}" type="file" accept="image/jpeg,image/png,image/webp"></label>${state.branding[kind] ? `<button class="button ghost" type="button" data-branding-reset="${kind}">${t("Utiliser l’image neutre", "Use neutral image")}</button>` : ""}</div></div></div>`).join("")}</div></section>`;
+}
+
+function publicSiteAdminSettings() {
+  const locale = currentLocale();
+  const title = state.publicSite.titles?.[locale] || "";
+  const philosophy = state.publicSite.philosophies?.[locale] || "";
+  return `<section class="panel public-site-admin-panel">
+    <div class="section-heading compact"><div><p class="eyebrow">${t("Publication", "Publishing", "Publicatie")}</p><h2>${t("Page publique", "Public page", "Publieke pagina")}</h2></div>${state.publicSite.enabled ? `<a class="button ghost" href="/public">${t("Voir la page", "View page", "Pagina bekijken")}</a>` : ""}</div>
+    <p class="muted">${t("La page, ses textes, ses événements et sa photo restent invisibles jusqu’à une publication explicite.", "The page, its text, events, and photo remain hidden until you publish them explicitly.", "De pagina, teksten, evenementen en foto blijven verborgen totdat u ze uitdrukkelijk publiceert.")}</p>
+    <form id="public-site-settings-form" class="form-stack compact-form">
+      <label class="access-toggle"><input name="enabled" type="checkbox" ${state.publicSite.enabled ? "checked" : ""}><span><strong>${t("Publier la page publique", "Publish the public page", "Publieke pagina publiceren")}</strong><small>${t("Seuls les événements marqués Public et Publié apparaîtront.", "Only events marked Public and Published will appear.", "Alleen evenementen gemarkeerd als Openbaar en Gepubliceerd verschijnen.")}</small></span></label>
+      <div class="public-language-note"><strong>${localeLabels[locale]}</strong><span>${t("Vous modifiez le texte de la langue active. Changez la langue de l’application pour compléter les autres versions.", "You are editing the active language. Switch the app language to complete other versions.", "U bewerkt de actieve taal. Wissel van taal om de andere versies aan te vullen.")}</span></div>
+      <label>${t("Titre public", "Public title", "Publieke titel")}<input name="title" maxlength="180" value="${escapeHtml(title)}" placeholder="${t("Ex. Un parc vivant, cultivé ensemble", "E.g. A living park, grown together", "Bijv. Een levend park, samen geteeld")}"></label>
+      <label>${t("Philosophie du parc et du potager", "Park and garden philosophy", "Filosofie van park en moestuin")}<textarea name="philosophy" maxlength="5000" rows="8" placeholder="${t("Expliquez ce qui guide le projet, comment participer et ce que vous cultivez ensemble.", "Explain what guides the project, how people can join, and what you grow together.", "Leg uit wat het project drijft, hoe mensen kunnen deelnemen en wat jullie samen telen.")}">${escapeHtml(philosophy)}</textarea></label>
+      <button class="button primary" type="submit">${t("Enregistrer la page publique", "Save public page", "Publieke pagina opslaan")}</button>
+    </form>
+  </section>`;
 }
 
 function renderProfile() {
@@ -1209,6 +1312,7 @@ function renderProfile() {
     </section>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
+    ${state.member.role === "admin" ? publicSiteAdminSettings() : ""}
     ${state.member.role === "admin" ? brandingSettings() : ""}
     ${state.member.role === "admin" ? `<section class="panel translation-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Traductions du contenu</h2></div></div><p class="muted">Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ <code>translation</code> dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.</p><div class="translation-actions"><button class="button secondary" type="button" id="translation-export">Télécharger le fichier horodaté</button><form id="translation-import-form" class="form-stack compact-form"><label>Fichier JSON traduit<input id="translation-file" type="file" accept=".json,application/json" required></label><button class="button secondary" type="submit">Réimporter les traductions</button></form></div><div id="translation-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
@@ -1279,6 +1383,7 @@ function bindShell() {
   document.querySelector("#create-event")?.addEventListener("click", () => renderEventForm());
   document.querySelector("#language-toggle")?.addEventListener("click", toggleLanguage);
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
+  document.querySelector("#public-site-settings-form")?.addEventListener("submit", savePublicSiteSettings);
   document.querySelector("#profile-photo-input")?.addEventListener("change", uploadProfilePhoto);
   document.querySelectorAll("[data-branding-input]").forEach((input) => input.addEventListener("change", uploadBrandingImage));
   document.querySelectorAll("[data-branding-reset]").forEach((button) => button.addEventListener("click", () => resetBrandingImage(button.dataset.brandingReset)));
@@ -1340,17 +1445,53 @@ async function loadMembers() {
 
 async function loadBranding() {
   const result = await api("/api/public/branding");
-  state.branding = { login: null, today: null, event: null, ...result.branding };
+  state.branding = { ...state.branding, login: null, public: null, ...result.branding };
 }
 
-function renderQuickLog(preselectedBedId = null) {
+async function loadPublicSiteSummary() {
+  const result = await api("/api/public/site");
+  state.publicSite = { ...state.publicSite, ...result.site };
+  if (result.site.parcName) state.parcName = result.site.parcName;
+}
+
+async function loadPublicSiteSettings() {
+  if (state.member?.role !== "admin") return;
+  const result = await api("/api/public-site-settings");
+  state.publicSite = { ...state.publicSite, ...result.settings };
+}
+
+async function savePublicSiteSettings(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const result = await api("/api/public-site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({
+        enabled: form.elements.enabled.checked,
+        locale: currentLocale(),
+        title: form.elements.title.value,
+        philosophy: form.elements.philosophy.value,
+      }),
+    });
+    state.publicSite = { ...state.publicSite, ...result.settings };
+    renderApp();
+    showToast(t("Page publique enregistrée.", "Public page saved.", "Publieke pagina opgeslagen."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+function renderQuickLog(preselectedBedId = null, preselectedType = "work") {
   const selectedId = preselectedBedId || state.selectedBed?.bed?.id || state.beds[0]?.id;
   const bedOptions = state.beds.map((bed) => `<option value="${bed.id}" ${bed.id === selectedId ? "selected" : ""}>${escapeHtml(`${bed.code} - ${bed.crop || t("Planche disponible", "Available bed")}`)}</option>`).join("");
   modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet quick-log-sheet" role="dialog" aria-modal="true" aria-labelledby="quick-log-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="${t("Fermer", "Close")}">x</button><div class="sheet-content form-sheet">
     <p class="eyebrow">${t("Sur le terrain", "In the garden")}</p><h2 id="quick-log-title">${t("Ajouter au journal", "Add to log")}</h2>
     <form id="quick-log-form" class="form-stack quick-log-form">
-      <fieldset class="log-type-picker"><legend>${t("Qu’avez-vous fait ou vu ?", "What did you do or see?")}</legend>${Object.entries(logTypeMeta).map(([value, meta], index) => `<label><input type="radio" name="type" value="${value}" ${index === 0 ? "checked" : ""}><span class="activity-type-icon">${meta.icon}</span><strong>${escapeHtml(t(meta.fr, meta.en))}</strong></label>`).join("")}</fieldset>
-      <label>${t("Où ?", "Where?")}<select name="bedId" required>${bedOptions}</select></label>
+      <fieldset class="log-type-picker"><legend>${t("Qu’avez-vous fait ou vu ?", "What did you do or see?")}</legend>${Object.entries(logTypeMeta).map(([value, meta]) => `<label><input type="radio" name="type" value="${value}" ${value === preselectedType ? "checked" : ""}><span class="activity-type-icon">${meta.icon}</span><strong>${escapeHtml(t(meta.fr, meta.en, meta.nl))}</strong></label>`).join("")}</fieldset>
+      <label>${t("Planche", "Bed", "Bed")}<select name="bedId" required>${bedOptions}</select></label>
       <label>${t("En quelques mots", "In a few words")}<textarea name="note" maxlength="600" required autofocus placeholder="${t("Ex. Désherbage terminé, pucerons repérés…", "E.g. Weeding finished, aphids spotted...")}"></textarea></label>
       <label class="quick-photo-field">${t("Photo", "Photo")} <small>(${t("facultatif sauf pour une entrée Photo", "optional except for a Photo entry")})</small><input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
       <button class="button primary" type="submit">${t("Ajouter au journal", "Add to log")}</button>
@@ -1435,7 +1576,7 @@ async function createArea(submitEvent) {
 function renderCreateBedForm() {
   const area = state.areas.find((item) => item.id === state.selectedAreaId);
   if (!area) return;
-  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="new-bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button><div class="sheet-content form-sheet"><p class="eyebrow">${escapeHtml(area.name)}</p><h2 id="new-bed-title">Ajouter une planche</h2><p class="muted">Le prochain numéro et le code ${escapeHtml(area.codePrefix)} seront proposés automatiquement.</p><form id="bed-create-form" class="form-stack bed-edit-form"><div class="two-fields"><label>Numéro <small>(automatique si vide)</small><input name="number" type="number" min="1" max="999" placeholder="${area.bedCount + 1}"></label><label>Code <small>(facultatif)</small><input name="code" maxlength="16" placeholder="${escapeHtml(area.codePrefix)}-${String(area.bedCount + 1).padStart(2, "0")}"></label></div><label>Secteur<input name="section" value="${escapeHtml(area.name)}" required></label><div class="two-fields"><label>Culture<input name="crop" placeholder="Ex. Tomates"></label><label>Variété<input name="variety"></label></div><label>État<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${value === "unknown" ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label><label>Repère sur place<input name="locationHint" value="${escapeHtml(area.locationHint)}"></label><label>Note du potager<textarea name="note"></textarea></label><div class="button-row"><button type="button" class="button ghost" id="cancel-bed-create">Annuler</button><button class="button primary" type="submit">Ajouter la planche</button></div></form></div></section></div>`;
+  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="new-bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button><div class="sheet-content form-sheet"><p class="eyebrow">${escapeHtml(area.name)}</p><h2 id="new-bed-title">Ajouter une planche</h2><p class="muted">Le prochain numéro et le code ${escapeHtml(area.codePrefix)} seront proposés automatiquement.</p><form id="bed-create-form" class="form-stack bed-edit-form"><div class="two-fields"><label>Numéro <small>(automatique si vide)</small><input name="number" type="number" min="1" max="999" placeholder="${area.bedCount + 1}"></label><label>Code <small>(facultatif)</small><input name="code" maxlength="16" placeholder="${escapeHtml(area.codePrefix)}-${String(area.bedCount + 1).padStart(2, "0")}"></label></div><div class="two-fields"><label>Culture<input name="crop" placeholder="Ex. Tomates"></label><label>Variété<input name="variety"></label></div><label>État<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${value === "unknown" ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label><label>Note du potager<textarea name="note"></textarea></label><div class="button-row"><button type="button" class="button ghost" id="cancel-bed-create">Annuler</button><button class="button primary" type="submit">Ajouter la planche</button></div></form></div></section></div>`;
   bindModal();
   document.querySelector("#cancel-bed-create").addEventListener("click", dismissModal);
   document.querySelector("#bed-create-form").addEventListener("submit", createBed);
@@ -1557,7 +1698,9 @@ async function cancelEventRegistration() {
 
 async function shareEvent() {
   const event = state.selectedEvent.event;
-  const url = `${location.origin}/?${event.audience === "public" ? "publicEvent" : "event"}=${event.id}`;
+  const url = event.audience === "public"
+    ? `${location.origin}/public?event=${event.id}`
+    : `${location.origin}/?event=${event.id}`;
   const text = `${event.title} — ${formatEventDate(event.startsAt)} à ${formatTime(event.startsAt)}, ${event.location}`;
   try {
     if (navigator.share) await navigator.share({ title: event.title, text, url });
@@ -1582,7 +1725,8 @@ function renderEventForm(event = null) {
     <label>Description<textarea name="description" maxlength="3000" placeholder="Que va-t-on faire ?">${escapeHtml(event?.description || "")}</textarea></label>
     <label>À prévoir<textarea name="preparationNote" maxlength="1000" placeholder="Gants, vêtements, matériel…">${escapeHtml(event?.preparationNote || "")}</textarea></label>
     <label>Accessibilité<textarea name="accessibilityNote" maxlength="1000" placeholder="Accès, besoins particuliers…">${escapeHtml(event?.accessibilityNote || "")}</textarea></label>
-    <div class="two-fields"><label>Visibilité<select name="audience"><option value="members" ${!event || event.audience === "members" ? "selected" : ""}>Tous les membres</option><option value="public" ${event?.audience === "public" ? "selected" : ""}>Public avec lien</option><option value="coordinators" ${event?.audience === "coordinators" ? "selected" : ""}>Coordinateurs</option></select></label><label>État<select name="state">${Object.keys(eventStateLabels).map((value) => `<option value="${value}" ${(event?.state || "published") === value ? "selected" : ""}>${escapeHtml(eventStateLabel(value))}</option>`).join("")}</select></label></div>
+    <div class="two-fields"><label>Visibilité<select name="audience"><option value="members" ${!event || event.audience === "members" ? "selected" : ""}>Tous les membres</option><option value="public" ${event?.audience === "public" ? "selected" : ""}>Public avec lien</option><option value="coordinators" ${event?.audience === "coordinators" ? "selected" : ""}>Coordinateurs</option></select></label><label>État<select name="state">${Object.keys(eventStateLabels).map((value) => `<option value="${value}" ${(event?.state || "draft") === value ? "selected" : ""}>${escapeHtml(eventStateLabel(value))}</option>`).join("")}</select></label></div>
+    <p class="privacy-note">${t("Par défaut, un nouvel événement est un brouillon réservé aux membres. Il ne devient public que si vous choisissez Public puis Publié.", "New events default to members-only drafts. They become public only when you choose Public and Published.", "Nieuwe evenementen zijn standaard concepten voor leden. Ze worden pas openbaar als u Openbaar en Gepubliceerd kiest.")}</p>
     <div class="button-row"><button type="button" class="button ghost" id="cancel-event-form">Annuler</button><button class="button primary" type="submit">${event ? "Enregistrer" : "Publier"}</button></div>
   </form></div></section></div>`;
   bindModal();
@@ -1624,27 +1768,6 @@ async function openBed(id) {
   }
 }
 
-function renderBedSheetLegacy(editing = false) {
-  const { bed, activities } = state.selectedBed;
-  const status = statusMetaFor(bed.status);
-  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">×</button>
-    <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
-    <div class="sheet-content">
-      <div class="detail-location"><span>${escapeHtml(bed.code)}</span>${escapeHtml(bed.garden)} · ${escapeHtml(bed.section)}</div>
-      <div class="detail-title"><div><h2 id="bed-title">${escapeHtml(bed.crop || "Planche disponible")}</h2><p>${escapeHtml(bed.variety || "Aucune culture renseignée")}</p></div><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>
-      <div class="location-card"><span>⌖</span><div><small>Pour la trouver</small><strong>${escapeHtml(bed.locationHint || "Emplacement à préciser")}</strong></div></div>
-      ${editing ? bedEditForm(bed) : `<div class="detail-section"><h3>Note du potager</h3><p>${escapeHtml(bed.note || "Aucune note pour le moment.")}</p></div>${bed.harvestNote ? `<div class="harvest-note"><small>Consigne de récolte</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}`}
-      ${isCoordinator() && !editing ? `<div class="coordinator-actions"><button class="button primary" id="edit-bed-button">Modifier la planche</button><label class="button secondary file-button photo-upload-button">${cameraIcon()}<span>Ajouter une photo</span><input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}
-      ${!editing ? `<div class="detail-section history"><h3>Journal de la planche</h3>${activities.length ? activities.map((activity) => `<div class="activity"><i></i><span><strong>${escapeHtml(activity.note || "Mise à jour")}</strong><small>${escapeHtml(activity.memberName || "Membre")} · ${escapeHtml(relativeDate(activity.createdAt))}</small></span></div>`).join("") : '<p class="muted">Aucune activité enregistrée.</p>'}</div>` : ""}
-    </div>
-  </section></div>`;
-  bindModal();
-  document.querySelector("#edit-bed-button")?.addEventListener("click", () => renderBedSheet(true));
-  document.querySelector("#cancel-edit")?.addEventListener("click", () => renderBedSheet(false));
-  document.querySelector("#bed-edit-form")?.addEventListener("submit", saveBed);
-  document.querySelector("#bed-photo-input")?.addEventListener("change", uploadBedPhoto);
-}
-
 function renderBedSheet(editing = false) {
   const { bed, activities, notes = [], harvests = [], howToVideos = [] } = state.selectedBed;
   const status = statusMetaFor(bed.status);
@@ -1658,13 +1781,17 @@ function renderBedSheet(editing = false) {
     <label>${t("Note", "Note")}<textarea name="note" maxlength="600" placeholder="${t("Pourquoi cette vidéo est utile ici ?", "Why is this video useful here?")}"></textarea></label>
     <button class="button secondary" type="submit">${t("Ajouter le tuto", "Add tutorial")}</button>
   </form>` : "";
+  const quickActions = bedQuickActionTypes.map((type) => {
+    const meta = logTypeMeta[type];
+    return `<button class="bed-action-button" type="button" data-bed-action="${type}"><span class="activity-type-icon">${meta.icon}</span><strong>${escapeHtml(t(meta.fr, meta.en, meta.nl))}</strong></button>`;
+  }).join("");
   const noteList = notes.length ? notes.map(bedNoteCard).join("") : `<p class="muted">${t("Aucune note pour le moment.", "No notes yet.")}</p>`;
   modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="bed-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="Fermer">x</button>
     <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
     <div class="sheet-content">
-      <div class="detail-location"><span>${escapeHtml(bed.code)}</span>${escapeHtml(bed.garden)} - ${escapeHtml(bed.section)}</div>
+      <div class="bed-identifier">${escapeHtml(bed.code)}</div>
       <div class="detail-title"><div class="detail-title-copy"><h2 id="bed-title">${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</h2><p>${escapeHtml(bed.variety || t("Aucune culture renseignée", "No crop listed"))}</p><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>${isCoordinator() && !editing ? `<div class="detail-title-actions"><button class="round-tool-button" id="edit-bed-button" type="button" aria-label="${t("Modifier la planche", "Edit bed")}" title="${t("Modifier la planche", "Edit bed")}">${editIcon()}</button><label class="round-tool-button file-button" aria-label="${t("Ajouter une photo", "Add a photo")}" title="${t("Ajouter une photo", "Add a photo")}">${cameraIcon()}<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}</div>
-      <div class="location-card"><span>#</span><div><small>${t("Pour la trouver", "How to find it")}</small><strong>${escapeHtml(bed.locationHint || t("Emplacement à préciser", "Location to be specified"))}</strong></div></div>
+      ${!editing ? `<div class="bed-actions"><div class="section-heading compact"><div><p class="eyebrow">${t("Action rapide", "Quick action", "Snelle actie")}</p><h3>${t("Que venez-vous de faire ?", "What did you just do?", "Wat hebt u net gedaan?")}</h3></div></div><div class="bed-action-grid">${quickActions}</div></div>` : ""}
       ${editing ? bedEditForm(bed) : `<div class="detail-section note-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Notes", "Notes")}</p><h3>${t("Commentaires horodatés", "Timestamped comments")}</h3></div><span class="count-pill">${notes.length}</span></div><div class="note-list">${noteList}</div></div>${bed.harvestNote ? `<div class="harvest-note"><small>${t("Dernière consigne de récolte", "Latest harvest instruction")}</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}
       <div class="detail-section harvest-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Récoltes", "Harvests")}</p><h3>${t("Photos et partages", "Photos and shares")}</h3></div><span class="count-pill">${harvests.length}</span></div>${harvestForm}<div class="harvest-list">${harvests.length ? harvests.map(harvestCard).join("") : `<p class="muted">${t("Aucune récolte ajoutée pour le moment.", "No harvests added yet.")}</p>`}</div></div>
       <div class="detail-section how-to-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Savoir-faire", "How-tos")}</p><h3>${t("Tutos vidéo", "Video tutorials")}</h3></div></div>${howToForm}<div class="how-to-list">${howToVideos.length ? howToVideos.map(howToVideoCard).join("") : `<p class="muted">${t("Aucun tuto lié à cette planche.", "No tutorial linked to this bed.")}</p>`}</div></div>`}
@@ -1676,27 +1803,15 @@ function renderBedSheet(editing = false) {
   document.querySelector("#cancel-edit")?.addEventListener("click", () => renderBedSheet(false));
   document.querySelector("#bed-edit-form")?.addEventListener("submit", saveBed);
   document.querySelector("#bed-photo-input")?.addEventListener("change", uploadBedPhoto);
+  document.querySelectorAll("[data-bed-action]").forEach((button) => button.addEventListener("click", () => renderQuickLog(bed.id, button.dataset.bedAction)));
   document.querySelector("#harvest-form")?.addEventListener("submit", submitHarvest);
   document.querySelector("#how-to-form")?.addEventListener("submit", addHowToVideo);
-}
-
-function bedEditFormLegacy(bed) {
-  return `<form id="bed-edit-form" class="form-stack bed-edit-form">
-    <div class="two-fields"><label>Culture<input name="crop" value="${escapeHtml(bed.crop || "")}" placeholder="Ex. Tomates"></label><label>Variété<input name="variety" value="${escapeHtml(bed.variety || "")}"></label></div>
-    <label>État<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${bed.status === value ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label>
-    <div class="two-fields"><label>Secteur<input name="section" value="${escapeHtml(bed.section)}" required></label><label>Repère sur place<input name="locationHint" value="${escapeHtml(bed.locationHint || "")}"></label></div>
-    <label>Note du potager<textarea name="note">${escapeHtml(bed.note || "")}</textarea></label>
-    <label>Consigne de récolte<textarea name="harvestNote">${escapeHtml(bed.harvestNote || "")}</textarea></label>
-    <label>Note pour le journal<input name="activityNote" placeholder="Ex. Désherbage terminé"></label>
-    <div class="button-row"><button type="button" class="button ghost" id="cancel-edit">Annuler</button><button class="button primary" type="submit">Enregistrer</button></div>
-  </form>`;
 }
 
 function bedEditForm(bed) {
   return `<form id="bed-edit-form" class="form-stack bed-edit-form">
     <div class="two-fields"><label>${t("Culture", "Crop")}<input name="crop" value="${escapeHtml(bed.crop || "")}" placeholder="${t("Ex. Tomates", "E.g. Tomatoes")}"></label><label>${t("Variété", "Variety")}<input name="variety" value="${escapeHtml(bed.variety || "")}"></label></div>
     <label>${t("État", "Status")}<select name="status">${Object.keys(statusMeta).map((value) => `<option value="${value}" ${bed.status === value ? "selected" : ""}>${escapeHtml(statusMetaFor(value).label)}</option>`).join("")}</select></label>
-    <div class="two-fields"><label>${t("Secteur", "Section")}<input name="section" value="${escapeHtml(bed.section)}" required></label><label>${t("Repère sur place", "Location hint")}<input name="locationHint" value="${escapeHtml(bed.locationHint || "")}"></label></div>
     <label>${t("Note du potager", "Garden note")}<textarea name="note">${escapeHtml(bed.note || "")}</textarea></label>
     <label>${t("Consigne de récolte", "Harvest instruction")}<textarea name="harvestNote">${escapeHtml(bed.harvestNote || "")}</textarea></label>
     <label>${t("Note pour le journal", "Activity note")}<input name="activityNote" placeholder="${t("Ex. Désherbage terminé", "E.g. Weeding completed")}"></label>
@@ -2047,10 +2162,11 @@ async function logout() {
 }
 
 async function boot() {
-  await loadBranding().catch(() => {});
+  await Promise.all([loadBranding().catch(() => {}), loadPublicSiteSummary().catch(() => {})]);
   const params = new URLSearchParams(location.search);
-  const publicEventId = Number(params.get("publicEvent"));
+  const publicEventId = Number(params.get("publicEvent") || (location.pathname === "/public" ? params.get("event") : ""));
   if (publicEventId) return renderPublicEvent(publicEventId);
+  if (location.pathname === "/public") return renderPublicSite();
   const invitation = params.get("invite");
   if (invitation) return renderInvite(invitation);
   const reset = params.get("reset");
@@ -2063,7 +2179,7 @@ async function boot() {
     state.parcName = result.parcName;
     if (result.branding) state.branding = { ...state.branding, ...result.branding };
     if (state.setupRequired) return renderSetup();
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
     renderApp();
     const eventId = Number(params.get("event"));
     if (eventId) openEvent(eventId);
