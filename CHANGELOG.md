@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 - 2026-07-26
 
 - Added an administrator-configurable public park page with philosophy text,
   upcoming public events, guest registration, and a dedicated optional image.
