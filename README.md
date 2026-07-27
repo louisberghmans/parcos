@@ -24,7 +24,7 @@ docker compose up -d
 
 Open `http://YOUR-SERVER:8080`, sign in as the administrator, and complete the
 one-time setup wizard. It asks for the park name and the areas you want to
-manage. The image is available as `ghcr.io/louisberghmans/parcos:1.3.0` and
+manage. The image is available as `ghcr.io/louisberghmans/parcos:1.3.1` and
 `ghcr.io/louisberghmans/parcos:latest` for amd64 and arm64.
 
 Administrators can configure the welcome, Today, and event images from
@@ -61,18 +61,13 @@ privileges; only `/data` is writable.
 
 ## Data and backups
 
-The `parcos-data` volume stores `parcos.db` and private uploaded photos. Stop the
-service before taking a filesystem-level backup:
-
-```sh
-docker compose stop
-docker run --rm -v parcos_parcos-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/parcos-backup.tgz -C /data .
-docker compose start
-```
-
-Restore only into the same or a newer ParcOS version. Protect backups as
-sensitive member data.
+The `parcos-data` volume stores the SQLite database and private uploaded media.
+Administrators can download a consistent, complete, versioned backup from
+**Profile > Complete backup** without stopping the service. The export includes
+private member information and password hashes and must be protected
+accordingly. See [docs/backup-and-restore.md](docs/backup-and-restore.md) for
+the exact offline validation, local restore test, Docker volume, and
+disaster-recovery procedures.
 
 ## Development
 

@@ -146,10 +146,13 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
     body: JSON.stringify({ rows: [
       { entity: "area", name: "Zone import", codePrefix: "ZI", membersCanAccess: "true" },
       { entity: "bed", areaCodePrefix: "ZI", number: "1", crop: "Basilic", status: "growing" },
+      { entity: "member", username: "nederlandse.import", displayName: "Nederlandse Import", initialPassword: "import-test-password", preferredLocale: "nl" },
     ] }),
   });
   assert.equal(imported.response.status, 200);
-  assert.deepEqual(imported.body.imported, { areas: 1, beds: 1, events: 0, members: 0 });
+  assert.deepEqual(imported.body.imported, { areas: 1, beds: 1, events: 0, members: 1 });
+  const importedMembers = await request(baseUrl, "/api/members", { headers: { cookie: adminCookie } });
+  assert.equal(importedMembers.body.members.find((member) => member.username === "nederlandse.import").preferredLocale, "nl");
 
   const calendar = await fetch(`${baseUrl}/api/events/${eventId}/calendar.ics`, { headers: { cookie: adminCookie } });
   assert.equal(calendar.status, 200);

@@ -1314,6 +1314,7 @@ function renderProfile() {
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? publicSiteAdminSettings() : ""}
     ${state.member.role === "admin" ? brandingSettings() : ""}
+    ${state.member.role === "admin" ? `<section class="panel backup-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Administration", "Administration", "Beheer")}</p><h2>${t("Sauvegarde complète", "Complete backup", "Volledige back-up")}</h2></div></div><p class="muted">${t("Cette exportation contient toutes les données privées de ParcOS, les mots de passe hachés et les médias téléversés. Conservez-la dans un emplacement sûr.", "This export contains all private ParcOS data, password hashes, and uploaded media. Store it securely.", "Deze export bevat alle privégegevens van ParcOS, wachtwoord-hashes en geüploade media. Bewaar hem veilig.")}</p><form id="complete-backup-form" class="form-stack compact-form"><label>${t("Mot de passe actuel", "Current password", "Huidig wachtwoord")}<input name="currentPassword" type="password" autocomplete="current-password" required></label><button class="button secondary" type="submit">${t("Télécharger la sauvegarde complète", "Download complete backup", "Volledige back-up downloaden")}</button></form><div id="backup-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel translation-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Traductions du contenu</h2></div></div><p class="muted">Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ <code>translation</code> dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.</p><div class="translation-actions"><button class="button secondary" type="button" id="translation-export">Télécharger le fichier horodaté</button><form id="translation-import-form" class="form-stack compact-form"><label>Fichier JSON traduit<input id="translation-file" type="file" accept=".json,application/json" required></label><button class="button secondary" type="submit">Réimporter les traductions</button></form></div><div id="translation-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
@@ -1389,6 +1390,7 @@ function bindShell() {
   document.querySelectorAll("[data-branding-reset]").forEach((button) => button.addEventListener("click", () => resetBrandingImage(button.dataset.brandingReset)));
   document.querySelector("#invite-create-form")?.addEventListener("submit", createInvite);
   document.querySelector("#import-form")?.addEventListener("submit", importData);
+  document.querySelector("#complete-backup-form")?.addEventListener("submit", downloadCompleteBackup);
   document.querySelector("#translation-export")?.addEventListener("click", exportTranslations);
   document.querySelector("#translation-import-form")?.addEventListener("submit", importTranslationsFile);
   document.querySelectorAll("[data-reset-member]").forEach((button) => button.addEventListener("click", () => createResetLink(Number(button.dataset.resetMember))));
@@ -2080,6 +2082,47 @@ async function exportTranslations() {
     showToast(t("Fichier de traduction téléchargé.", "Translation file downloaded."));
   } catch (error) {
     showToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function downloadCompleteBackup(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  const resultBox = document.querySelector("#backup-result");
+  const currentPassword = new FormData(form).get("currentPassword");
+  button.disabled = true;
+  resultBox.innerHTML = "";
+  try {
+    const response = await fetch("/api/backups/complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": state.csrfToken,
+        "X-Parcos-Locale": currentLocale(),
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({ currentPassword }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || t("Impossible de créer la sauvegarde.", "Could not create the backup.", "De back-up kon niet worden gemaakt."));
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") || "";
+    const filename = /filename="([^"]+)"/i.exec(disposition)?.[1] || "parcos-backup.tar.gz";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    form.reset();
+    resultBox.innerHTML = `<div class="invite-result"><small>${t("Sauvegarde téléchargée", "Backup downloaded", "Back-up gedownload")}</small><p>${t("Conservez ce fichier privé dans un emplacement sûr.", "Keep this private file in a secure location.", "Bewaar dit privébestand op een veilige plaats.")}</p></div>`;
+  } catch (error) {
+    resultBox.innerHTML = `<div class="form-error">${escapeHtml(error.message)}</div>`;
   } finally {
     button.disabled = false;
   }

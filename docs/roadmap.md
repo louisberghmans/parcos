@@ -36,6 +36,8 @@ and dependable before adding scale or automation.
   upload validation, security headers, and locked-down container defaults.
 - French, Dutch, and English interface support plus export/import translation
   workflows for authored content.
+- Administrator-controlled complete backup export and a validated offline
+  restore workflow for isolated local rebuilds.
 
 ## Now: daily work and live-data safety
 
@@ -46,7 +48,6 @@ Goal: make ParcOS the garden's reliable daily action list.
 - Show urgent, available, and assigned work on Today.
 - Let members claim and complete work in under a minute.
 - Turn logged problems into proposed tasks without duplicating data.
-- Add administrator backup/export controls and document a tested restore flow.
 - Introduce explicit, versioned database migrations before the next group of
   tables is added.
 - Add focused tests for public/private boundaries, migrations, waitlists, and

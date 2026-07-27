@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.1 - 2026-07-27
+
+- Added an administrator-only, password-reauthenticated complete backup export
+  using SQLite's online backup API and a checksummed `parcos-backup-v1` archive.
+- Added a defensive offline restore command, Docker Compose restore workflow,
+  round-trip recovery tests, and detailed local rebuild documentation.
+- Expanded `/health` to check SQLite, persistent storage, and writable uploads
+  while keeping responses generic.
+- Hardened release publication with version/tag validation, the full check
+  suite, a built-container health smoke test, and prerelease-safe image tags.
+- Fixed Dutch (`nl`) member locale handling in CSV imports.
+
 ## 1.3.0 - 2026-07-26
 
 - Added an administrator-configurable public park page with philosophy text,
