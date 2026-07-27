@@ -2,19 +2,27 @@ import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import {
+  accessSync,
+  constants as fsConstants,
+  createReadStream,
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, extname, join, resolve, sep } from "node:path";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const runtime = globalThis.process;
 const env = runtime?.env ?? {};
+const packageMetadata = JSON.parse(readFileSync(join(moduleDir, "package.json"), "utf8"));
+const APP_VERSION = packageMetadata.version;
 
 const SESSION_COOKIE = "parcos_session";
 const SESSION_DAYS = 30;
@@ -1348,7 +1356,7 @@ function importRows(db, rows, adminId, contentLocale = DEFAULT_CONTENT_LOCALE) {
           const displayName = cleanDisplayName(row.displayName ?? row.name);
           const password = validatePassword(row.initialPassword ?? row.password);
           const role = ["member", "coordinator"].includes(row.role) ? row.role : "member";
-          const locale = ["fr", "en"].includes(row.preferredLocale) ? row.preferredLocale : "fr";
+          const locale = SUPPORTED_LOCALES.includes(row.preferredLocale) ? row.preferredLocale : "fr";
           const bio = String(row.bio ?? "").trim().slice(0, 400) || null;
           db.prepare(`insert into members (username, display_name, password_hash, role, preferred_locale, bio, created_at, updated_at)
             values (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -1507,25 +1515,64 @@ export function createApp(options = {}) {
   }
   mkdirSync(dataDir, { recursive: true });
   mkdirSync(uploadsDir, { recursive: true });
+  for (const name of readdirSync(dataDir)) {
+    if (name.startsWith(".parcos-backup-")) rmSync(join(dataDir, name), { recursive: true, force: true });
+  }
+  const runningMarkerPath = join(dataDir, RUNNING_MARKER);
+  if (existsSync(runningMarkerPath)) throw new Error("ParcOS data directory appears to be in use.");
+  writeFileSync(runningMarkerPath, `${JSON.stringify({ pid: runtime?.pid ?? null, startedAt: now() })}\n`, { flag: "wx", mode: 0o600 });
 
-  const db = new DatabaseSync(dbPath);
-  createSchema(db);
-  seedDatabase(db, options.adminUsername ?? env.PARCOS_ADMIN_USERNAME, options.adminPassword ?? env.PARCOS_ADMIN_PASSWORD,
-    options.seedDemoData ?? env.PARCOS_SEED_DEMO === "true");
-  backfillBedNotes(db);
-  backfillLocalizedContent(db);
-  db.prepare("delete from sessions where expires_at <= ?").run(now());
+  let db;
+  try {
+    db = new DatabaseSync(dbPath);
+    createSchema(db);
+    seedDatabase(db, options.adminUsername ?? env.PARCOS_ADMIN_USERNAME, options.adminPassword ?? env.PARCOS_ADMIN_PASSWORD,
+      options.seedDemoData ?? env.PARCOS_SEED_DEMO === "true");
+    backfillBedNotes(db);
+    backfillLocalizedContent(db);
+    db.prepare("delete from sessions where expires_at <= ?").run(now());
+  } catch (error) {
+    try {
+      db?.close();
+    } catch {
+      // Preserve the startup error.
+    }
+    rmSync(runningMarkerPath, { force: true });
+    throw error;
+  }
 
   const loginAttempts = new Map();
+  let activeWrites = 0;
+  let backupInProgress = false;
+  let writesBlockedForBackup = false;
   const server = createServer(async (req, res) => {
     securityHeaders(res);
+    let countedWrite = false;
     try {
       const url = new URL(req.url, "http://parcos.local");
       const path = decodeURIComponent(url.pathname);
       const locale = requestLocale(req, url);
+      const completeBackupRequest = req.method === "POST" && path === "/api/backups/complete";
+      if (!["GET", "HEAD"].includes(req.method) && !completeBackupRequest) {
+        if (writesBlockedForBackup) throw new HttpError(503, "Une sauvegarde est en cours. Réessayez dans un instant.");
+        activeWrites += 1;
+        countedWrite = true;
+      }
 
       if (req.method === "GET" && path === "/health") {
-        return json(res, 200, { status: "ok" });
+        let probePath = null;
+        try {
+          db.prepare("select 1 as ok").get();
+          accessSync(dataDir, fsConstants.R_OK);
+          accessSync(uploadsDir, fsConstants.R_OK | fsConstants.W_OK);
+          probePath = join(uploadsDir, `.health-${runtime?.pid ?? "node"}-${randomBytes(6).toString("hex")}`);
+          writeFileSync(probePath, "", { flag: "wx", mode: 0o600 });
+          rmSync(probePath, { force: true });
+          return json(res, 200, { status: "ok" });
+        } catch {
+          if (probePath) rmSync(probePath, { force: true });
+          return json(res, 503, { status: "unhealthy" });
+        }
       }
 
       if (path.startsWith("/api/")) {
@@ -1792,6 +1839,44 @@ export function createApp(options = {}) {
           requireCoordinator(session);
           const rows = db.prepare("select id, username, display_name, role, preferred_locale, bio, avatar_path, created_at from members order by display_name collate nocase").all();
           return json(res, 200, { members: rows.map(memberJson) });
+        }
+
+        if (req.method === "POST" && path === "/api/backups/complete") {
+          requireCsrf(req, session);
+          if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
+          const body = await readJson(req);
+          const member = db.prepare("select password_hash from members where id = ?").get(session.member.id);
+          if (!passwordMatches(String(body.currentPassword ?? ""), member?.password_hash)) {
+            throw new HttpError(403, "Le mot de passe actuel est incorrect.");
+          }
+          if (backupInProgress || activeWrites > 0) throw new HttpError(409, "Une autre sauvegarde ou écriture est déjà en cours.");
+          backupInProgress = true;
+          writesBlockedForBackup = true;
+          let completedBackup = null;
+          try {
+            completedBackup = await createCompleteBackup({
+              db,
+              dataDir,
+              uploadsDir,
+              appVersion: APP_VERSION,
+              onStaged() {
+                writesBlockedForBackup = false;
+              },
+            });
+            const size = statSync(completedBackup.archivePath).size;
+            res.writeHead(200, {
+              "Content-Type": "application/gzip",
+              "Content-Length": size,
+              "Content-Disposition": `attachment; filename="${completedBackup.filename}"`,
+              "Cache-Control": "no-store",
+            });
+            await pipeline(createReadStream(completedBackup.archivePath), res);
+            return;
+          } finally {
+            writesBlockedForBackup = false;
+            backupInProgress = false;
+            if (completedBackup?.workDir) rmSync(completedBackup.workDir, { recursive: true, force: true });
+          }
         }
 
         if (req.method === "GET" && path === "/api/translations/export") {
@@ -2332,6 +2417,8 @@ export function createApp(options = {}) {
       if (status === 500) console.error(error);
       if (!res.headersSent) return json(res, status, { error: status === 500 ? "Erreur interne du serveur." : error.message });
       res.end();
+    } finally {
+      if (countedWrite) activeWrites -= 1;
     }
   });
 
@@ -2346,7 +2433,12 @@ export function createApp(options = {}) {
     dataDir,
     close() {
       server.close();
-      db.close();
+      try {
+        db.close();
+      } catch {
+        // The database may already be closed by a degraded-health test.
+      }
+      rmSync(runningMarkerPath, { force: true });
     },
   };
 }
@@ -2358,4 +2450,7 @@ if (entry && import.meta.url === pathToFileURL(resolve(entry)).href) {
   app.server.listen(port, "0.0.0.0", () => {
     console.log(`ParcOS listening on http://0.0.0.0:${port}`);
   });
+  const shutdown = () => app.close();
+  runtime.once("SIGTERM", shutdown);
+  runtime.once("SIGINT", shutdown);
 }
