@@ -1,118 +1,214 @@
 # ParcOS roadmap
 
-Last updated: 2026-07-26
+Last updated: 2026-08-22
 
 ParcOS is a private-first operating app for community parks and vegetable
-gardens. The roadmap follows one product rule: make everyday garden work clear
-and dependable before adding scale or automation.
+gardens. Each release below has one primary outcome. A feature belongs in a
+version only when it strengthens that outcome; otherwise it waits.
 
-## Product principles
+Version numbers describe product milestones, not delivery dates. Patch releases
+may still be used for focused fixes, security work, and release hardening.
 
-- Private by default. Publishing an event, text, image, or other data must
-  always be an explicit administrator or coordinator decision.
-- Useful in the garden. A member should understand what needs doing and record
-  the result from a phone in a few taps.
-- Human confirmed. Automation may propose changes, but a person remains
-  responsible for changes to trusted garden data.
-- Small and self-hostable. Keep the one-container Node and SQLite deployment
-  until real usage proves that more infrastructure is necessary.
-- Accessible and multilingual. New public and member workflows should work in
-  French, Dutch, and English and target WCAG 2.2 AA.
+## Product direction
 
-## Shipped foundation
+ParcOS should feel like a shared garden conversation with useful actions
+attached, not a collection of management dashboards.
 
-- Invitation-only member access, account recovery, and member, coordinator, and
-  administrator roles.
-- Managed garden areas, beds, bed status, notes, photos, harvests, tutorials,
-  and activity history.
-- Mobile Quick Log and bed actions for watering, weeding, clearing, planting,
-  mulching, pruning, general work, observations, problems, harvests, and photos.
-- Events, capacity, member registration, waitlists, calendar downloads, and
-  coordinator attendee views.
-- An administrator-configurable public page for the park philosophy and
-  explicitly public events, with guest registration and a private-by-default
-  publishing model.
-- Private member media, CSRF protection, hashed sessions and one-time tokens,
-  upload validation, security headers, and locked-down container defaults.
-- French, Dutch, and English interface support plus export/import translation
-  workflows for authored content.
-- Administrator-controlled complete backup export and a validated offline
-  restore workflow for isolated local rebuilds.
+The **Today** page will therefore put the garden feed first. Members should see
+what people have said, asked, noticed, or completed before secondary summaries.
+Tasks, events, beds, and harvest information remain important, but Today should
+link to those records instead of repeating every screen in stacked cards.
 
-## Now: daily work and live-data safety
+## Scope rules
 
-Goal: make ParcOS the garden's reliable daily action list.
+- **One outcome per version.** Avoid unrelated feature bundles.
+- **Conversation before administration.** Member communication and next actions
+  come before statistics, hero imagery, and coordinator controls.
+- **Progressive detail.** Today stays short; Calendar and Garden hold operational
+  detail.
+- **Private by default.** A post, reply, event, image, or other record inherits
+  its private context unless a coordinator explicitly publishes it.
+- **Human confirmed.** Assistance may propose changes, but a person confirms
+  changes to trusted garden data.
+- **Small and self-hostable.** Keep the one-container Node and SQLite deployment
+  until measured usage proves that more infrastructure is necessary.
+- **Accessible and multilingual.** New workflows must work in French, Dutch,
+  and English and target WCAG 2.2 AA.
 
-- Add first-class tasks connected to an area, bed, event, or no location.
-- Support open, claimed, done, skipped, and archived task states.
-- Show urgent, available, and assigned work on Today.
-- Let members claim and complete work in under a minute.
-- Turn logged problems into proposed tasks without duplicating data.
-- Introduce explicit, versioned database migrations before the next group of
-  tables is added.
-- Add focused tests for public/private boundaries, migrations, waitlists, and
-  media authorization.
+## Shipped versions
 
-Success means a member can choose useful work, complete it, and leave a durable
-record without learning a project-management system.
+| Version | Explicit feature goal |
+| --- | --- |
+| `1.0.0` | Establish a secure, self-hosted private member application with invitations, recovery, roles, areas, beds, events, and private photos. |
+| `1.0.1` | Make generated links proxy-safe and add private member profile pictures. |
+| `1.0.2` | Extend event participation with attendance names, opt-in public registration, bilingual flows, and administrator CSV import. |
+| `1.0.4` | Repair embedded tutorial playback and make photo actions clearer. |
+| `1.1.0` | Let members record garden work from a phone through Quick Log, bed actions, and activity history. |
+| `1.1.1` | Let administrators personalize core application imagery and ensure recent activity loads reliably. |
+| `1.2.0` | Make the interface and authored content usable in French, Dutch, and English with a safe manual translation workflow. |
+| `1.3.0` | Add an explicitly published public park surface while strengthening private-by-default event and member boundaries. |
+| `1.3.1` | Make complete backups, offline restores, health checks, and container releases dependable. |
+| `1.3.2` | Make daily work actionable with first-class tasks, fast claim/completion flows, and versioned database migrations. |
 
-## Next: event-day operations
+## 1.4.0 — Garden feed and conversations
 
-Goal: support the work of running an event, not only announcing it.
+**Feature goal:** make Today the place where members catch up and talk about
+the garden, without turning ParcOS into a general-purpose chat application.
 
-- Add fast attendee check-in and attended/no-show controls.
-- Add registration opening and closing dates.
-- Improve waitlist promotion visibility and cancellation communication.
-- Add an event completion flow with attendance, notes, and a shareable summary.
-- Add recurring sessions while preserving clear registration boundaries.
-- Add optional registration confirmation and coordinator contact workflows.
+### Member result
 
-## Then: planting and harvest lifecycle
+A member opens ParcOS, immediately sees the latest relevant conversation, can
+post an update or question, and can reply without navigating through every bed,
+event, or task.
 
-Goal: preserve what grows in each bed across seasons.
+### Coordinator result
 
-- Add planting records with crop, variety, start date, expected harvest window,
-  and end date.
-- Derive the current bed summary from active planting records where possible.
-- Connect watering, weeding, clearing, planting, mulching, pruning, observation,
-  and harvest activity to the relevant planting.
-- Add seasonal archives and lightweight bed/planting import and export.
+A coordinator can publish and pin an announcement, answer questions in context,
+and moderate a conversation without copying it into an external chat.
 
-## Later: knowledge and communication
+### Included
 
-Goal: help members learn how this specific park and garden work.
+- Put the feed immediately below the compact Today header, before tasks, events,
+  harvest summaries, imagery, or statistics.
+- Replace the separate Quick Log and recent-activity blocks with one feed
+  composer and one chronological stream.
+- Support four intentional post types: update, question, announcement, and
+  automatically generated activity.
+- Add replies so a discussion stays attached to its originating post.
+- Allow posts to reference an area, bed, task, or event and open that context in
+  one tap.
+- Add unread state, a visible reply count, coordinator pinning, and resolved
+  questions.
+- Let authors edit or remove their own posts and let coordinators moderate any
+  post, with a minimal audit record.
+- Preserve private-area and member-only access rules for posts, replies, and
+  linked records.
+- Show a compact **Next actions** section after the feed for assigned or urgent
+  work and the next event; keep the full lists in Garden and Calendar.
+- Provide translated interface copy and keyboard/screen-reader usable controls
+  in French, Dutch, and English.
 
-- Add a Learn section with administrator-authored articles and announcements.
-- Connect guidance to relevant tasks, beds, plantings, and events.
-- Add search across knowledge, events, tasks, and crops.
-- Generate WhatsApp-ready weekly summaries without exposing private member
-  information.
-- Improve the public page with optional accessibility details, contact
-  information, and public calendar feeds, all opt-in.
+### Deliberately not included
 
-## Future: assisted coordination and scale
+- One-to-one private messages, arbitrary group chats, typing indicators, online
+  presence, reactions, read receipts per person, or end-to-end encryption.
+- Email, push, SMS, or WhatsApp delivery. The in-app unread state comes first.
+- A second notification centre or a separate messaging navigation item.
+- Feed ranking, engagement scores, streaks, or infinite scrolling.
 
-Goal: save coordinator time without silently changing trusted data.
+### Done when
+
+- A phone user can read, post, and reply from the top of Today in under a minute.
+- A question and its answer remain discoverable from both the feed and linked
+  garden context.
+- Members cannot infer posts or replies from private areas they cannot access.
+- Today no longer repeats large task, calendar, garden, image, and statistics
+  panels before the conversation.
+
+## 1.5.0 — Event-day operations
+
+**Feature goal:** support running an event from registration through completion,
+not only announcing it.
+
+### Included
+
+- Fast attendee check-in plus attended and no-show states.
+- Registration opening and closing dates.
+- Visible waitlist promotion and cancellation status.
+- Recurring sessions with individually editable occurrences.
+- An event completion flow with attendance, notes, and a feed summary.
+- Optional confirmation text and a coordinator contact workflow that does not
+  expose member details publicly.
+
+### Done when
+
+A coordinator can run a work session from a phone and finish with an accurate
+attendance record and a concise update visible to the appropriate members.
+
+## 1.6.0 — Planting and harvest lifecycle
+
+**Feature goal:** preserve what grows in each bed across seasons.
+
+### Included
+
+- Planting records with crop, variety, start date, expected harvest window, and
+  end date.
+- A current bed summary derived from active planting records.
+- Links from watering, weeding, clearing, planting, mulching, pruning,
+  observation, and harvest activity to the relevant planting.
+- Seasonal archives and lightweight planting import/export.
+- Feed updates for meaningful planting and harvest transitions without flooding
+  the conversation with routine changes.
+
+### Done when
+
+A member can understand what is growing now and what happened in prior seasons,
+and a coordinator no longer has to overwrite a bed description to record change.
+
+## 1.7.0 — Garden knowledge and search
+
+**Feature goal:** make the garden's accumulated instructions and discussions
+easy to find and reuse.
+
+### Included
+
+- Administrator-authored articles and short guidance in Learn.
+- Links between guidance and relevant posts, tasks, beds, plantings, and events.
+- Search across articles, conversations, events, tasks, crops, and beds with
+  permission-aware results.
+- Convert a resolved feed question into draft guidance while retaining a link
+  to its source discussion.
+- Generate privacy-safe, WhatsApp-ready weekly summaries for a coordinator to
+  review and copy.
+
+### Done when
+
+A member can find an earlier answer or garden instruction without asking the
+same question in an external chat.
+
+## 1.8.0 — Assisted coordination
+
+**Feature goal:** reduce coordinator writing and triage work without silently
+changing trusted data.
+
+### Included
 
 - Draft event descriptions, task summaries, announcements, and seasonal notes.
-- Convert free-form notes into proposed structured tasks or planting updates.
-- Require review before every AI-proposed write and record source, reviewer,
-  timestamp, and before/after values.
-- Reassess SQLite, local media, and the one-container deployment only when
-  measured concurrency, reliability, or hosting requirements justify it.
+- Convert free-form posts and notes into proposed structured tasks or planting
+  updates.
+- Show the source, proposed before/after values, and confirmation step for every
+  assisted write.
+- Record the reviewer and timestamp for accepted or rejected proposals.
 
-## Open decisions
+### Done when
 
-- Which quick actions and fields do members actually use in the garden?
-- How much task detail is useful before due dates, priority, recurrence, and
-  assignment become administrative overhead?
-- Which contribution history should be visible to members without creating
-  social pressure?
-- Should public guest registrations support self-service cancellation, and what
-  contact channel is appropriate for a self-hosted installation?
-- What is the smallest backup and restore experience that administrators can
-  test confidently?
+Assistance saves preparation time, every write remains understandable and
+reversible, and disabling assistance leaves all core workflows intact.
 
-Feedback and implementation proposals are welcome through GitHub issues. Keep
-proposals tied to a real garden workflow and state the privacy impact of any new
-public surface.
+## 2.0.0 — Scale only when evidence requires it
+
+**Feature goal:** change the deployment or data architecture only for measured
+reliability, concurrency, or hosting needs that the `1.x` design cannot meet.
+
+Possible work includes PostgreSQL, external object storage, background jobs, or
+multiple application instances. None is committed until real installations
+provide thresholds and migration requirements. A `2.0.0` plan must preserve a
+documented path from SQLite backups and must not make small self-hosting an
+afterthought.
+
+## Product questions to validate during 1.4.0
+
+- Does one garden-wide feed plus contextual threads cover real conversations,
+  or do users need narrower area subscriptions?
+- Which automatic activities are meaningful enough for the feed, and which are
+  noise?
+- How many unread items should Today show before older conversation moves to a
+  dedicated history view?
+- Do coordinators need to restrict an announcement to coordinators, a private
+  area, or an event audience?
+- Which current Today panels can be removed entirely after **Next actions** is
+  introduced?
+
+Feedback and implementation proposals are welcome through GitHub issues. Tie a
+proposal to one version outcome, describe the real garden workflow, and state
+the privacy impact of any new surface.
