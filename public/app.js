@@ -11,6 +11,7 @@ const state = {
   areas: [],
   events: [],
   activities: [],
+  tasks: [],
   branding: { login: null, today: null, event: null, public: null },
   publicSite: {
     enabled: false,
@@ -764,7 +765,7 @@ function renderLogin(error = "") {
       state.parcName = result.parcName;
       if (result.branding) state.branding = { ...state.branding, ...result.branding };
       if (state.setupRequired) return renderSetup();
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       const linkedEventId = Number(new URLSearchParams(location.search).get("event"));
       if (linkedEventId) openEvent(linkedEventId);
@@ -807,7 +808,7 @@ function renderSetup(error = "") {
       const result = await api("/api/setup", { method: "POST", body: JSON.stringify({ parcName: new FormData(event.currentTarget).get("parcName"), areas }) });
       state.setupRequired = result.setupRequired;
       state.parcName = result.parcName;
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre espace ParcOS est prêt.");
     } catch (setupError) {
@@ -864,7 +865,7 @@ function renderReset(token, error = "") {
       state.member = result.member;
       state.csrfToken = result.csrfToken;
       history.replaceState({}, "", "/");
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre accès a été renouvelé.");
     } catch (resetError) {
@@ -1030,10 +1031,21 @@ function renderToday() {
   const locale = dateLocaleTag();
   const bedWord = (count) => t(`planche${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "s"}`, `bed${count === 1 ? "" : "den"}`);
   const zoneWord = (count) => t(`zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`, `zone${count === 1 ? "" : "s"}`);
+  const assignedTasks = state.tasks.filter((task) => task.status === "claimed" && task.claimedBy?.id === state.member.id);
+  const urgentTasks = state.tasks.filter((task) => task.status === "open" && task.priority === "urgent");
+  const availableTasks = state.tasks.filter((task) => task.status === "open" && task.priority !== "urgent");
+  const hasDailyTasks = assignedTasks.length || urgentTasks.length || availableTasks.length;
   return `<section class="page today-page">
     <div class="welcome-row"><div><p class="eyebrow">${t("Bonjour", "Hello")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Que se passe-t-il", "What is happening")}<br>${t("au potager ?", "in the garden?")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
     <article class="hero-card">${brandingImage("today", "hero-card-image")}<div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest", "te oogsten")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`, `${attention.length === 1 ? "heeft" : "hebben"} aandacht nodig.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
     <button class="quick-log-card" id="today-quick-log" type="button"><span>+</span><strong>${t("Ajouter au journal", "Add to log")}</strong><small>${t("Travail, observation, problème, récolte ou photo", "Work, observation, problem, harvest or photo")}</small></button>
+    <div class="section-heading task-heading"><div><p class="eyebrow">${t("À faire aujourd’hui", "Work for today", "Werk voor vandaag")}</p><h2>${t("Tâches", "Tasks", "Taken")}</h2></div>${isCoordinator() ? `<button class="button secondary compact-button" id="create-task" type="button">+ ${t("Tâche", "Task", "Taak")}</button>` : ""}</div>
+    <div class="today-task-board">
+      ${assignedTasks.length ? taskGroup(t("Mes tâches", "My tasks", "Mijn taken"), assignedTasks, "assigned") : ""}
+      ${urgentTasks.length ? taskGroup(t("Urgent", "Urgent", "Dringend"), urgentTasks, "urgent") : ""}
+      ${availableTasks.length ? taskGroup(t("Disponible", "Available", "Beschikbaar"), availableTasks, "available") : ""}
+      ${!hasDailyTasks ? `<div class="empty-state compact"><strong>${t("Aucune tâche ouverte", "No open tasks", "Geen open taken")}</strong><p>${t("Le travail disponible apparaîtra ici.", "Available work will appear here.", "Beschikbaar werk verschijnt hier.")}</p></div>` : ""}
+    </div>
     <div class="section-heading"><div><p class="eyebrow">Prochain rendez-vous</p><h2>À l’agenda</h2></div><button class="text-link" data-page="agenda">Tout voir</button></div>
     ${nextEvent ? compactEventCard(nextEvent) : '<div class="empty-state"><strong>Rien de prévu pour le moment</strong><p>Les prochains rendez-vous apparaîtront ici.</p></div>'}
     <div class="section-heading"><div><p class="eyebrow">En un coup d’œil</p><h2>État du potager</h2></div></div>
@@ -1047,6 +1059,26 @@ function renderToday() {
     <div class="section-heading compact"><div><p class="eyebrow">${t("Le journal", "The log")}</p><h2>${t("Activité récente", "Recent activity")}</h2></div></div>
     <div class="recent-activity-list">${state.activities.length ? state.activities.slice(0, 6).map(recentActivityCard).join("") : `<div class="empty-state compact"><strong>${t("Rien de consigné pour le moment", "Nothing logged yet")}</strong></div>`}</div>
   </section>`;
+}
+
+function taskGroup(label, tasks, kind) {
+  return `<section class="task-group ${kind}"><div class="task-group-title"><strong>${escapeHtml(label)}</strong><span>${tasks.length}</span></div><div class="task-list">${tasks.slice(0, 6).map(taskCard).join("")}</div></section>`;
+}
+
+function taskCard(task) {
+  const due = task.dueAt ? `<time datetime="${escapeHtml(task.dueAt)}">${escapeHtml(formatDate(task.dueAt, { day: "numeric", month: "short" }))}</time>` : "";
+  const location = task.locationLabel ? `<span class="task-location">⌖ ${escapeHtml(task.locationLabel)}</span>` : `<span class="task-location">${t("Sans lieu", "No location", "Geen locatie")}</span>`;
+  let action = "";
+  if (task.status === "open") {
+    action = `<button class="button task-action" type="button" data-task-action="claim" data-task-id="${task.id}">${t("Je m’en charge", "Claim", "Oppakken")}</button>`;
+  } else if (task.status === "claimed" && task.claimedBy?.id === state.member.id) {
+    action = `<button class="button task-action done" type="button" data-task-action="complete" data-task-id="${task.id}">${t("Terminer", "Complete", "Voltooien")}</button>`;
+  } else if (task.claimedBy?.name) {
+    action = `<span class="task-owner">${escapeHtml(task.claimedBy.name)}</span>`;
+  }
+  return `<article class="task-card ${task.priority === "urgent" ? "urgent" : ""}">
+    <div class="task-card-copy"><div class="task-meta">${task.priority === "urgent" ? `<span class="urgent-pill">${t("Urgent", "Urgent", "Dringend")}</span>` : ""}${due}${location}</div><strong>${escapeHtml(task.title)}</strong>${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}</div>${action}
+  </article>`;
 }
 
 function recentActivityCard(activity) {
@@ -1353,6 +1385,8 @@ function bindShell() {
   document.querySelectorAll("[data-bed-id]").forEach((button) => button.addEventListener("click", () => openBed(Number(button.dataset.bedId))));
   document.querySelector("#quick-log")?.addEventListener("click", () => renderQuickLog());
   document.querySelector("#today-quick-log")?.addEventListener("click", () => renderQuickLog());
+  document.querySelector("#create-task")?.addEventListener("click", renderCreateTaskForm);
+  document.querySelectorAll("[data-task-action]").forEach((button) => button.addEventListener("click", () => updateTaskAction(button)));
   document.querySelector("#manage-areas")?.addEventListener("click", renderAreasManager);
   document.querySelector("#add-bed")?.addEventListener("click", renderCreateBedForm);
   document.querySelectorAll("[data-event-id]").forEach((button) => button.addEventListener("click", () => openEvent(Number(button.dataset.eventId))));
@@ -1413,7 +1447,7 @@ async function toggleLanguage() {
       showToast(error.message);
     }
   }
-  await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities()]);
+  await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks()]);
   if (state.selectedBed) state.selectedBed = await api(`/api/beds/${state.selectedBed.bed.id}`);
   renderApp();
 }
@@ -1439,6 +1473,11 @@ async function loadActivities() {
   state.activities = result.activities;
 }
 
+async function loadTasks() {
+  const result = await api("/api/tasks");
+  state.tasks = result.tasks;
+}
+
 async function loadMembers() {
   if (!isCoordinator()) return;
   const result = await api("/api/members");
@@ -1460,6 +1499,64 @@ async function loadPublicSiteSettings() {
   if (state.member?.role !== "admin") return;
   const result = await api("/api/public-site-settings");
   state.publicSite = { ...state.publicSite, ...result.settings };
+}
+
+function renderCreateTaskForm() {
+  const areaOptions = state.areas.map((area) => `<option value="area:${area.id}">${escapeHtml(area.name)}</option>`).join("");
+  const bedOptions = state.beds.map((bed) => `<option value="bed:${bed.id}">${escapeHtml(`${bed.code} - ${bed.crop || t("Planche disponible", "Available bed", "Beschikbaar bed")}`)}</option>`).join("");
+  const eventOptions = state.events.filter((event) => !["cancelled", "completed"].includes(event.state))
+    .map((event) => `<option value="event:${event.id}">${escapeHtml(event.title)}</option>`).join("");
+  modalRoot.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="task-form-title"><div class="sheet-handle"></div><button class="sheet-close" data-close-modal aria-label="${t("Fermer", "Close", "Sluiten")}">×</button><div class="sheet-content form-sheet">
+    <p class="eyebrow">${t("Coordination", "Coordination", "Coördinatie")}</p><h2 id="task-form-title">${t("Nouvelle tâche", "New task", "Nieuwe taak")}</h2>
+    <form id="task-create-form" class="form-stack">
+      <label>${t("Titre", "Title", "Titel")}<input name="title" maxlength="140" required autofocus></label>
+      <label>${t("Détails facultatifs", "Optional details", "Optionele details")}<textarea name="description" maxlength="1000"></textarea></label>
+      <div class="two-fields"><label>${t("Priorité", "Priority", "Prioriteit")}<select name="priority"><option value="normal">${t("Normale", "Normal", "Normaal")}</option><option value="urgent">${t("Urgente", "Urgent", "Dringend")}</option></select></label><label>${t("Échéance", "Due", "Deadline")}<input name="dueAt" type="datetime-local"></label></div>
+      <label>${t("Lieu facultatif", "Optional location", "Optionele locatie")}<select name="location"><option value="">${t("Sans lieu", "No location", "Geen locatie")}</option>${areaOptions ? `<optgroup label="${t("Lieux", "Areas", "Gebieden")}">${areaOptions}</optgroup>` : ""}${bedOptions ? `<optgroup label="${t("Planches", "Beds", "Bedden")}">${bedOptions}</optgroup>` : ""}${eventOptions ? `<optgroup label="${t("Événements", "Events", "Evenementen")}">${eventOptions}</optgroup>` : ""}</select></label>
+      <div class="button-row"><button type="button" class="button ghost" data-close-modal>${t("Annuler", "Cancel", "Annuleren")}</button><button class="button primary" type="submit">${t("Créer la tâche", "Create task", "Taak maken")}</button></div>
+    </form>
+  </div></section></div>`;
+  bindModal();
+  document.querySelector("#task-create-form").addEventListener("submit", createTask);
+}
+
+async function createTask(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  const data = Object.fromEntries(new FormData(form));
+  const payload = { title: data.title, description: data.description, priority: data.priority };
+  if (data.dueAt) payload.dueAt = new Date(data.dueAt).toISOString();
+  if (data.location) {
+    const [kind, id] = data.location.split(":");
+    payload[`${kind}Id`] = Number(id);
+  }
+  button.disabled = true;
+  try {
+    await api("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
+    await loadTasks();
+    dismissModal();
+    renderApp();
+    showToast(t("Tâche créée.", "Task created.", "Taak gemaakt."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function updateTaskAction(button) {
+  button.disabled = true;
+  try {
+    await api(`/api/tasks/${Number(button.dataset.taskId)}/${button.dataset.taskAction}`, { method: "POST", body: "{}" });
+    await loadTasks();
+    renderApp();
+    showToast(button.dataset.taskAction === "claim"
+      ? t("Tâche attribuée.", "Task claimed.", "Taak toegewezen.")
+      : t("Tâche terminée.", "Task completed.", "Taak voltooid."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
 }
 
 async function savePublicSiteSettings(event) {
@@ -2000,7 +2097,7 @@ async function saveProfile(event) {
     state.member = result.member;
     state.locale = result.member.preferredLocale;
     localStorage.setItem("parcos_locale", state.locale);
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks()]);
     renderApp();
     showToast(t("Profil enregistré.", "Profile saved."));
   } catch (error) {
@@ -2140,7 +2237,7 @@ async function importTranslationsFile(event) {
     const payload = JSON.parse(await file.text());
     const result = await api("/api/translations/import", { method: "POST", body: JSON.stringify(payload) });
     resultBox.innerHTML = `<div class="invite-result"><small>${t("Import des traductions terminé", "Translation import complete")}</small><p>${result.imported} ${t("traductions importées", "translations imported")}; ${result.empty} ${t("vides", "empty")}; ${result.stale} ${t("obsolètes refusées", "stale rejected")}; ${result.invalid} ${t("invalides", "invalid")}.</p></div>`;
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks()]);
     renderApp();
     showToast(t("Les traductions ont été importées.", "Translations were imported."));
   } catch (error) {
@@ -2198,6 +2295,7 @@ async function logout() {
   state.areas = [];
   state.events = [];
   state.activities = [];
+  state.tasks = [];
   if ("caches" in window) {
     for (const key of await caches.keys()) await caches.delete(key);
   }
@@ -2222,7 +2320,7 @@ async function boot() {
     state.parcName = result.parcName;
     if (result.branding) state.branding = { ...state.branding, ...result.branding };
     if (state.setupRequired) return renderSetup();
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadMembers(), loadPublicSiteSettings()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
     renderApp();
     const eventId = Number(params.get("event"));
     if (eventId) openEvent(eventId);

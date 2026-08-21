@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.2 - 2026-08-21
+
+- Added first-class daily tasks connected to an area, bed, event, or no location,
+  with urgent and normal priorities plus open, claimed, done, skipped, and
+  archived states.
+- Added a mobile Today workflow where members can see urgent, available, and
+  assigned work, then claim and complete a task in a few taps.
+- Added coordinator task creation with optional details, due dates, priorities,
+  and location links while preserving private-area and coordinator-event access
+  boundaries.
+- Introduced transactional, ordered database migrations with recorded schema
+  versions and a safe refusal to open databases from unknown newer releases.
+- Added migration, task authorization, CSRF, claim/completion, and private-area
+  visibility tests, and refreshed the offline application shell cache.
+
 ## 1.3.1 - 2026-07-27
 
 - Added an administrator-only, password-reauthenticated complete backup export
