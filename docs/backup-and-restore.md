@@ -1,6 +1,6 @@
 # Complete backup and offline restore
 
-ParcOS 1.3.1 uses the versioned `parcos-backup-v1` format for complete
+ParcOS 1.3.2 uses the versioned `parcos-backup-v1` format for complete
 administrator exports. A backup is a gzip-compressed tar archive containing:
 
 - `manifest.json`
@@ -100,7 +100,7 @@ docker run --rm --name parcos-restore-test-app \
   --cap-drop ALL --security-opt no-new-privileges:true \
   -e PARCOS_ADMIN_PASSWORD='use-the-existing-admin-password' \
   -v parcos-restore-test:/data \
-  ghcr.io/louisberghmans/parcos:1.3.1
+  ghcr.io/louisberghmans/parcos:1.3.2
 ```
 
 PowerShell:
@@ -112,7 +112,7 @@ docker run --rm --name parcos-restore-test-app `
   --cap-drop ALL --security-opt "no-new-privileges:true" `
   -e "PARCOS_ADMIN_PASSWORD=use-the-existing-admin-password" `
   -v "parcos-restore-test:/data" `
-  "ghcr.io/louisberghmans/parcos:1.3.1"
+  "ghcr.io/louisberghmans/parcos:1.3.2"
 ```
 
 ## Verify and remove the local copy

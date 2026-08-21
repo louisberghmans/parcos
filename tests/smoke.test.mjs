@@ -104,6 +104,34 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(publicEvent.body.event.audience, "public");
   const publicEventId = publicEvent.body.event.id;
 
+  const urgentTask = await request(baseUrl, "/api/tasks", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ title: "Arroser les tomates", description: "Avant midi.", priority: "urgent", bedId: 1 }),
+  });
+  assert.equal(urgentTask.response.status, 201);
+  assert.equal(urgentTask.body.task.status, "open");
+  assert.equal(urgentTask.body.task.bedCode, "GP-01");
+  const hiddenTask = await request(baseUrl, "/api/tasks", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ title: "Travail réservé", bedId: nurseryBed.body.bed.id }),
+  });
+  assert.equal(hiddenTask.response.status, 201);
+  const eventTask = await request(baseUrl, "/api/tasks", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ title: "Préparer les paniers", eventId, dueAt: startsAt }),
+  });
+  assert.equal(eventTask.response.status, 201);
+  assert.equal(eventTask.body.task.eventTitle, "Récolte collective");
+  const taskWithoutCsrf = await request(baseUrl, "/api/tasks", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Refusée" }),
+  });
+  assert.equal(taskWithoutCsrf.response.status, 403);
+
   const publicDetail = await request(baseUrl, `/api/public/events/${publicEventId}`);
   assert.equal(publicDetail.response.status, 200);
   assert.equal(publicDetail.body.event.title, "Portes ouvertes");
@@ -183,6 +211,47 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(memberBeds.body.beds.some((bed) => bed.id === orchardBed.body.bed.id), true);
   const hiddenBed = await request(baseUrl, `/api/beds/${nurseryBed.body.bed.id}`, { headers: { cookie: memberCookie } });
   assert.equal(hiddenBed.response.status, 404);
+
+  const memberTasks = await request(baseUrl, "/api/tasks", { headers: { cookie: memberCookie } });
+  assert.equal(memberTasks.response.status, 200);
+  assert.ok(memberTasks.body.tasks.some((task) => task.id === urgentTask.body.task.id && task.priority === "urgent"));
+  assert.ok(memberTasks.body.tasks.some((task) => task.id === eventTask.body.task.id));
+  assert.equal(memberTasks.body.tasks.some((task) => task.id === hiddenTask.body.task.id), false);
+  const memberTaskCreate = await request(baseUrl, "/api/tasks", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ title: "Member-created task" }),
+  });
+  assert.equal(memberTaskCreate.response.status, 403);
+  const claimWithoutCsrf = await request(baseUrl, `/api/tasks/${urgentTask.body.task.id}/claim`, {
+    method: "POST", headers: { cookie: memberCookie, "content-type": "application/json" }, body: "{}",
+  });
+  assert.equal(claimWithoutCsrf.response.status, 403);
+  const claimedTask = await request(baseUrl, `/api/tasks/${urgentTask.body.task.id}/claim`, {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: "{}",
+  });
+  assert.equal(claimedTask.response.status, 200);
+  assert.equal(claimedTask.body.task.status, "claimed");
+  assert.equal(claimedTask.body.task.claimedBy.id, redeem.body.member.id);
+  const completedTask = await request(baseUrl, `/api/tasks/${urgentTask.body.task.id}/complete`, {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: "{}",
+  });
+  assert.equal(completedTask.response.status, 200);
+  assert.equal(completedTask.body.task.status, "done");
+  assert.equal(completedTask.body.task.completedBy.id, redeem.body.member.id);
+  const archivedTask = await request(baseUrl, `/api/tasks/${eventTask.body.task.id}`, {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ status: "archived" }),
+  });
+  assert.equal(archivedTask.response.status, 200);
+  assert.equal(archivedTask.body.task.status, "archived");
+  const memberTasksAfterArchive = await request(baseUrl, "/api/tasks", { headers: { cookie: memberCookie } });
+  assert.equal(memberTasksAfterArchive.body.tasks.some((task) => task.id === eventTask.body.task.id), false);
 
   const quickLog = await request(baseUrl, "/api/beds/1/logs", {
     method: "POST",
@@ -493,4 +562,29 @@ test("fresh install uses the forwarded public origin once and protects the membe
   });
   const memberDirectory = await request(baseUrl, "/api/members", { headers: { cookie: cookieFrom(redeem.response) } });
   assert.equal(memberDirectory.response.status, 403);
+});
+
+test("schema migrations apply once and upgrade a database without the tasks table", () => {
+  const dataDir = mkdtempSync(join(tmpdir(), "parcos-migration-test-"));
+  let app;
+  try {
+    app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+    const migrations = app.db.prepare("select version, name from schema_migrations").all();
+    assert.equal(migrations.length, 1);
+    assert.equal(migrations[0].version, 1);
+    assert.equal(migrations[0].name, "first_class_tasks");
+    app.db.exec("drop table tasks; delete from schema_migrations where version = 1");
+    app.close();
+
+    app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations where version = 1").get().count, 1);
+    assert.ok(app.db.prepare("select name from sqlite_master where type = 'table' and name = 'tasks'").get());
+    app.close();
+
+    app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations").get().count, 1);
+  } finally {
+    try { app?.close(); } catch { /* Already closed. */ }
+    rmSync(dataDir, { recursive: true, force: true });
+  }
 });

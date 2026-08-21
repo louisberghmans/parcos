@@ -10,10 +10,18 @@ This file describes the production data shape used by ParcOS and the CSV workflo
 | `garden_areas` | Managed areas or gardens. | `name`, `slug`, `code_prefix`, `description`, `location_hint`, `members_can_access` |
 | `beds` | Individual beds inside an area. | `area_id`, `code`, `display_number`, `garden`, `section`, `crop`, `variety`, `status`, `note`, `harvest_note` |
 | `events` | Member, coordinator, or public events. | `title`, `description`, `location`, `event_type`, `state`, `audience`, `starts_at`, `ends_at`, `capacity` |
+| `tasks` | Daily work connected to an area, bed, event, or no location. | `title`, `description`, `status`, `priority`, `due_at`, location foreign keys, claim/completion fields |
 | `event_registrations` | Member event attendance. | `event_id`, `member_id`, participant counts, `status` |
 | `public_event_registrations` | Non-member attendance for public event links. | `event_id`, `guest_name`, `guest_contact`, participant counts, `status` |
 | `invites` | Member invite links. | `token_hash`, `role`, `created_by`, `expires_at`, `used_at` |
 | `access_resets` | Recovery links created by coordinators/admins. | `token_hash`, `member_id`, `created_by`, `expires_at`, `used_at` |
+| `schema_migrations` | Ordered record of database migrations applied at startup. | `version`, `name`, `applied_at` |
+
+## Schema migrations
+
+ParcOS applies pending migrations in version order when it starts. Each migration runs in a transaction and is recorded in `schema_migrations` only after it succeeds. Startup stops rather than opening a database created by a newer, unknown schema version.
+
+The first versioned migration adds `tasks` and its indexes. Existing installations receive this table automatically while keeping their current members, areas, beds, events, activity, and media data.
 
 ## CSV import
 

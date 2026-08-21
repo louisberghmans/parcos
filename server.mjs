@@ -38,6 +38,7 @@ const localizedEntities = {
   event: { table: "events", fields: ["title", "description", "location", "accessibility_note", "preparation_note"] },
   bed_note: { table: "bed_notes", fields: ["body"] },
   activity: { table: "activities", fields: ["note"] },
+  task: { table: "tasks", fields: ["title", "description"] },
   harvest: { table: "harvests", fields: ["quantity", "note"] },
   how_to: { table: "how_to_videos", fields: ["title", "note"] },
   bed_photo: { table: "bed_photos", fields: ["caption"] },
@@ -258,6 +259,32 @@ function activityJson(row) {
   };
 }
 
+function taskJson(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? "",
+    status: row.status,
+    priority: row.priority,
+    dueAt: row.due_at ?? null,
+    areaId: row.area_id ?? null,
+    areaName: row.area_name ?? null,
+    bedId: row.bed_id ?? null,
+    bedCode: row.bed_code ?? null,
+    eventId: row.event_id ?? null,
+    eventTitle: row.event_title ?? null,
+    locationLabel: row.bed_code ?? row.area_name ?? row.event_title ?? null,
+    createdBy: row.created_by ? { id: row.created_by, name: row.creator_name ?? null } : null,
+    claimedBy: row.claimed_by ? { id: row.claimed_by, name: row.claimed_by_name ?? null } : null,
+    completedBy: row.completed_by ? { id: row.completed_by, name: row.completed_by_name ?? null } : null,
+    sourceActivityId: row.source_activity_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    claimedAt: row.claimed_at ?? null,
+    completedAt: row.completed_at ?? null,
+  };
+}
+
 function howToVideoJson(row) {
   return {
     id: row.id,
@@ -327,6 +354,76 @@ async function readJson(req) {
     return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
   } catch {
     throw new HttpError(400, "JSON invalide.");
+  }
+}
+
+const schemaMigrations = [
+  {
+    version: 1,
+    name: "first_class_tasks",
+    up(db) {
+      db.exec(`
+        create table tasks (
+          id integer primary key,
+          title text not null,
+          description text,
+          status text not null default 'open'
+            check (status in ('open', 'claimed', 'done', 'skipped', 'archived')),
+          priority text not null default 'normal'
+            check (priority in ('normal', 'urgent')),
+          due_at text,
+          area_id integer references garden_areas(id) on delete set null,
+          bed_id integer references beds(id) on delete set null,
+          event_id integer references events(id) on delete set null,
+          created_by integer references members(id) on delete set null,
+          claimed_by integer references members(id) on delete set null,
+          completed_by integer references members(id) on delete set null,
+          source_activity_id integer unique references activities(id) on delete set null,
+          created_at text not null,
+          updated_at text not null,
+          claimed_at text,
+          completed_at text,
+          check ((area_id is not null) + (bed_id is not null) + (event_id is not null) <= 1)
+        );
+        create index tasks_status_priority_idx on tasks(status, priority, due_at, created_at);
+        create index tasks_claimed_by_idx on tasks(claimed_by, status, updated_at);
+        create index tasks_area_idx on tasks(area_id, status);
+        create index tasks_bed_idx on tasks(bed_id, status);
+        create index tasks_event_idx on tasks(event_id, status);
+      `);
+    },
+  },
+];
+
+function applySchemaMigrations(db) {
+  db.exec(`create table if not exists schema_migrations (
+    version integer primary key,
+    name text not null unique,
+    applied_at text not null
+  )`);
+  const applied = new Map(db.prepare("select version, name from schema_migrations order by version").all()
+    .map((migration) => [migration.version, migration.name]));
+  const latestKnown = schemaMigrations.at(-1)?.version ?? 0;
+  const latestApplied = Math.max(0, ...applied.keys());
+  if (latestApplied > latestKnown) {
+    throw new Error(`Database schema version ${latestApplied} is newer than this ParcOS release (${latestKnown}).`);
+  }
+  for (const migration of schemaMigrations) {
+    const appliedName = applied.get(migration.version);
+    if (appliedName && appliedName !== migration.name) {
+      throw new Error(`Database migration ${migration.version} does not match this ParcOS release.`);
+    }
+    if (appliedName) continue;
+    db.exec("begin immediate");
+    try {
+      migration.up(db);
+      db.prepare("insert into schema_migrations (version, name, applied_at) values (?, ?, ?)")
+        .run(migration.version, migration.name, now());
+      db.exec("commit");
+    } catch (error) {
+      db.exec("rollback");
+      throw error;
+    }
   }
 }
 
@@ -607,6 +704,7 @@ function createSchema(db) {
     `);
   }
   db.exec("create index if not exists events_starts_idx on events(starts_at, state)");
+  applySchemaMigrations(db);
 }
 
 function localeValue(value, fallback = DEFAULT_CONTENT_LOCALE) {
@@ -802,6 +900,16 @@ function localizedActivityJson(db, row, locale) {
     localized.bed_crop = bed.crop;
   }
   return activityJson(localized);
+}
+function localizedTaskJson(db, row, locale) {
+  const localized = localizedRow(db, "task", row, locale);
+  if (localized.area_id && localized.area_name) {
+    localized.area_name = localizedRow(db, "area", { id: localized.area_id, name: localized.area_name }, locale).name;
+  }
+  if (localized.event_id && localized.event_title) {
+    localized.event_title = localizedRow(db, "event", { id: localized.event_id, title: localized.event_title }, locale).title;
+  }
+  return taskJson(localized);
 }
 function localizedBedNoteJson(db, row, locale) { return bedNoteJson(localizedRow(db, "bed_note", row, locale)); }
 function localizedHarvestJson(db, row, locale) { return harvestJson(localizedRow(db, "harvest", row, locale)); }
@@ -1155,6 +1263,75 @@ function eventSelect(db, memberId, eventId = null) {
 function findEvent(db, eventId, memberId) {
   const row = eventSelect(db, memberId, eventId)[0];
   if (!row) throw new HttpError(404, "Événement introuvable.");
+  return row;
+}
+
+function taskInput(db, body, existing = {}) {
+  const title = String(body.title ?? existing.title ?? "").trim().slice(0, 140);
+  if (!title) throw new HttpError(400, "Le titre de la tâche est requis.");
+  const description = body.description === undefined
+    ? (existing.description ?? null)
+    : (String(body.description ?? "").trim().slice(0, 1000) || null);
+  const status = String(body.status ?? existing.status ?? "open");
+  if (!["open", "claimed", "done", "skipped", "archived"].includes(status)) {
+    throw new HttpError(400, "État de tâche invalide.");
+  }
+  const priority = String(body.priority ?? existing.priority ?? "normal");
+  if (!["normal", "urgent"].includes(priority)) throw new HttpError(400, "Priorité de tâche invalide.");
+  let dueAt = body.dueAt === undefined ? (existing.due_at ?? null) : (String(body.dueAt ?? "").trim() || null);
+  if (dueAt) {
+    const parsed = new Date(dueAt);
+    if (Number.isNaN(parsed.getTime())) throw new HttpError(400, "Échéance de tâche invalide.");
+    dueAt = parsed.toISOString();
+  }
+  const locationSubmitted = ["areaId", "bedId", "eventId"].some((key) => body[key] !== undefined);
+  const idValue = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const id = Number(value);
+    if (!Number.isInteger(id) || id < 1) throw new HttpError(400, "Lieu de tâche invalide.");
+    return id;
+  };
+  const areaId = locationSubmitted ? idValue(body.areaId) : (existing.area_id ?? null);
+  const bedId = locationSubmitted ? idValue(body.bedId) : (existing.bed_id ?? null);
+  const eventId = locationSubmitted ? idValue(body.eventId) : (existing.event_id ?? null);
+  if ([areaId, bedId, eventId].filter(Boolean).length > 1) throw new HttpError(400, "Choisissez un seul lieu pour la tâche.");
+  if (areaId) findArea(db, areaId);
+  if (bedId) findBed(db, bedId);
+  if (eventId && !db.prepare("select id from events where id = ?").get(eventId)) throw new HttpError(404, "Événement introuvable.");
+  return { title, description, status, priority, dueAt, areaId, bedId, eventId };
+}
+
+function taskSelect(db, taskId = null) {
+  const where = taskId === null ? "" : "where task.id = ?";
+  const parameters = taskId === null ? [] : [taskId];
+  return db.prepare(`select task.*,
+    area.name as area_name, area.members_can_access as area_members_can_access,
+    bed.code as bed_code, bed_area.members_can_access as bed_members_can_access,
+    event.title as event_title, event.state as event_state, event.audience as event_audience,
+    creator.display_name as creator_name, claimant.display_name as claimed_by_name,
+    completer.display_name as completed_by_name
+    from tasks task
+    left join garden_areas area on area.id = task.area_id
+    left join beds bed on bed.id = task.bed_id
+    left join garden_areas bed_area on bed_area.id = bed.area_id
+    left join events event on event.id = task.event_id
+    left join members creator on creator.id = task.created_by
+    left join members claimant on claimant.id = task.claimed_by
+    left join members completer on completer.id = task.completed_by
+    ${where}`).all(...parameters);
+}
+
+function taskIsVisible(row, session) {
+  if (["coordinator", "admin"].includes(session.member.role)) return true;
+  if (row.area_id && !row.area_members_can_access) return false;
+  if (row.bed_id && !row.bed_members_can_access) return false;
+  if (row.event_id && (row.event_state === "draft" || row.event_audience === "coordinators")) return false;
+  return row.status !== "archived";
+}
+
+function findTask(db, taskId, session) {
+  const row = taskSelect(db, taskId)[0];
+  if (!row || !taskIsVisible(row, session)) throw new HttpError(404, "Tâche introuvable.");
   return row;
 }
 
@@ -2031,6 +2208,121 @@ export function createApp(options = {}) {
           }
           rebalanceWaitlist(db, eventId);
           return json(res, 200, { event: localizedEventJson(db, findEvent(db, eventId, session.member.id), eventAttendees(db, eventId), locale) });
+        }
+
+        if (req.method === "GET" && path === "/api/tasks") {
+          const tasks = taskSelect(db)
+            .filter((task) => taskIsVisible(task, session))
+            .sort((a, b) => {
+              const activeA = ["open", "claimed"].includes(a.status) ? 0 : 1;
+              const activeB = ["open", "claimed"].includes(b.status) ? 0 : 1;
+              if (activeA !== activeB) return activeA - activeB;
+              if (a.priority !== b.priority) return a.priority === "urgent" ? -1 : 1;
+              if (a.claimed_by === session.member.id && b.claimed_by !== session.member.id) return -1;
+              if (b.claimed_by === session.member.id && a.claimed_by !== session.member.id) return 1;
+              return (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999") || b.created_at.localeCompare(a.created_at);
+            })
+            .map((task) => localizedTaskJson(db, task, locale));
+          return json(res, 200, { tasks });
+        }
+
+        if (req.method === "POST" && path === "/api/tasks") {
+          requireCsrf(req, session);
+          requireCoordinator(session);
+          const values = taskInput(db, await readJson(req));
+          const timestamp = now();
+          db.exec("begin immediate");
+          try {
+            const result = db.prepare(`insert into tasks
+              (title, description, status, priority, due_at, area_id, bed_id, event_id, created_by,
+               claimed_by, completed_by, created_at, updated_at, claimed_at, completed_at)
+              values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+              .run(values.title, values.description, values.status, values.priority, values.dueAt,
+                values.areaId, values.bedId, values.eventId, session.member.id,
+                values.status === "claimed" ? session.member.id : null,
+                values.status === "done" ? session.member.id : null,
+                timestamp, timestamp, values.status === "claimed" ? timestamp : null,
+                values.status === "done" ? timestamp : null);
+            const taskId = Number(result.lastInsertRowid);
+            registerLocalizedEntity(db, "task", taskId, { title: values.title, description: values.description }, locale, timestamp);
+            db.exec("commit");
+            return json(res, 201, { task: localizedTaskJson(db, findTask(db, taskId, session), locale) });
+          } catch (error) {
+            db.exec("rollback");
+            throw error;
+          }
+        }
+
+        const taskActionMatch = /^\/api\/tasks\/(\d+)\/(claim|complete)$/.exec(path);
+        if (taskActionMatch && req.method === "POST") {
+          requireCsrf(req, session);
+          const taskId = Number(taskActionMatch[1]);
+          const action = taskActionMatch[2];
+          const before = findTask(db, taskId, session);
+          const coordinator = ["coordinator", "admin"].includes(session.member.role);
+          const timestamp = now();
+          if (action === "claim") {
+            if (before.status === "claimed" && before.claimed_by === session.member.id) {
+              return json(res, 200, { task: localizedTaskJson(db, before, locale) });
+            }
+            if (before.status !== "open") throw new HttpError(409, "Cette tâche n’est plus disponible.");
+            const result = db.prepare(`update tasks set status = 'claimed', claimed_by = ?, claimed_at = ?,
+              completed_by = null, completed_at = null, updated_at = ? where id = ? and status = 'open'`)
+              .run(session.member.id, timestamp, timestamp, taskId);
+            if (result.changes !== 1) throw new HttpError(409, "Cette tâche vient d’être réclamée.");
+          } else {
+            if (before.status === "done") return json(res, 200, { task: localizedTaskJson(db, before, locale) });
+            if (!["open", "claimed"].includes(before.status)) throw new HttpError(409, "Cette tâche ne peut pas être terminée.");
+            if (before.status === "claimed" && before.claimed_by !== session.member.id && !coordinator) {
+              throw new HttpError(409, "Cette tâche est attribuée à un autre membre.");
+            }
+            db.prepare(`update tasks set status = 'done', claimed_by = coalesce(claimed_by, ?),
+              claimed_at = coalesce(claimed_at, ?), completed_by = ?, completed_at = ?, updated_at = ? where id = ?`)
+              .run(session.member.id, timestamp, session.member.id, timestamp, timestamp, taskId);
+          }
+          return json(res, 200, { task: localizedTaskJson(db, findTask(db, taskId, session), locale) });
+        }
+
+        const taskMatch = /^\/api\/tasks\/(\d+)$/.exec(path);
+        if (taskMatch && req.method === "PATCH") {
+          requireCsrf(req, session);
+          requireCoordinator(session);
+          const taskId = Number(taskMatch[1]);
+          const before = findTask(db, taskId, session);
+          const body = await readJson(req);
+          const values = taskInput(db, body, before);
+          let claimedBy = before.claimed_by ?? null;
+          let claimedAt = before.claimed_at ?? null;
+          let completedBy = before.completed_by ?? null;
+          let completedAt = before.completed_at ?? null;
+          const timestamp = now();
+          if (values.status === "open") {
+            claimedBy = null; claimedAt = null; completedBy = null; completedAt = null;
+          } else if (values.status === "claimed") {
+            claimedBy = body.claimedById === undefined ? (claimedBy ?? session.member.id) : Number(body.claimedById);
+            if (!Number.isInteger(claimedBy) || !db.prepare("select id from members where id = ?").get(claimedBy)) {
+              throw new HttpError(400, "Membre attribué invalide.");
+            }
+            claimedAt ||= timestamp; completedBy = null; completedAt = null;
+          } else if (values.status === "done") {
+            claimedBy ||= session.member.id; claimedAt ||= timestamp; completedBy ||= session.member.id; completedAt ||= timestamp;
+          } else {
+            claimedBy = null; claimedAt = null; completedBy = null; completedAt = null;
+          }
+          db.exec("begin immediate");
+          try {
+            const canonical = localizedUpdateValues(db, "task", taskId, before,
+              { title: values.title, description: values.description }, locale, timestamp);
+            db.prepare(`update tasks set title = ?, description = ?, status = ?, priority = ?, due_at = ?,
+              area_id = ?, bed_id = ?, event_id = ?, claimed_by = ?, completed_by = ?, claimed_at = ?, completed_at = ?, updated_at = ?
+              where id = ?`).run(canonical.title, canonical.description, values.status, values.priority, values.dueAt,
+              values.areaId, values.bedId, values.eventId, claimedBy, completedBy, claimedAt, completedAt, timestamp, taskId);
+            db.exec("commit");
+          } catch (error) {
+            db.exec("rollback");
+            throw error;
+          }
+          return json(res, 200, { task: localizedTaskJson(db, findTask(db, taskId, session), locale) });
         }
 
         if (req.method === "GET" && path === "/api/areas") {
