@@ -41,11 +41,12 @@ existing profile.
 
 ## Core navigation
 
-1. **Today** — next event, urgent work, harvest-ready beds, and who is here
+1. **Today** — garden feed and contextual conversations first, followed by a
+   compact view of the next event and urgent or assigned work
 2. **Calendar** — agenda and month views, filters, event registration
 3. **Garden** — photographic place and bed cards, crops, state, tasks, and
    harvest information; maps are optional orientation aids
-4. **Learn** — searchable articles and videos
+4. **Learn** — searchable articles, videos, and resolved garden knowledge
 5. **Profile** — registrations, tasks, contributions, badges, and preferences
 
 ## Calendar and registration
@@ -173,7 +174,9 @@ A coordinator can:
 
 ## Explicitly deferred
 
-- Private instant messaging
+- General-purpose private chat, including direct messages, arbitrary group
+  chats, typing indicators, and presence; ParcOS first supports garden-wide and
+  contextual feed conversations
 - Continuous location tracking
 - Complex yield accounting
 - Competitive leaderboards
