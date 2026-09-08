@@ -28,6 +28,7 @@ const SESSION_COOKIE = "parcos_session";
 const SESSION_DAYS = 30;
 const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const PHOTO_BYTES = 6 * 1024 * 1024;
+const FEED_PHOTO_BYTES = 5 * 1024 * 1024;
 const AVATAR_BYTES = 2 * 1024 * 1024;
 const SUPPORTED_LOCALES = ["fr", "nl", "en"];
 const DEFAULT_CONTENT_LOCALE = "fr";
@@ -285,6 +286,73 @@ function taskJson(row) {
   };
 }
 
+function feedReplyJson(row, session) {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    body: row.body,
+    author: row.author_id ? {
+      id: row.author_id,
+      displayName: row.author_name ?? "Ancien membre",
+      avatarUrl: row.author_avatar_path ? `/media/${row.author_avatar_path}` : null,
+    } : null,
+    canManage: row.author_id === session.member.id || ["coordinator", "admin"].includes(session.member.role),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function feedPostJson(db, row, session) {
+  const replyCount = Number(db.prepare("select count(*) as count from feed_replies where post_id = ?").get(row.id).count);
+  const replies = db.prepare(`select * from (
+      select reply.*, member.display_name as author_name, member.avatar_path as author_avatar_path
+      from feed_replies reply left join members member on member.id = reply.author_id
+      where reply.post_id = ? order by reply.created_at desc, reply.id desc limit 50
+    ) order by created_at, id`).all(row.id);
+  return {
+    id: row.id,
+    type: row.post_type,
+    body: row.body,
+    imageUrl: row.image_path ? `/media/${row.image_path}` : null,
+    author: row.author_id ? {
+      id: row.author_id,
+      displayName: row.author_name ?? "Ancien membre",
+      avatarUrl: row.author_avatar_path ? `/media/${row.author_avatar_path}` : null,
+    } : null,
+    canManage: row.author_id === session.member.id || ["coordinator", "admin"].includes(session.member.role),
+    replies: replies.map((reply) => feedReplyJson(reply, session)),
+    replyCount,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function feedText(value, maximum, label) {
+  const text = String(value ?? "").trim();
+  if (!text || text.length > maximum) throw new HttpError(400, `${label} doit contenir entre 1 et ${maximum} caractères.`);
+  return text;
+}
+
+function findFeedPost(db, postId) {
+  const row = db.prepare(`select post.*, member.display_name as author_name, member.avatar_path as author_avatar_path
+    from feed_posts post left join members member on member.id = post.author_id where post.id = ?`).get(postId);
+  if (!row) throw new HttpError(404, "Publication introuvable.");
+  return row;
+}
+
+function findFeedReply(db, replyId) {
+  const row = db.prepare(`select reply.*, member.display_name as author_name, member.avatar_path as author_avatar_path
+    from feed_replies reply left join members member on member.id = reply.author_id where reply.id = ?`).get(replyId);
+  if (!row) throw new HttpError(404, "Réponse introuvable.");
+  return row;
+}
+
+function requireFeedManager(row, session) {
+  if (row.author_id !== session.member.id && !["coordinator", "admin"].includes(session.member.role)) {
+    throw new HttpError(403, "Vous ne pouvez pas modifier cette publication.");
+  }
+}
+
 function howToVideoJson(row) {
   return {
     id: row.id,
@@ -390,6 +458,38 @@ const schemaMigrations = [
         create index tasks_area_idx on tasks(area_id, status);
         create index tasks_bed_idx on tasks(bed_id, status);
         create index tasks_event_idx on tasks(event_id, status);
+      `);
+    },
+  },
+  {
+    version: 2,
+    name: "garden_feed",
+    up(db) {
+      db.exec(`
+        create table feed_posts (
+          id integer primary key,
+          post_type text not null default 'update'
+            check (post_type in ('update', 'question', 'announcement')),
+          body text not null check (length(trim(body)) between 1 and 4000),
+          image_path text unique,
+          image_content_type text,
+          author_id integer references members(id) on delete set null,
+          created_at text not null,
+          updated_at text not null,
+          check ((image_path is null) = (image_content_type is null)),
+          check (image_path is null or (image_path like 'feed-%' and instr(image_path, '/') = 0 and instr(image_path, char(92)) = 0))
+        );
+        create index feed_posts_created_idx on feed_posts(created_at desc, id desc);
+
+        create table feed_replies (
+          id integer primary key,
+          post_id integer not null references feed_posts(id) on delete cascade,
+          body text not null check (length(trim(body)) between 1 and 2000),
+          author_id integer references members(id) on delete set null,
+          created_at text not null,
+          updated_at text not null
+        );
+        create index feed_replies_post_created_idx on feed_replies(post_id, created_at, id);
       `);
     },
   },
@@ -1875,6 +1975,96 @@ export function createApp(options = {}) {
           return json(res, 200, { member: session.member, csrfToken: session.csrfToken, branding: brandingJson(db), ...setupInfo(db) });
         }
 
+        if (req.method === "GET" && path === "/api/feed") {
+          const rows = db.prepare(`select post.*, member.display_name as author_name, member.avatar_path as author_avatar_path
+            from feed_posts post left join members member on member.id = post.author_id
+            order by post.created_at desc, post.id desc limit 30`).all();
+          return json(res, 200, { posts: rows.map((row) => feedPostJson(db, row, session)) });
+        }
+
+        if (req.method === "POST" && path === "/api/feed") {
+          requireCsrf(req, session);
+          const body = await readJson(req);
+          const postBody = feedText(body.body, 4000, "La publication");
+          const postType = body.type ?? "update";
+          if (!["update", "question", "announcement"].includes(postType)) throw new HttpError(400, "Type de publication invalide.");
+          if (postType === "announcement" && !["coordinator", "admin"].includes(session.member.role)) {
+            throw new HttpError(403, "Accès coordinateur requis pour publier une annonce.");
+          }
+          const photo = body.dataUrl ? photoData(body.dataUrl, FEED_PHOTO_BYTES) : null;
+          const timestamp = now();
+          const filename = photo ? `feed-${Date.now()}-${randomBytes(12).toString("hex")}.${photo.extension}` : null;
+          const filePath = filename ? join(uploadsDir, filename) : null;
+          if (filePath) writeFileSync(filePath, photo.bytes, { flag: "wx", mode: 0o600 });
+          try {
+            const result = db.prepare(`insert into feed_posts
+              (post_type, body, image_path, image_content_type, author_id, created_at, updated_at)
+              values (?, ?, ?, ?, ?, ?, ?)`).run(postType, postBody, filename, photo?.contentType ?? null,
+              session.member.id, timestamp, timestamp);
+            return json(res, 201, { post: feedPostJson(db, findFeedPost(db, Number(result.lastInsertRowid)), session) });
+          } catch (error) {
+            if (filePath) rmSync(filePath, { force: true });
+            throw error;
+          }
+        }
+
+        const feedReplyCreateMatch = /^\/api\/feed\/posts\/(\d+)\/replies$/.exec(path);
+        if (feedReplyCreateMatch && req.method === "POST") {
+          requireCsrf(req, session);
+          const postId = Number(feedReplyCreateMatch[1]);
+          findFeedPost(db, postId);
+          const body = await readJson(req);
+          const replyBody = feedText(body.body, 2000, "La réponse");
+          const timestamp = now();
+          db.prepare(`insert into feed_replies (post_id, body, author_id, created_at, updated_at)
+            values (?, ?, ?, ?, ?)`).run(postId, replyBody, session.member.id, timestamp, timestamp);
+          return json(res, 201, { post: feedPostJson(db, findFeedPost(db, postId), session) });
+        }
+
+        const feedPostMatch = /^\/api\/feed\/posts\/(\d+)$/.exec(path);
+        if (feedPostMatch && ["PATCH", "DELETE"].includes(req.method)) {
+          requireCsrf(req, session);
+          const postId = Number(feedPostMatch[1]);
+          const before = findFeedPost(db, postId);
+          requireFeedManager(before, session);
+          if (req.method === "DELETE") {
+            db.prepare("delete from feed_posts where id = ?").run(postId);
+            if (/^feed-\d+-[a-f0-9]{24}\.(?:jpg|png|webp)$/.test(before.image_path ?? "")) {
+              rmSync(join(uploadsDir, before.image_path), { force: true });
+            }
+            return json(res, 200, { ok: true });
+          }
+          if (before.post_type === "announcement" && !["coordinator", "admin"].includes(session.member.role)) {
+            throw new HttpError(403, "Accès coordinateur requis pour modifier une annonce.");
+          }
+          const body = await readJson(req);
+          const postBody = feedText(body.body, 4000, "La publication");
+          const postType = body.type ?? before.post_type;
+          if (!["update", "question", "announcement"].includes(postType)) throw new HttpError(400, "Type de publication invalide.");
+          if (postType === "announcement" && !["coordinator", "admin"].includes(session.member.role)) {
+            throw new HttpError(403, "Accès coordinateur requis pour publier une annonce.");
+          }
+          db.prepare("update feed_posts set post_type = ?, body = ?, updated_at = ? where id = ?")
+            .run(postType, postBody, now(), postId);
+          return json(res, 200, { post: feedPostJson(db, findFeedPost(db, postId), session) });
+        }
+
+        const feedReplyMatch = /^\/api\/feed\/replies\/(\d+)$/.exec(path);
+        if (feedReplyMatch && ["PATCH", "DELETE"].includes(req.method)) {
+          requireCsrf(req, session);
+          const replyId = Number(feedReplyMatch[1]);
+          const before = findFeedReply(db, replyId);
+          requireFeedManager(before, session);
+          if (req.method === "DELETE") {
+            db.prepare("delete from feed_replies where id = ?").run(replyId);
+            return json(res, 200, { ok: true });
+          }
+          const body = await readJson(req);
+          const replyBody = feedText(body.body, 2000, "La réponse");
+          db.prepare("update feed_replies set body = ?, updated_at = ? where id = ?").run(replyBody, now(), replyId);
+          return json(res, 200, { reply: feedReplyJson(findFeedReply(db, replyId), session) });
+        }
+
         if (path === "/api/public-site-settings" && ["GET", "PATCH"].includes(req.method)) {
           if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
           if (req.method === "GET") return json(res, 200, { settings: publicSiteSettings(db) });
@@ -2692,6 +2882,8 @@ export function createApp(options = {}) {
         const filename = path.slice("/media/".length);
         const avatar = db.prepare("select id from members where avatar_path = ?").get(filename);
         if (avatar) return serveFile(res, uploadsDir, filename, "private, no-store");
+        const feedImage = db.prepare("select id from feed_posts where image_path = ?").get(filename);
+        if (feedImage) return serveFile(res, uploadsDir, filename, "private, no-store");
         const photo = db.prepare(`select a.members_can_access from bed_photos p
           join beds b on b.id = p.bed_id join garden_areas a on a.id = b.area_id where p.path = ?`).get(filename);
         const harvestPhoto = photo ? null : db.prepare(`select a.members_can_access from harvest_photos hp

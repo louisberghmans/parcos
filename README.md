@@ -1,8 +1,9 @@
 # ParcOS
 
 ParcOS is a private, mobile-first operating app for community parks and gardens.
-It packages member access and profile pictures, invitations, account recovery,
-managed areas, garden beds and photos, events, attendance, and coordinator workflows into one small
+It packages a private garden feed with photos and discussions, member access
+and profile pictures, invitations, account recovery, managed areas, garden
+beds and photos, events, attendance, and coordinator workflows into one small
 self-hosted container.
 
 ## Quick start
@@ -24,7 +25,7 @@ docker compose up -d
 
 Open `http://YOUR-SERVER:8080`, sign in as the administrator, and complete the
 one-time setup wizard. It asks for the park name and the areas you want to
-manage. The image is available as `ghcr.io/louisberghmans/parcos:1.3.3` and
+manage. The image is available as `ghcr.io/louisberghmans/parcos:1.4.0` and
 `ghcr.io/louisberghmans/parcos:latest` for amd64 and arm64.
 
 Administrators can configure the welcome, Today, and event images from

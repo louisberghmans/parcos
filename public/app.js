@@ -11,6 +11,7 @@ const state = {
   areas: [],
   events: [],
   activities: [],
+  feed: [],
   tasks: [],
   branding: { login: null, today: null, event: null, public: null },
   publicSite: {
@@ -765,7 +766,7 @@ function renderLogin(error = "") {
       state.parcName = result.parcName;
       if (result.branding) state.branding = { ...state.branding, ...result.branding };
       if (state.setupRequired) return renderSetup();
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       const linkedEventId = Number(new URLSearchParams(location.search).get("event"));
       if (linkedEventId) openEvent(linkedEventId);
@@ -808,7 +809,7 @@ function renderSetup(error = "") {
       const result = await api("/api/setup", { method: "POST", body: JSON.stringify({ parcName: new FormData(event.currentTarget).get("parcName"), areas }) });
       state.setupRequired = result.setupRequired;
       state.parcName = result.parcName;
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre espace ParcOS est prêt.");
     } catch (setupError) {
@@ -865,7 +866,7 @@ function renderReset(token, error = "") {
       state.member = result.member;
       state.csrfToken = result.csrfToken;
       history.replaceState({}, "", "/");
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre accès a été renouvelé.");
     } catch (resetError) {
@@ -1005,7 +1006,7 @@ function shell(content) {
     </header>
     <main class="main-content">${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
-      <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>Aujourd’hui</button>
+      <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>${t("Accueil", "Home", "Start")}</button>
       <button data-page="agenda" class="${state.page === "agenda" ? "active" : ""}"><span>□</span>Agenda</button>
       <button class="quick-log-nav" id="quick-log" type="button" aria-label="${t("Ajouter au journal", "Add to log")}"><span>+</span>${t("Journal", "Log")}</button>
       <button data-page="garden" class="${state.page === "garden" ? "active" : ""}"><span>♧</span>Potager</button>
@@ -1036,19 +1037,20 @@ function renderToday() {
   const availableTasks = state.tasks.filter((task) => task.status === "open" && task.priority !== "urgent");
   const hasDailyTasks = assignedTasks.length || urgentTasks.length || availableTasks.length;
   return `<section class="page today-page">
-    <div class="welcome-row"><div><p class="eyebrow">${t("Bonjour", "Hello")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Que se passe-t-il", "What is happening")}<br>${t("au potager ?", "in the garden?")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
-    <article class="hero-card">${brandingImage("today", "hero-card-image")}<div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest", "te oogsten")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`, `${attention.length === 1 ? "heeft" : "hebben"} aandacht nodig.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds")}</button></div></article>
-    <button class="quick-log-card" id="today-quick-log" type="button"><span>+</span><strong>${t("Ajouter au journal", "Add to log")}</strong><small>${t("Travail, observation, problème, récolte ou photo", "Work, observation, problem, harvest or photo")}</small></button>
-    <div class="section-heading task-heading"><div><p class="eyebrow">${t("À faire aujourd’hui", "Work for today", "Werk voor vandaag")}</p><h2>${t("Tâches", "Tasks", "Taken")}</h2></div>${isCoordinator() ? `<button class="button secondary compact-button" id="create-task" type="button">+ ${t("Tâche", "Task", "Taak")}</button>` : ""}</div>
+    <div class="welcome-row feed-welcome"><div><p class="eyebrow">${t("Bonjour", "Hello", "Hallo")} ${escapeHtml(state.member.displayName.split(" ")[0])}</p><h1>${t("Le jardin en direct", "The garden live", "De tuin live")}</h1></div><span class="date-badge">${escapeHtml(new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(new Date()))}</span></div>
+    ${renderFeedComposer()}
+    <div class="feed-list">${state.feed.length ? state.feed.map(feedPostCard).join("") : `<div class="empty-state feed-empty"><strong>${t("La conversation commence ici.", "The conversation starts here.", "Het gesprek begint hier.")}</strong><p>${t("Partagez une nouvelle, une question ou une photo du jardin.", "Share an update, a question, or a garden photo.", "Deel een update, een vraag of een foto uit de tuin.")}</p></div>`}</div>
+    <div class="section-heading task-heading next-actions-heading"><div><p class="eyebrow">${t("Ensuite", "Next", "Hierna")}</p><h2>${t("Prochaines actions", "Next actions", "Volgende acties")}</h2></div>${isCoordinator() ? `<button class="button secondary compact-button" id="create-task" type="button">+ ${t("Tâche", "Task", "Taak")}</button>` : ""}</div>
     <div class="today-task-board">
       ${assignedTasks.length ? taskGroup(t("Mes tâches", "My tasks", "Mijn taken"), assignedTasks, "assigned") : ""}
       ${urgentTasks.length ? taskGroup(t("Urgent", "Urgent", "Dringend"), urgentTasks, "urgent") : ""}
       ${availableTasks.length ? taskGroup(t("Disponible", "Available", "Beschikbaar"), availableTasks, "available") : ""}
       ${!hasDailyTasks ? `<div class="empty-state compact"><strong>${t("Aucune tâche ouverte", "No open tasks", "Geen open taken")}</strong><p>${t("Le travail disponible apparaîtra ici.", "Available work will appear here.", "Beschikbaar werk verschijnt hier.")}</p></div>` : ""}
     </div>
-    <div class="section-heading"><div><p class="eyebrow">Prochain rendez-vous</p><h2>À l’agenda</h2></div><button class="text-link" data-page="agenda">Tout voir</button></div>
-    ${nextEvent ? compactEventCard(nextEvent) : '<div class="empty-state"><strong>Rien de prévu pour le moment</strong><p>Les prochains rendez-vous apparaîtront ici.</p></div>'}
-    <div class="section-heading"><div><p class="eyebrow">En un coup d’œil</p><h2>État du potager</h2></div></div>
+    <article class="hero-card home-garden-summary">${brandingImage("today", "hero-card-image")}<div><span class="hero-kicker">${t("Le potager aujourd’hui", "The garden today", "De tuin vandaag")}</span><h2>${harvest.length} ${bedWord(harvest.length)} ${t("à récolter", "ready to harvest", "te oogsten")}</h2><p>${attention.length} ${zoneWord(attention.length)} ${t(`demande${attention.length === 1 ? "" : "nt"} de l’attention.`, `${attention.length === 1 ? "needs" : "need"} attention.`, `${attention.length === 1 ? "heeft" : "hebben"} aandacht nodig.`)}</p><button class="button light" data-page="garden">${t("Voir les planches", "View beds", "Bedden bekijken")}</button></div></article>
+    <div class="section-heading"><div><p class="eyebrow">${t("Prochain rendez-vous", "Next gathering", "Volgende bijeenkomst")}</p><h2>${t("À l’agenda", "On the calendar", "Op de agenda")}</h2></div><button class="text-link" data-page="agenda">${t("Tout voir", "View all", "Alles bekijken")}</button></div>
+    ${nextEvent ? compactEventCard(nextEvent) : `<div class="empty-state"><strong>${t("Rien de prévu pour le moment", "Nothing planned yet", "Nog niets gepland")}</strong><p>${t("Les prochains rendez-vous apparaîtront ici.", "Upcoming gatherings will appear here.", "Komende bijeenkomsten verschijnen hier.")}</p></div>`}
+    <div class="section-heading"><div><p class="eyebrow">${t("En un coup d’œil", "At a glance", "In een oogopslag")}</p><h2>${t("État du potager", "Garden status", "Status van de tuin")}</h2></div></div>
     <div class="stat-grid">
       <button data-filter-link="harvest"><strong>${harvest.length}</strong><span>${t("À récolter", "To harvest")}</span></button>
       <button data-filter-link="ready"><strong>${state.beds.filter((bed) => bed.status === "ready").length}</strong><span>${t("Disponibles", "Available")}</span></button>
@@ -1056,9 +1058,50 @@ function renderToday() {
       <button data-filter-link="no-photo"><strong>${noPhoto}</strong><span>${t("Sans photo", "No photo")}</span></button>
     </div>
     ${harvest.length ? `<div class="section-heading compact"><div><p class="eyebrow">${t("Récolte ouverte", "Harvest open")}</p><h2>${t("Prêt maintenant", "Ready now")}</h2></div></div><div class="mini-bed-list">${harvest.slice(0, 4).map(miniBed).join("")}</div>` : ""}
-    <div class="section-heading compact"><div><p class="eyebrow">${t("Le journal", "The log")}</p><h2>${t("Activité récente", "Recent activity")}</h2></div></div>
-    <div class="recent-activity-list">${state.activities.length ? state.activities.slice(0, 6).map(recentActivityCard).join("") : `<div class="empty-state compact"><strong>${t("Rien de consigné pour le moment", "Nothing logged yet")}</strong></div>`}</div>
   </section>`;
+}
+
+function renderFeedComposer() {
+  const announcementOption = isCoordinator()
+    ? `<option value="announcement">${t("Annonce", "Announcement", "Aankondiging")}</option>`
+    : "";
+  return `<section class="feed-composer panel" aria-labelledby="feed-composer-title">
+    <div class="feed-composer-heading"><span class="avatar-button">${avatarContent(state.member)}</span><div><p class="eyebrow">${t("Fil du jardin", "Garden feed", "Tuinfeed")}</p><h2 id="feed-composer-title">${t("Partager avec le jardin", "Share with the garden", "Delen met de tuin")}</h2></div></div>
+    <form id="feed-composer-form" class="form-stack">
+      <label class="sr-only" for="feed-body">${t("Votre publication", "Your post", "Uw bericht")}</label>
+      <textarea id="feed-body" name="body" maxlength="4000" required placeholder="${t("Quoi de neuf au jardin ?", "What is happening in the garden?", "Wat gebeurt er in de tuin?")}"></textarea>
+      <div class="feed-composer-actions"><label>${t("Type", "Type", "Type")}<select name="type"><option value="update">${t("Nouvelle", "Update", "Update")}</option><option value="question">${t("Question", "Question", "Vraag")}</option>${announcementOption}</select></label><label class="button secondary file-button feed-photo-button">${cameraIcon()}<span>${t("Photo", "Photo", "Foto")}</span><input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><button class="button primary" type="submit">${t("Publier", "Post", "Plaatsen")}</button></div>
+    </form>
+  </section>`;
+}
+
+function feedTypeLabel(type) {
+  if (type === "question") return t("Question", "Question", "Vraag");
+  if (type === "announcement") return t("Annonce", "Announcement", "Aankondiging");
+  return t("Nouvelle", "Update", "Update");
+}
+
+function feedAuthor(author) {
+  return author || { displayName: t("Ancien membre", "Former member", "Voormalig lid"), avatarUrl: null };
+}
+
+function feedReplyCard(reply) {
+  const author = feedAuthor(reply.author);
+  return `<div class="feed-reply"><span class="avatar-button small-avatar">${avatarContent(author)}</span><div><div class="feed-reply-heading"><strong>${escapeHtml(author.displayName)}</strong><time datetime="${escapeHtml(reply.createdAt)}">${escapeHtml(relativeDate(reply.createdAt))}</time>${reply.canManage ? `<button type="button" class="feed-text-action" data-delete-feed-reply="${reply.id}">${t("Supprimer", "Delete", "Verwijderen")}</button>` : ""}</div><p>${escapeHtml(reply.body)}</p></div></div>`;
+}
+
+function feedPostCard(post) {
+  const author = feedAuthor(post.author);
+  return `<article class="feed-post ${post.type}" aria-labelledby="feed-post-${post.id}-author">
+    <header class="feed-post-header"><span class="avatar-button">${avatarContent(author)}</span><div><strong id="feed-post-${post.id}-author">${escapeHtml(author.displayName)}</strong><small><span class="feed-type-pill">${escapeHtml(feedTypeLabel(post.type))}</span> · <time datetime="${escapeHtml(post.createdAt)}">${escapeHtml(relativeDate(post.createdAt))}</time></small></div>${post.canManage ? `<button type="button" class="feed-text-action" data-delete-feed-post="${post.id}">${t("Supprimer", "Delete", "Verwijderen")}</button>` : ""}</header>
+    <p class="feed-post-body">${escapeHtml(post.body)}</p>
+    ${post.imageUrl ? `<img class="feed-post-image" src="${escapeHtml(post.imageUrl)}" alt="${t("Photo partagée dans le fil du jardin", "Photo shared in the garden feed", "Foto gedeeld in de tuinfeed")}" loading="lazy">` : ""}
+    <section class="feed-discussion" aria-label="${t("Discussion", "Discussion", "Discussie")}">
+      ${post.replyCount > post.replies.length ? `<p class="feed-hidden-replies">${post.replyCount - post.replies.length} ${t("réponses plus anciennes ne sont pas affichées.", "older replies are not shown.", "oudere antwoorden worden niet getoond.")}</p>` : ""}
+      <div class="feed-replies">${post.replies.length ? post.replies.map(feedReplyCard).join("") : `<p class="feed-no-replies">${t("Aucune réponse pour le moment.", "No replies yet.", "Nog geen antwoorden.")}</p>`}</div>
+      <form class="feed-reply-form" data-feed-reply-form="${post.id}"><label class="sr-only" for="feed-reply-${post.id}">${t("Répondre", "Reply", "Antwoorden")}</label><input id="feed-reply-${post.id}" name="body" maxlength="2000" required placeholder="${t("Répondre…", "Reply…", "Antwoorden…")}"><button class="button secondary" type="submit">${t("Envoyer", "Send", "Versturen")}</button></form>
+    </section>
+  </article>`;
 }
 
 function taskGroup(label, tasks, kind) {
@@ -1385,6 +1428,10 @@ function bindShell() {
   document.querySelectorAll("[data-bed-id]").forEach((button) => button.addEventListener("click", () => openBed(Number(button.dataset.bedId))));
   document.querySelector("#quick-log")?.addEventListener("click", () => renderQuickLog());
   document.querySelector("#today-quick-log")?.addEventListener("click", () => renderQuickLog());
+  document.querySelector("#feed-composer-form")?.addEventListener("submit", submitFeedPost);
+  document.querySelectorAll("[data-feed-reply-form]").forEach((form) => form.addEventListener("submit", submitFeedReply));
+  document.querySelectorAll("[data-delete-feed-post]").forEach((button) => button.addEventListener("click", () => deleteFeedPost(button)));
+  document.querySelectorAll("[data-delete-feed-reply]").forEach((button) => button.addEventListener("click", () => deleteFeedReply(button)));
   document.querySelector("#create-task")?.addEventListener("click", renderCreateTaskForm);
   document.querySelectorAll("[data-task-action]").forEach((button) => button.addEventListener("click", () => updateTaskAction(button)));
   document.querySelector("#manage-areas")?.addEventListener("click", renderAreasManager);
@@ -1448,7 +1495,7 @@ async function toggleLanguage() {
       showToast(error.message);
     }
   }
-  await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks()]);
+  await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks()]);
   if (state.selectedBed) state.selectedBed = await api(`/api/beds/${state.selectedBed.bed.id}`);
   renderApp();
 }
@@ -1472,6 +1519,11 @@ async function loadEvents() {
 async function loadActivities() {
   const result = await api("/api/activities");
   state.activities = result.activities;
+}
+
+async function loadFeed() {
+  const result = await api("/api/feed");
+  state.feed = result.posts;
 }
 
 async function loadTasks() {
@@ -1620,6 +1672,75 @@ async function submitQuickLog(event) {
     dismissModal();
     renderApp();
     showToast(t("Ajouté au journal.", "Added to the log."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function submitFeedPost(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const file = form.elements.photo.files[0];
+    const dataUrl = file ? await compressPhoto(file) : null;
+    await api("/api/feed", { method: "POST", body: JSON.stringify({
+      body: form.elements.body.value,
+      type: form.elements.type.value,
+      dataUrl,
+    }) });
+    await loadFeed();
+    renderApp();
+    showToast(t("Publication ajoutée.", "Post added.", "Bericht geplaatst."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function submitFeedReply(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    await api(`/api/feed/posts/${Number(form.dataset.feedReplyForm)}/replies`, {
+      method: "POST",
+      body: JSON.stringify({ body: form.elements.body.value }),
+    });
+    await loadFeed();
+    renderApp();
+    showToast(t("Réponse ajoutée.", "Reply added.", "Antwoord toegevoegd."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function deleteFeedPost(button) {
+  if (!window.confirm(t("Supprimer cette publication et ses réponses ?", "Delete this post and its replies?", "Dit bericht en de antwoorden verwijderen?"))) return;
+  button.disabled = true;
+  try {
+    await api(`/api/feed/posts/${Number(button.dataset.deleteFeedPost)}`, { method: "DELETE" });
+    await loadFeed();
+    renderApp();
+    showToast(t("Publication supprimée.", "Post deleted.", "Bericht verwijderd."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function deleteFeedReply(button) {
+  if (!window.confirm(t("Supprimer cette réponse ?", "Delete this reply?", "Dit antwoord verwijderen?"))) return;
+  button.disabled = true;
+  try {
+    await api(`/api/feed/replies/${Number(button.dataset.deleteFeedReply)}`, { method: "DELETE" });
+    await loadFeed();
+    renderApp();
+    showToast(t("Réponse supprimée.", "Reply deleted.", "Antwoord verwijderd."));
   } catch (error) {
     button.disabled = false;
     showToast(error.message);
@@ -2098,7 +2219,7 @@ async function saveProfile(event) {
     state.member = result.member;
     state.locale = result.member.preferredLocale;
     localStorage.setItem("parcos_locale", state.locale);
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks()]);
     renderApp();
     showToast(t("Profil enregistré.", "Profile saved."));
   } catch (error) {
@@ -2238,7 +2359,7 @@ async function importTranslationsFile(event) {
     const payload = JSON.parse(await file.text());
     const result = await api("/api/translations/import", { method: "POST", body: JSON.stringify(payload) });
     resultBox.innerHTML = `<div class="invite-result"><small>${t("Import des traductions terminé", "Translation import complete")}</small><p>${result.imported} ${t("traductions importées", "translations imported")}; ${result.empty} ${t("vides", "empty")}; ${result.stale} ${t("obsolètes refusées", "stale rejected")}; ${result.invalid} ${t("invalides", "invalid")}.</p></div>`;
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks()]);
     renderApp();
     showToast(t("Les traductions ont été importées.", "Translations were imported."));
   } catch (error) {
@@ -2314,6 +2435,7 @@ async function logout() {
   state.areas = [];
   state.events = [];
   state.activities = [];
+  state.feed = [];
   state.tasks = [];
   if ("caches" in window) {
     for (const key of await caches.keys()) await caches.delete(key);
@@ -2339,7 +2461,7 @@ async function boot() {
     state.parcName = result.parcName;
     if (result.branding) state.branding = { ...state.branding, ...result.branding };
     if (state.setupRequired) return renderSetup();
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
     renderApp();
     const eventId = Number(params.get("event"));
     if (eventId) openEvent(eventId);

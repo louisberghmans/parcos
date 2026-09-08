@@ -132,6 +132,22 @@ test("complete backup exports securely and restores a validated standalone insta
     }),
   });
   assert.equal(harvest.response.status, 201);
+  const feedPost = await request(baseUrl, "/api/feed", {
+    method: "POST",
+    headers: adminWriteHeaders,
+    body: JSON.stringify({
+      body: "Backup feed post",
+      type: "announcement",
+      dataUrl: `data:image/png;base64,${media.toString("base64")}`,
+    }),
+  });
+  assert.equal(feedPost.response.status, 201);
+  const feedReply = await request(baseUrl, `/api/feed/posts/${feedPost.body.post.id}/replies`, {
+    method: "POST",
+    headers: adminWriteHeaders,
+    body: JSON.stringify({ body: "Backup feed reply" }),
+  });
+  assert.equal(feedReply.response.status, 201);
   const localized = sourceApp.db.prepare("select * from localized_content order by entity_type, entity_id, field limit 1").get();
   sourceApp.db.prepare(`insert into content_translations
     (entity_type, entity_id, field, locale, value, source_revision, created_at, updated_at)
@@ -141,8 +157,9 @@ test("complete backup exports securely and restores a validated standalone insta
   sourceApp.db.prepare(`insert into app_meta (key, value, updated_at) values ('backup_test_setting', 'preserved', ?)
     on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(timestamp);
   const mediaName = sourceApp.db.prepare("select path from harvest_photos order by id desc limit 1").get().path;
+  const feedMediaName = sourceApp.db.prepare("select image_path from feed_posts where id = ?").get(feedPost.body.post.id).image_path;
 
-  const tableNames = ["members", "garden_areas", "beds", "events", "content_translations", "bed_notes", "activities", "harvests", "harvest_photos"];
+  const tableNames = ["members", "garden_areas", "beds", "events", "content_translations", "bed_notes", "activities", "harvests", "harvest_photos", "feed_posts", "feed_replies"];
   const expectedCounts = Object.fromEntries(tableNames.map((table) => [
     table,
     Number(sourceApp.db.prepare(`select count(*) as count from ${table}`).get().count),
@@ -221,6 +238,9 @@ test("complete backup exports securely and restores a validated standalone insta
   assert.equal(restoredApp.db.prepare("select value from app_meta where key = 'backup_test_setting'").get().value, "preserved");
   assert.equal(restoredApp.db.prepare("select preferred_locale from members where username = 'backup.member'").get().preferred_locale, "nl");
   assert.deepEqual(readFileSync(join(restoredDir, "uploads", mediaName)), media);
+  assert.deepEqual(readFileSync(join(restoredDir, "uploads", feedMediaName)), media);
+  assert.equal(restoredApp.db.prepare("select body from feed_posts where id = ?").get(feedPost.body.post.id).body, "Backup feed post");
+  assert.equal(restoredApp.db.prepare("select body from feed_replies where post_id = ?").get(feedPost.body.post.id).body, "Backup feed reply");
   assert.equal(restoredApp.db.prepare("pragma integrity_check").get().integrity_check, "ok");
   const restoredHealth = await request(`http://127.0.0.1:${restoredApp.server.address().port}`, "/health");
   assert.equal(restoredHealth.response.status, 200);

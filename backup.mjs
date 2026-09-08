@@ -377,10 +377,12 @@ function validateDatabase(stageDir) {
   try {
     const integrity = db.prepare("pragma integrity_check").all();
     if (integrity.length !== 1 || integrity[0].integrity_check !== "ok") throw new Error("Restored SQLite integrity check failed.");
+    const hasFeed = Boolean(db.prepare("select 1 from sqlite_master where type = 'table' and name = 'feed_posts'").get());
     const references = [
       ...db.prepare("select avatar_path as path from members where avatar_path is not null").all(),
       ...db.prepare("select path from bed_photos").all(),
       ...db.prepare("select path from harvest_photos").all(),
+      ...(hasFeed ? db.prepare("select image_path as path from feed_posts where image_path is not null").all() : []),
       ...db.prepare("select value as path from app_meta where key like 'branding_%'").all(),
     ];
     for (const reference of references) {
