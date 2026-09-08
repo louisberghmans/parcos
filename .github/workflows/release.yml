@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24.17.0"
+          cache: npm
       - name: Verify release tag
         shell: bash
         run: |
@@ -26,6 +27,7 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match package.json ($expected)." >&2
             exit 1
           fi
+      - run: npm ci --ignore-scripts
       - run: npm run check
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3

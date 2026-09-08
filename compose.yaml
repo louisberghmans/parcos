@@ -1,6 +1,6 @@
 services:
   parcos:
-    image: "${PARCOS_IMAGE:-ghcr.io/louisberghmans/parcos:1.4.0}"
+    image: "${PARCOS_IMAGE:-ghcr.io/louisberghmans/parcos:1.4.1}"
     build:
       context: .
     restart: unless-stopped
@@ -12,6 +12,7 @@ services:
       PARCOS_BASE_URL: "${PARCOS_BASE_URL:-}"
       PARCOS_COOKIE_SECURE: "${PARCOS_COOKIE_SECURE:-false}"
       PARCOS_TRUST_PROXY: "${PARCOS_TRUST_PROXY:-false}"
+      PARCOS_VAPID_SUBJECT: "${PARCOS_VAPID_SUBJECT:-mailto:admin@parcos.local}"
     volumes:
       - parcos-data:/data
     init: true

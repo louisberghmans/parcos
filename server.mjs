@@ -17,6 +17,17 @@ import { dirname, extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
+import {
+  DEFAULT_NOTIFICATION_TIME,
+  DEFAULT_NOTIFICATION_TIME_ZONE,
+  generateVapidKeys,
+  permanentPushFailure,
+  sendWebPush,
+  summaryBody,
+  validDeliveryTime,
+  validTimeZone,
+  zonedDateAndTime,
+} from "./src/services/push-notifications.mjs";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const runtime = globalThis.process;
@@ -327,6 +338,68 @@ function feedPostJson(db, row, session) {
   };
 }
 
+function feedUnreadCount(db, session) {
+  const lastReadAt = db.prepare("select last_read_at from feed_read_state where member_id = ?").get(session.member.id)?.last_read_at
+    ?? "1970-01-01T00:00:00.000Z";
+  return Number(db.prepare(`select count(*) as count from (
+      select created_at, author_id from feed_posts
+      union all
+      select created_at, author_id from feed_replies
+    ) where created_at > ? and (author_id is null or author_id != ?)`).get(lastReadAt, session.member.id).count);
+}
+
+function notificationPreferenceJson(db, memberId) {
+  const row = db.prepare("select * from notification_preferences where member_id = ?").get(memberId);
+  return {
+    configured: Boolean(row),
+    enabled: Boolean(row?.enabled),
+    frequency: "daily",
+    deliveryTime: row?.delivery_time ?? DEFAULT_NOTIFICATION_TIME,
+    timeZone: row?.time_zone ?? DEFAULT_NOTIFICATION_TIME_ZONE,
+    categories: {
+      feedPosts: row ? Boolean(row.include_feed_posts) : true,
+      feedReplies: row ? Boolean(row.include_feed_replies) : true,
+    },
+  };
+}
+
+function notificationPreferenceInput(body) {
+  const deliveryTime = String(body.deliveryTime ?? "").trim();
+  const timeZone = String(body.timeZone ?? "").trim();
+  const feedPosts = body.categories?.feedPosts;
+  const feedReplies = body.categories?.feedReplies;
+  if (!validDeliveryTime(deliveryTime)) throw new HttpError(400, "Heure de notification invalide.");
+  if (!validTimeZone(timeZone)) throw new HttpError(400, "Fuseau horaire invalide.");
+  if (typeof feedPosts !== "boolean" || typeof feedReplies !== "boolean") {
+    throw new HttpError(400, "Catégories de notification invalides.");
+  }
+  if (!feedPosts && !feedReplies) throw new HttpError(400, "Choisissez au moins une catégorie de notification.");
+  return { deliveryTime, timeZone, feedPosts, feedReplies };
+}
+
+function pushSubscriptionInput(body) {
+  const endpoint = String(body.endpoint ?? "").trim();
+  let parsedEndpoint;
+  try {
+    parsedEndpoint = new URL(endpoint);
+  } catch {
+    throw new HttpError(400, "Abonnement de notification invalide.");
+  }
+  if (endpoint.length > 2048 || parsedEndpoint.protocol !== "https:" || parsedEndpoint.username || parsedEndpoint.password || parsedEndpoint.hash) {
+    throw new HttpError(400, "Abonnement de notification invalide.");
+  }
+  const p256dh = String(body.keys?.p256dh ?? "").trim();
+  const auth = String(body.keys?.auth ?? "").trim();
+  if (![p256dh, auth].every((value) => /^[A-Za-z0-9_-]{16,256}$/.test(value))) {
+    throw new HttpError(400, "Clés de notification invalides.");
+  }
+  const expirationTime = body.expirationTime == null ? null : Number(body.expirationTime);
+  if (expirationTime !== null && (!Number.isSafeInteger(expirationTime) || expirationTime <= 0)) {
+    throw new HttpError(400, "Expiration de notification invalide.");
+  }
+  return { endpoint, p256dh, auth, expirationTime };
+}
+
 function feedText(value, maximum, label) {
   const text = String(value ?? "").trim();
   if (!text || text.length > maximum) throw new HttpError(400, `${label} doit contenir entre 1 et ${maximum} caractères.`);
@@ -490,6 +563,53 @@ const schemaMigrations = [
           updated_at text not null
         );
         create index feed_replies_post_created_idx on feed_replies(post_id, created_at, id);
+      `);
+    },
+  },
+  {
+    version: 3,
+    name: "feed_read_state",
+    up(db) {
+      db.exec(`
+        create table feed_read_state (
+          member_id integer primary key references members(id) on delete cascade,
+          last_read_at text not null,
+          updated_at text not null
+        );
+      `);
+    },
+  },
+  {
+    version: 4,
+    name: "daily_push_notifications",
+    up(db) {
+      db.exec(`
+        create table notification_preferences (
+          member_id integer primary key references members(id) on delete cascade,
+          enabled integer not null default 0 check (enabled in (0, 1)),
+          frequency text not null default 'daily' check (frequency = 'daily'),
+          delivery_time text not null default '18:00' check (length(delivery_time) = 5),
+          time_zone text not null default 'Europe/Brussels',
+          include_feed_posts integer not null default 1 check (include_feed_posts in (0, 1)),
+          include_feed_replies integer not null default 1 check (include_feed_replies in (0, 1)),
+          last_digest_at text not null,
+          last_digest_date text,
+          created_at text not null,
+          updated_at text not null,
+          check (include_feed_posts = 1 or include_feed_replies = 1)
+        );
+
+        create table push_subscriptions (
+          id integer primary key,
+          member_id integer not null references members(id) on delete cascade,
+          endpoint text not null unique,
+          p256dh text not null,
+          auth text not null,
+          expiration_time integer,
+          created_at text not null,
+          updated_at text not null
+        );
+        create index push_subscriptions_member_idx on push_subscriptions(member_id);
       `);
     },
   },
@@ -1722,6 +1842,40 @@ function setAppMeta(db, key, value, timestamp = now()) {
     .run(key, normalized, timestamp);
 }
 
+function ensureVapidDetails(db, configuredSubject = "") {
+  let publicKey = appMetaValue(db, "push_vapid_public_key");
+  let privateKey = appMetaValue(db, "push_vapid_private_key");
+  if (Boolean(publicKey) !== Boolean(privateKey)) {
+    throw new Error("Stored Web Push identity is incomplete. Restore both VAPID keys from backup before starting ParcOS.");
+  }
+  if (!publicKey) {
+    const generated = generateVapidKeys();
+    const timestamp = now();
+    db.exec("begin immediate");
+    try {
+      setAppMeta(db, "push_vapid_public_key", generated.publicKey, timestamp);
+      setAppMeta(db, "push_vapid_private_key", generated.privateKey, timestamp);
+      db.exec("commit");
+    } catch (error) {
+      db.exec("rollback");
+      throw error;
+    }
+    publicKey = generated.publicKey;
+    privateKey = generated.privateKey;
+  }
+  const subject = String(configuredSubject || "mailto:admin@parcos.local").trim();
+  let parsedSubject;
+  try {
+    parsedSubject = new URL(subject);
+  } catch {
+    throw new Error("PARCOS_VAPID_SUBJECT must be a mailto or http(s) URL.");
+  }
+  if (!["mailto:", "http:", "https:"].includes(parsedSubject.protocol)) {
+    throw new Error("PARCOS_VAPID_SUBJECT must be a mailto or http(s) URL.");
+  }
+  return { subject, publicKey, privateKey };
+}
+
 function localizedPublicText(db, key, locale) {
   const preferred = localeValue(locale);
   const values = Object.fromEntries(SUPPORTED_LOCALES.map((item) => [item, appMetaValue(db, `${key}_${item}`)]));
@@ -1800,6 +1954,7 @@ export function createApp(options = {}) {
   writeFileSync(runningMarkerPath, `${JSON.stringify({ pid: runtime?.pid ?? null, startedAt: now() })}\n`, { flag: "wx", mode: 0o600 });
 
   let db;
+  let vapidDetails;
   try {
     db = new DatabaseSync(dbPath);
     createSchema(db);
@@ -1808,6 +1963,7 @@ export function createApp(options = {}) {
     backfillBedNotes(db);
     backfillLocalizedContent(db);
     db.prepare("delete from sessions where expires_at <= ?").run(now());
+    vapidDetails = ensureVapidDetails(db, options.vapidSubject ?? env.PARCOS_VAPID_SUBJECT);
   } catch (error) {
     try {
       db?.close();
@@ -1818,10 +1974,88 @@ export function createApp(options = {}) {
     throw error;
   }
 
+  const notificationSender = options.notificationSender ?? sendWebPush;
+  const notificationClock = options.notificationClock ?? (() => new Date());
   const loginAttempts = new Map();
   let activeWrites = 0;
   let backupInProgress = false;
   let writesBlockedForBackup = false;
+  let notificationTimer = null;
+  let notificationCycleActive = false;
+
+  async function runNotificationCycle(at = notificationClock()) {
+    if (notificationCycleActive) return { processed: 0, sent: 0, removed: 0, skipped: true };
+    const cycleDate = at instanceof Date ? at : new Date(at);
+    if (Number.isNaN(cycleDate.getTime())) throw new Error("Notification cycle date is invalid.");
+    notificationCycleActive = true;
+    let processed = 0;
+    let sent = 0;
+    let removed = 0;
+    try {
+      const recipients = db.prepare(`select preference.*, member.preferred_locale
+        from notification_preferences preference
+        join members member on member.id = preference.member_id
+        where preference.enabled = 1
+          and exists (select 1 from push_subscriptions subscription where subscription.member_id = preference.member_id)`)
+        .all();
+      const cycleAt = cycleDate.toISOString();
+      for (const preference of recipients) {
+        const local = zonedDateAndTime(cycleDate, preference.time_zone);
+        if (local.time < preference.delivery_time || preference.last_digest_date === local.date) continue;
+        processed += 1;
+        const feedReadAt = db.prepare("select last_read_at from feed_read_state where member_id = ?")
+          .get(preference.member_id)?.last_read_at;
+        const since = feedReadAt && feedReadAt > preference.last_digest_at ? feedReadAt : preference.last_digest_at;
+        let count = 0;
+        if (preference.include_feed_posts) {
+          count += Number(db.prepare(`select count(*) as count from feed_posts
+            where created_at > ? and (author_id is null or author_id != ?)`)
+            .get(since, preference.member_id).count);
+        }
+        if (preference.include_feed_replies) {
+          count += Number(db.prepare(`select count(*) as count from feed_replies
+            where created_at > ? and (author_id is null or author_id != ?)`)
+            .get(since, preference.member_id).count);
+        }
+        if (count > 0) {
+          const payload = {
+            title: "ParcOS",
+            body: summaryBody(preference.preferred_locale, count),
+            url: "/",
+            count,
+          };
+          const subscriptions = db.prepare("select * from push_subscriptions where member_id = ? order by id")
+            .all(preference.member_id);
+          for (const subscription of subscriptions) {
+            try {
+              await notificationSender({
+                endpoint: subscription.endpoint,
+                expirationTime: subscription.expiration_time,
+                keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+              }, payload, vapidDetails);
+              sent += 1;
+            } catch (error) {
+              if (permanentPushFailure(error)) {
+                db.prepare("delete from push_subscriptions where id = ?").run(subscription.id);
+                removed += 1;
+              } else {
+                console.error("Web Push delivery failed:", error?.message ?? error);
+              }
+            }
+          }
+        }
+        const remainingSubscriptions = Number(db.prepare("select count(*) as count from push_subscriptions where member_id = ?")
+          .get(preference.member_id).count);
+        db.prepare(`update notification_preferences
+          set enabled = ?, last_digest_at = ?, last_digest_date = ?, updated_at = ? where member_id = ?`)
+          .run(remainingSubscriptions ? 1 : 0, cycleAt, local.date, cycleAt, preference.member_id);
+      }
+      return { processed, sent, removed, skipped: false };
+    } finally {
+      notificationCycleActive = false;
+    }
+  }
+
   const server = createServer(async (req, res) => {
     securityHeaders(res);
     let countedWrite = false;
@@ -1975,11 +2209,99 @@ export function createApp(options = {}) {
           return json(res, 200, { member: session.member, csrfToken: session.csrfToken, branding: brandingJson(db), ...setupInfo(db) });
         }
 
+        if (req.method === "GET" && path === "/api/notifications/preferences") {
+          return json(res, 200, {
+            preferences: notificationPreferenceJson(db, session.member.id),
+            publicKey: vapidDetails.publicKey,
+          });
+        }
+
+        if (req.method === "PATCH" && path === "/api/notifications/preferences") {
+          requireCsrf(req, session);
+          const values = notificationPreferenceInput(await readJson(req));
+          const timestamp = now();
+          db.prepare(`insert into notification_preferences
+            (member_id, enabled, frequency, delivery_time, time_zone, include_feed_posts, include_feed_replies,
+              last_digest_at, last_digest_date, created_at, updated_at)
+            values (?, 0, 'daily', ?, ?, ?, ?, ?, null, ?, ?)
+            on conflict(member_id) do update set delivery_time = excluded.delivery_time, time_zone = excluded.time_zone,
+              include_feed_posts = excluded.include_feed_posts, include_feed_replies = excluded.include_feed_replies,
+              updated_at = excluded.updated_at`)
+            .run(session.member.id, values.deliveryTime, values.timeZone, Number(values.feedPosts), Number(values.feedReplies),
+              timestamp, timestamp, timestamp);
+          return json(res, 200, { preferences: notificationPreferenceJson(db, session.member.id) });
+        }
+
+        if (req.method === "POST" && path === "/api/notifications/subscriptions") {
+          requireCsrf(req, session);
+          const subscription = pushSubscriptionInput(await readJson(req));
+          const existing = db.prepare("select member_id from push_subscriptions where endpoint = ?").get(subscription.endpoint);
+          if (existing && existing.member_id !== session.member.id) {
+            throw new HttpError(409, "Cet appareil est déjà lié à un autre profil ParcOS.");
+          }
+          const timestamp = now();
+          db.exec("begin immediate");
+          try {
+            db.prepare(`insert into push_subscriptions
+              (member_id, endpoint, p256dh, auth, expiration_time, created_at, updated_at)
+              values (?, ?, ?, ?, ?, ?, ?)
+              on conflict(endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth,
+                expiration_time = excluded.expiration_time, updated_at = excluded.updated_at`)
+              .run(session.member.id, subscription.endpoint, subscription.p256dh, subscription.auth,
+                subscription.expirationTime, timestamp, timestamp);
+            db.prepare(`insert into notification_preferences
+              (member_id, enabled, frequency, delivery_time, time_zone, include_feed_posts, include_feed_replies,
+                last_digest_at, last_digest_date, created_at, updated_at)
+              values (?, 1, 'daily', ?, ?, 1, 1, ?, null, ?, ?)
+              on conflict(member_id) do update set enabled = 1,
+                last_digest_at = case when notification_preferences.enabled = 0 then excluded.last_digest_at else notification_preferences.last_digest_at end,
+                last_digest_date = case when notification_preferences.enabled = 0 then null else notification_preferences.last_digest_date end,
+                updated_at = excluded.updated_at`)
+              .run(session.member.id, DEFAULT_NOTIFICATION_TIME, DEFAULT_NOTIFICATION_TIME_ZONE, timestamp, timestamp, timestamp);
+            db.exec("commit");
+          } catch (error) {
+            db.exec("rollback");
+            throw error;
+          }
+          return json(res, 201, {
+            preferences: notificationPreferenceJson(db, session.member.id),
+            subscriptionCount: Number(db.prepare("select count(*) as count from push_subscriptions where member_id = ?")
+              .get(session.member.id).count),
+          });
+        }
+
+        if (req.method === "DELETE" && path === "/api/notifications/subscriptions") {
+          requireCsrf(req, session);
+          await readJson(req);
+          const timestamp = now();
+          db.exec("begin immediate");
+          try {
+            db.prepare("delete from push_subscriptions where member_id = ?").run(session.member.id);
+            db.prepare(`update notification_preferences
+              set enabled = 0, last_digest_at = ?, last_digest_date = null, updated_at = ? where member_id = ?`)
+              .run(timestamp, timestamp, session.member.id);
+            db.exec("commit");
+          } catch (error) {
+            db.exec("rollback");
+            throw error;
+          }
+          return json(res, 200, { preferences: notificationPreferenceJson(db, session.member.id), subscriptionCount: 0 });
+        }
+
         if (req.method === "GET" && path === "/api/feed") {
           const rows = db.prepare(`select post.*, member.display_name as author_name, member.avatar_path as author_avatar_path
             from feed_posts post left join members member on member.id = post.author_id
             order by post.created_at desc, post.id desc limit 30`).all();
-          return json(res, 200, { posts: rows.map((row) => feedPostJson(db, row, session)) });
+          return json(res, 200, { posts: rows.map((row) => feedPostJson(db, row, session)), unreadCount: feedUnreadCount(db, session) });
+        }
+
+        if (req.method === "POST" && path === "/api/feed/read") {
+          requireCsrf(req, session);
+          const timestamp = now();
+          db.prepare(`insert into feed_read_state (member_id, last_read_at, updated_at) values (?, ?, ?)
+            on conflict(member_id) do update set last_read_at = excluded.last_read_at, updated_at = excluded.updated_at`)
+            .run(session.member.id, timestamp, timestamp);
+          return json(res, 200, { unreadCount: 0, readAt: timestamp });
         }
 
         if (req.method === "POST" && path === "/api/feed") {
@@ -2925,12 +3247,23 @@ export function createApp(options = {}) {
   server.requestTimeout = 30_000;
   server.keepAliveTimeout = 5_000;
   server.maxHeadersCount = 100;
+  if (options.notificationScheduler !== false) {
+    const intervalMs = Math.max(15_000, Number(options.notificationIntervalMs) || 60_000);
+    server.once("listening", () => {
+      notificationTimer = setInterval(() => {
+        runNotificationCycle().catch((error) => console.error("Notification cycle failed:", error));
+      }, intervalMs);
+      notificationTimer.unref();
+    });
+  }
 
   return {
     server,
     db,
     dataDir,
+    runNotificationCycle,
     close() {
+      if (notificationTimer) clearInterval(notificationTimer);
       server.close();
       try {
         db.close();

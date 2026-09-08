@@ -14,6 +14,7 @@ Create a `.env` file:
 PARCOS_ADMIN_USERNAME=admin
 PARCOS_ADMIN_PASSWORD=replace-with-a-unique-password-of-12-or-more-characters
 PARCOS_PORT=8080
+PARCOS_VAPID_SUBJECT=mailto:your-contact@example.com
 ```
 
 Then start the published image:
@@ -25,7 +26,7 @@ docker compose up -d
 
 Open `http://YOUR-SERVER:8080`, sign in as the administrator, and complete the
 one-time setup wizard. It asks for the park name and the areas you want to
-manage. The image is available as `ghcr.io/louisberghmans/parcos:1.4.0` and
+manage. The image is available as `ghcr.io/louisberghmans/parcos:1.4.1` and
 `ghcr.io/louisberghmans/parcos:latest` for amd64 and arm64.
 
 Administrators can configure the welcome, Today, and event images from
@@ -60,6 +61,14 @@ Only enable proxy trust when the app port is reachable exclusively through that
 proxy. The Compose service runs read-only, without Linux capabilities or new
 privileges; only `/data` is writable.
 
+Members can install ParcOS from their browser and configure a private daily
+notification summary under **Profile > App and notifications**. Push requires
+HTTPS; on iPhone or iPad, ParcOS must first be added to the Home Screen. ParcOS
+generates its Web Push identity on first start and stores the private key only
+in the SQLite data volume, so preserving the complete backup preserves existing
+device subscriptions. Set `PARCOS_VAPID_SUBJECT` to a monitored `mailto:` or
+HTTPS contact address for your installation.
+
 ## Data and backups
 
 The `parcos-data` volume stores the SQLite database and private uploaded media.
@@ -72,7 +81,7 @@ disaster-recovery procedures.
 
 ## Development
 
-ParcOS has no third-party runtime dependencies and uses Node's built-in SQLite:
+ParcOS uses Node's built-in SQLite and one locked Web Push dependency:
 
 ```sh
 PARCOS_ADMIN_PASSWORD=a-long-local-password npm start

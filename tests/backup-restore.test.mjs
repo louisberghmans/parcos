@@ -118,6 +118,15 @@ test("complete backup exports securely and restores a validated standalone insta
   const timestamp = new Date().toISOString();
   const adminId = sourceApp.db.prepare("select id from members where role = 'admin' order by id limit 1").get().id;
   const bedId = sourceApp.db.prepare("select id from beds order by id limit 1").get().id;
+  sourceApp.db.prepare(`insert into notification_preferences
+    (member_id, enabled, frequency, delivery_time, time_zone, include_feed_posts, include_feed_replies,
+      last_digest_at, last_digest_date, created_at, updated_at)
+    values (?, 1, 'daily', '18:00', 'Europe/Brussels', 1, 1, ?, null, ?, ?)`)
+    .run(adminId, timestamp, timestamp, timestamp);
+  sourceApp.db.prepare(`insert into push_subscriptions
+    (member_id, endpoint, p256dh, auth, expiration_time, created_at, updated_at)
+    values (?, 'https://push.example.test/backup-device', 'backup-p256dh-key', 'backup-auth-key', null, ?, ?)`)
+    .run(adminId, timestamp, timestamp);
   sourceApp.db.prepare("insert into bed_notes (bed_id, member_id, note_type, body, created_at, updated_at) values (?, ?, 'garden', ?, ?, ?)")
     .run(bedId, adminId, "Backup note", timestamp, timestamp);
   const media = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
@@ -158,8 +167,9 @@ test("complete backup exports securely and restores a validated standalone insta
     on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(timestamp);
   const mediaName = sourceApp.db.prepare("select path from harvest_photos order by id desc limit 1").get().path;
   const feedMediaName = sourceApp.db.prepare("select image_path from feed_posts where id = ?").get(feedPost.body.post.id).image_path;
+  const vapidPrivateKey = sourceApp.db.prepare("select value from app_meta where key = 'push_vapid_private_key'").get().value;
 
-  const tableNames = ["members", "garden_areas", "beds", "events", "content_translations", "bed_notes", "activities", "harvests", "harvest_photos", "feed_posts", "feed_replies"];
+  const tableNames = ["members", "garden_areas", "beds", "events", "content_translations", "bed_notes", "activities", "harvests", "harvest_photos", "feed_posts", "feed_replies", "feed_read_state", "notification_preferences", "push_subscriptions"];
   const expectedCounts = Object.fromEntries(tableNames.map((table) => [
     table,
     Number(sourceApp.db.prepare(`select count(*) as count from ${table}`).get().count),
@@ -241,6 +251,10 @@ test("complete backup exports securely and restores a validated standalone insta
   assert.deepEqual(readFileSync(join(restoredDir, "uploads", feedMediaName)), media);
   assert.equal(restoredApp.db.prepare("select body from feed_posts where id = ?").get(feedPost.body.post.id).body, "Backup feed post");
   assert.equal(restoredApp.db.prepare("select body from feed_replies where post_id = ?").get(feedPost.body.post.id).body, "Backup feed reply");
+  assert.equal(restoredApp.db.prepare("select delivery_time from notification_preferences where member_id = ?").get(adminId).delivery_time, "18:00");
+  assert.equal(restoredApp.db.prepare("select endpoint from push_subscriptions where member_id = ?").get(adminId).endpoint, "https://push.example.test/backup-device");
+  assert.equal(restoredApp.db.prepare("select value from app_meta where key = 'push_vapid_private_key'").get().value,
+    vapidPrivateKey);
   assert.equal(restoredApp.db.prepare("pragma integrity_check").get().integrity_check, "ok");
   const restoredHealth = await request(`http://127.0.0.1:${restoredApp.server.address().port}`, "/health");
   assert.equal(restoredHealth.response.status, 200);

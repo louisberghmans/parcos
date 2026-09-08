@@ -13,6 +13,9 @@ This file describes the production data shape used by ParcOS and the CSV workflo
 | `tasks` | Daily work connected to an area, bed, event, or no location. | `title`, `description`, `status`, `priority`, `due_at`, location foreign keys, claim/completion fields |
 | `feed_posts` | Private garden-wide member updates, questions, announcements, and optional photos. | `post_type`, `body`, `image_path`, `image_content_type`, `author_id`, timestamps |
 | `feed_replies` | One-level discussions attached to feed posts. | `post_id`, `body`, `author_id`, timestamps |
+| `feed_read_state` | Per-member point used to calculate private feed unread counts. | `member_id`, `last_read_at`, `updated_at` |
+| `notification_preferences` | Per-member daily summary choices and delivery cursor. | `member_id`, `enabled`, `delivery_time`, `time_zone`, category flags, digest timestamps |
+| `push_subscriptions` | Private browser/device Web Push endpoints and encryption keys. | `member_id`, `endpoint`, `p256dh`, `auth`, `expiration_time`, timestamps |
 | `event_registrations` | Member event attendance. | `event_id`, `member_id`, participant counts, `status` |
 | `public_event_registrations` | Non-member attendance for public event links. | `event_id`, `guest_name`, `guest_contact`, participant counts, `status` |
 | `invites` | Member invite links. | `token_hash`, `role`, `created_by`, `expires_at`, `used_at` |
@@ -23,9 +26,11 @@ This file describes the production data shape used by ParcOS and the CSV workflo
 
 ParcOS applies pending migrations in version order when it starts. Each migration runs in a transaction and is recorded in `schema_migrations` only after it succeeds. Startup stops rather than opening a database created by a newer, unknown schema version.
 
-The first versioned migration adds `tasks` and its indexes. The second adds the private garden feed and its replies. Existing installations receive these tables automatically while keeping their current members, areas, beds, events, activity, and media data.
+The first versioned migration adds `tasks` and its indexes. The second adds the private garden feed and its replies. The third adds durable per-member feed read state. The fourth adds member notification preferences and device subscriptions. Existing installations receive these tables automatically while keeping their current members, areas, beds, events, activity, and media data.
 
 Feed photos remain private uploaded media. They are included in complete backups and validated during restore in the same way as avatars, bed photos, and harvest photos.
+
+Push endpoints, device encryption keys, and the installation's VAPID identity are private operational data. The VAPID private key is generated once and stored in `app_meta`; no API returns it. Complete backups preserve this identity so restored installations can continue sending to existing subscriptions.
 
 ## CSV import
 

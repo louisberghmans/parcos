@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.1 - 2026-09-08
+
+- Added a discoverable ParcOS installation action when the browser exposes its
+  PWA install prompt, with platform-neutral Home Screen guidance as fallback.
+- Added durable per-member unread counts for new feed posts and replies, a Home
+  navigation badge, and an explicit mark-as-read control.
+- Added preference-first Web Push settings with a privacy-safe, once-daily
+  summary at 18:00 local time by default. Members choose the time and feed
+  categories before the browser permission prompt is shown.
+- Added automatic persistent VAPID identity, per-member notification settings,
+  per-device subscriptions, expired-subscription cleanup, and a single-container
+  daily dispatcher.
+- Improved standalone application metadata and refreshed the offline shell.
+- Added ordered migrations 3 and 4 for feed read state and push notifications,
+  with authorization, CSRF, scheduling, migration, and backup/restore coverage.
+
 ## 1.4.0 - 2026-09-08
 
 - Made the private garden feed the centerpiece of Home, ahead of compact next
