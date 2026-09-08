@@ -20,5 +20,6 @@ seven days.
   the public origin used in generated links.
 - Use a unique administrator password of at least 12 characters.
 - Keep `/data` private, persistent, and backed up; it contains the SQLite
-  database and member-uploaded photos.
+  database, member-uploaded photos, Web Push endpoints, and the installation's
+  VAPID private key.
 - Do not publish `.env`, database files, backups, or invitation/reset URLs.

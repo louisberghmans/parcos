@@ -1,8 +1,12 @@
 {
   "name": "ParcOS — Jardin partagé",
   "short_name": "ParcOS",
+  "description": "Espace privé pour organiser et faire vivre un jardin partagé.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#f4f1e8",
   "theme_color": "#173f32",
   "icons": [

@@ -12,6 +12,18 @@ const state = {
   events: [],
   activities: [],
   feed: [],
+  feedUnread: 0,
+  installPrompt: null,
+  installed: window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true,
+  notificationPublicKey: "",
+  notificationPreferences: {
+    configured: false,
+    enabled: false,
+    frequency: "daily",
+    deliveryTime: "18:00",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Brussels",
+    categories: { feedPosts: true, feedReplies: true },
+  },
   tasks: [],
   branding: { login: null, today: null, event: null, public: null },
   publicSite: {
@@ -34,6 +46,18 @@ const state = {
   publicEvent: null,
   locale: localStorage.getItem("parcos_locale") || "fr",
 };
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  state.installPrompt = event;
+  if (state.member && state.page === "profile") renderApp();
+});
+
+window.addEventListener("appinstalled", () => {
+  state.installed = true;
+  state.installPrompt = null;
+  if (state.member) renderApp();
+});
 
 const supportedLocales = ["fr", "nl", "en"];
 const localeLabels = { fr: "FR", nl: "NL", en: "EN" };
@@ -766,7 +790,7 @@ function renderLogin(error = "") {
       state.parcName = result.parcName;
       if (result.branding) state.branding = { ...state.branding, ...result.branding };
       if (state.setupRequired) return renderSetup();
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadNotificationPreferences(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       const linkedEventId = Number(new URLSearchParams(location.search).get("event"));
       if (linkedEventId) openEvent(linkedEventId);
@@ -809,7 +833,7 @@ function renderSetup(error = "") {
       const result = await api("/api/setup", { method: "POST", body: JSON.stringify({ parcName: new FormData(event.currentTarget).get("parcName"), areas }) });
       state.setupRequired = result.setupRequired;
       state.parcName = result.parcName;
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadNotificationPreferences(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre espace ParcOS est prêt.");
     } catch (setupError) {
@@ -866,7 +890,7 @@ function renderReset(token, error = "") {
       state.member = result.member;
       state.csrfToken = result.csrfToken;
       history.replaceState({}, "", "/");
-      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+      await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadNotificationPreferences(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
       renderApp();
       showToast("Votre accès a été renouvelé.");
     } catch (resetError) {
@@ -1006,7 +1030,7 @@ function shell(content) {
     </header>
     <main class="main-content">${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
-      <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>${t("Accueil", "Home", "Start")}</button>
+      <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>${t("Accueil", "Home", "Start")}${state.feedUnread ? `<em class="nav-notification-badge" aria-label="${state.feedUnread} ${t("nouveautés", "new items", "nieuwe items")}">${Math.min(state.feedUnread, 99)}</em>` : ""}</button>
       <button data-page="agenda" class="${state.page === "agenda" ? "active" : ""}"><span>□</span>Agenda</button>
       <button class="quick-log-nav" id="quick-log" type="button" aria-label="${t("Ajouter au journal", "Add to log")}"><span>+</span>${t("Journal", "Log")}</button>
       <button data-page="garden" class="${state.page === "garden" ? "active" : ""}"><span>♧</span>Potager</button>
@@ -1067,6 +1091,7 @@ function renderFeedComposer() {
     : "";
   return `<section class="feed-composer panel" aria-labelledby="feed-composer-title">
     <div class="feed-composer-heading"><span class="avatar-button">${avatarContent(state.member)}</span><div><p class="eyebrow">${t("Fil du jardin", "Garden feed", "Tuinfeed")}</p><h2 id="feed-composer-title">${t("Partager avec le jardin", "Share with the garden", "Delen met de tuin")}</h2></div></div>
+    ${state.feedUnread ? `<button class="feed-unread-button" id="mark-feed-read" type="button">${state.feedUnread} ${t("nouveautés · Marquer comme lues", "new items · Mark as read", "nieuwe items · Markeren als gelezen")}</button>` : ""}
     <form id="feed-composer-form" class="form-stack">
       <label class="sr-only" for="feed-body">${t("Votre publication", "Your post", "Uw bericht")}</label>
       <textarea id="feed-body" name="body" maxlength="4000" required placeholder="${t("Quoi de neuf au jardin ?", "What is happening in the garden?", "Wat gebeurt er in de tuin?")}"></textarea>
@@ -1385,6 +1410,7 @@ function renderProfile() {
         <button class="button primary" type="submit">Enregistrer mon profil</button>
       </form>
     </section>
+    ${applicationSettingsPanel()}
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Profils", "Profiles", "Profielen")}</p><h2>${t("Les membres", "Members", "Leden")}</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span><div class="member-admin-actions">${state.member.role === "admin" && member.role !== "admin" ? `<form class="member-role-form" data-member-role-form="${member.id}"><label class="sr-only" for="member-role-${member.id}">${t("Type de membre", "Member type", "Ledentype")}</label><select id="member-role-${member.id}" name="role"><option value="member" ${member.role === "member" ? "selected" : ""}>${t("Membre", "Member", "Lid")}</option><option value="coordinator" ${member.role === "coordinator" ? "selected" : ""}>${t("Coordinateur", "Coordinator", "Coördinator")}</option></select><button class="reset-link-button" type="submit">${t("Enregistrer", "Save", "Opslaan")}</button></form>` : ""}${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">${t("Nouvel accès", "New access", "Nieuwe toegang")}</button>` : ""}</div></div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? publicSiteAdminSettings() : ""}
@@ -1393,6 +1419,46 @@ function renderProfile() {
     ${state.member.role === "admin" ? `<section class="panel translation-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Traductions du contenu</h2></div></div><p class="muted">Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ <code>translation</code> dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.</p><div class="translation-actions"><button class="button secondary" type="button" id="translation-export">Télécharger le fichier horodaté</button><form id="translation-import-form" class="form-stack compact-form"><label>Fichier JSON traduit<input id="translation-file" type="file" accept=".json,application/json" required></label><button class="button secondary" type="submit">Réimporter les traductions</button></form></div><div id="translation-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
     <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
+  </section>`;
+}
+
+function applicationSettingsPanel() {
+  const preferences = state.notificationPreferences;
+  const pushSupported = window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const installAction = state.installed
+    ? `<span class="installed-pill">✓ ${t("Application installée", "App installed", "App geïnstalleerd")}</span>`
+    : state.installPrompt
+      ? `<button class="button primary" id="install-app" type="button">${t("Installer ParcOS", "Install ParcOS", "ParcOS installeren")}</button>`
+      : `<p class="muted install-guidance">${t("Dans le menu du navigateur, choisissez « Ajouter à l’écran d’accueil » ou « Installer l’application ».", "In your browser menu, choose Add to Home Screen or Install app.", "Kies in het browsermenu Toevoegen aan startscherm of App installeren.")}</p>`;
+  const status = preferences.enabled
+    ? `<span class="notification-status enabled">✓ ${t("Notifications activées", "Notifications enabled", "Meldingen ingeschakeld")}</span>`
+    : `<span class="notification-status">${t("Notifications désactivées", "Notifications disabled", "Meldingen uitgeschakeld")}</span>`;
+  const permissionNote = pushSupported
+    ? Notification.permission === "denied"
+      ? `<p class="form-error">${t("Les notifications sont bloquées dans les réglages de ce navigateur. Autorisez ParcOS avant de réessayer.", "Notifications are blocked in this browser's settings. Allow ParcOS before trying again.", "Meldingen zijn geblokkeerd in de browserinstellingen. Sta ParcOS toe en probeer opnieuw.")}</p>`
+      : `<p class="privacy-note">${t("ParcOS demandera l’autorisation du téléphone uniquement après avoir appuyé sur Activer. L’écran verrouillé n’affiche aucun nom ni contenu privé.", "ParcOS asks for phone permission only after you press Enable. Lock-screen notifications contain no names or private content.", "ParcOS vraagt pas toestemming van uw telefoon nadat u op Inschakelen drukt. Op het vergrendelscherm verschijnen geen namen of privé-inhoud.")}</p>`
+    : `<p class="muted install-guidance">${t("Pour recevoir des notifications, ouvrez ParcOS via HTTPS dans un navigateur compatible. Sur iPhone, installez d’abord l’application sur l’écran d’accueil.", "To receive notifications, open ParcOS over HTTPS in a supported browser. On iPhone, install the app on your Home Screen first.", "Open ParcOS via HTTPS in een ondersteunde browser om meldingen te ontvangen. Installeer de app op een iPhone eerst op het startscherm.")}</p>`;
+  const notificationAction = preferences.enabled
+    ? `<button class="button ghost" id="disable-notifications" type="button">${t("Désactiver", "Disable", "Uitschakelen")}</button>`
+    : pushSupported && Notification.permission !== "denied"
+      ? `<button class="button primary" id="enable-notifications" type="button">${t("Activer les notifications", "Enable notifications", "Meldingen inschakelen")}</button>`
+      : "";
+  return `<section class="panel application-panel">
+    <div class="section-heading compact"><div><p class="eyebrow">${t("Sur ce téléphone", "On this phone", "Op deze telefoon")}</p><h2>${t("Application et notifications", "App and notifications", "App en meldingen")}</h2></div></div>
+    <p class="muted">${t("Installez ParcOS pour l’ouvrir comme une application. Le badge Accueil indique les nouvelles publications et réponses.", "Install ParcOS to open it like an app. The Home badge shows new posts and replies.", "Installeer ParcOS om het als app te openen. De badge bij Start toont nieuwe berichten en antwoorden.")}</p>
+    ${installAction}
+    <div class="notification-settings-heading"><h3>${t("Résumé quotidien", "Daily summary", "Dagelijks overzicht")}</h3>${status}</div>
+    <p class="muted">${t("Au maximum une notification par jour, uniquement s’il y a du nouveau. L’heure et les sujets peuvent être choisis avant l’activation.", "At most one notification a day, only when something is new. Choose the time and topics before enabling it.", "Maximaal één melding per dag, alleen als er nieuws is. Kies het tijdstip en de onderwerpen voordat u meldingen inschakelt.")}</p>
+    <form id="notification-preferences-form" class="form-stack compact-form">
+      <label>${t("Heure du résumé", "Summary time", "Tijdstip van overzicht")}<input name="deliveryTime" type="time" value="${escapeHtml(preferences.deliveryTime)}" required></label>
+      <p class="notification-time-zone">${t("Fuseau horaire", "Time zone", "Tijdzone")}: <strong>${escapeHtml(preferences.timeZone)}</strong></p>
+      <fieldset class="notification-categories"><legend>${t("Inclure", "Include", "Opnemen")}</legend>
+        <label class="access-toggle"><input name="feedPosts" type="checkbox" ${preferences.categories.feedPosts ? "checked" : ""}><span><strong>${t("Publications et annonces", "Posts and announcements", "Berichten en aankondigingen")}</strong><small>${t("Nouvelles publications du jardin", "New garden posts", "Nieuwe tuinberichten")}</small></span></label>
+        <label class="access-toggle"><input name="feedReplies" type="checkbox" ${preferences.categories.feedReplies ? "checked" : ""}><span><strong>${t("Réponses", "Replies", "Reacties")}</strong><small>${t("Nouvelles réponses aux discussions", "New discussion replies", "Nieuwe reacties op gesprekken")}</small></span></label>
+      </fieldset>
+      ${permissionNote}
+      <div class="button-row notification-actions"><button class="button secondary" type="submit">${t("Enregistrer mes choix", "Save my choices", "Mijn keuzes opslaan")}</button>${notificationAction}</div>
+    </form>
   </section>`;
 }
 
@@ -1429,6 +1495,11 @@ function bindShell() {
   document.querySelector("#quick-log")?.addEventListener("click", () => renderQuickLog());
   document.querySelector("#today-quick-log")?.addEventListener("click", () => renderQuickLog());
   document.querySelector("#feed-composer-form")?.addEventListener("submit", submitFeedPost);
+  document.querySelector("#mark-feed-read")?.addEventListener("click", markFeedRead);
+  document.querySelector("#install-app")?.addEventListener("click", installApp);
+  document.querySelector("#notification-preferences-form")?.addEventListener("submit", saveNotificationPreferences);
+  document.querySelector("#enable-notifications")?.addEventListener("click", enableNotifications);
+  document.querySelector("#disable-notifications")?.addEventListener("click", disableNotifications);
   document.querySelectorAll("[data-feed-reply-form]").forEach((form) => form.addEventListener("submit", submitFeedReply));
   document.querySelectorAll("[data-delete-feed-post]").forEach((button) => button.addEventListener("click", () => deleteFeedPost(button)));
   document.querySelectorAll("[data-delete-feed-reply]").forEach((button) => button.addEventListener("click", () => deleteFeedReply(button)));
@@ -1524,6 +1595,16 @@ async function loadActivities() {
 async function loadFeed() {
   const result = await api("/api/feed");
   state.feed = result.posts;
+  state.feedUnread = result.unreadCount || 0;
+}
+
+async function loadNotificationPreferences() {
+  const result = await api("/api/notifications/preferences");
+  state.notificationPreferences = result.preferences;
+  if (!result.preferences.configured) {
+    state.notificationPreferences.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Brussels";
+  }
+  state.notificationPublicKey = result.publicKey;
 }
 
 async function loadTasks() {
@@ -1696,6 +1777,126 @@ async function submitFeedPost(event) {
     showToast(t("Publication ajoutée.", "Post added.", "Bericht geplaatst."));
   } catch (error) {
     button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+async function markFeedRead() {
+  try {
+    await api("/api/feed/read", { method: "POST", body: "{}" });
+    state.feedUnread = 0;
+    renderApp();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function installApp() {
+  if (!state.installPrompt) return;
+  const prompt = state.installPrompt;
+  state.installPrompt = null;
+  await prompt.prompt();
+  const choice = await prompt.userChoice;
+  if (choice.outcome !== "accepted") renderApp();
+}
+
+function notificationPreferencesPayload() {
+  const form = document.querySelector("#notification-preferences-form");
+  return {
+    deliveryTime: form?.elements.deliveryTime.value || state.notificationPreferences.deliveryTime,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || state.notificationPreferences.timeZone || "Europe/Brussels",
+    categories: {
+      feedPosts: Boolean(form?.elements.feedPosts.checked),
+      feedReplies: Boolean(form?.elements.feedReplies.checked),
+    },
+  };
+}
+
+async function persistNotificationPreferences(payload = notificationPreferencesPayload()) {
+  if (!payload.categories.feedPosts && !payload.categories.feedReplies) {
+    throw new Error(t("Choisissez au moins une catégorie.", "Choose at least one category.", "Kies minstens één categorie."));
+  }
+  const result = await api("/api/notifications/preferences", { method: "PATCH", body: JSON.stringify(payload) });
+  state.notificationPreferences = result.preferences;
+  return result.preferences;
+}
+
+async function saveNotificationPreferences(event) {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    await persistNotificationPreferences();
+    renderApp();
+    showToast(t("Préférences enregistrées.", "Preferences saved.", "Voorkeuren opgeslagen."));
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+function applicationServerKey(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const bytes = atob(`${value.replace(/-/g, "+").replace(/_/g, "/")}${padding}`);
+  return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
+}
+
+async function enableNotifications() {
+  const button = document.querySelector("#enable-notifications");
+  if (button) button.disabled = true;
+  try {
+    if (!window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      throw new Error(t("Installez ParcOS et ouvrez-le via HTTPS pour activer les notifications.", "Install ParcOS and open it over HTTPS to enable notifications.", "Installeer ParcOS en open het via HTTPS om meldingen in te schakelen."));
+    }
+    const payload = notificationPreferencesPayload();
+    if (!payload.categories.feedPosts && !payload.categories.feedReplies) {
+      throw new Error(t("Choisissez au moins une catégorie.", "Choose at least one category.", "Kies minstens één categorie."));
+    }
+    const savePromise = persistNotificationPreferences(payload);
+    const permissionPromise = Notification.permission === "granted"
+      ? Promise.resolve("granted")
+      : Notification.requestPermission();
+    const [, permission] = await Promise.all([savePromise, permissionPromise]);
+    if (permission !== "granted") {
+      throw new Error(t("Autorisation non accordée. Vos préférences sont enregistrées, mais les notifications restent désactivées.", "Permission was not granted. Your preferences are saved, but notifications remain disabled.", "Geen toestemming verleend. Uw voorkeuren zijn opgeslagen, maar meldingen blijven uitgeschakeld."));
+    }
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKey(state.notificationPublicKey),
+      });
+    }
+    const result = await api("/api/notifications/subscriptions", {
+      method: "POST",
+      body: JSON.stringify(subscription.toJSON()),
+    });
+    state.notificationPreferences = result.preferences;
+    renderApp();
+    showToast(t("Notifications activées.", "Notifications enabled.", "Meldingen ingeschakeld."));
+  } catch (error) {
+    if (button?.isConnected) button.disabled = false;
+    renderApp();
+    showToast(error.message);
+  }
+}
+
+async function disableNotifications() {
+  const button = document.querySelector("#disable-notifications");
+  if (button) button.disabled = true;
+  try {
+    const result = await api("/api/notifications/subscriptions", { method: "DELETE", body: "{}" });
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager?.getSubscription();
+      await subscription?.unsubscribe();
+    }
+    state.notificationPreferences = result.preferences;
+    renderApp();
+    showToast(t("Notifications désactivées.", "Notifications disabled.", "Meldingen uitgeschakeld."));
+  } catch (error) {
+    if (button?.isConnected) button.disabled = false;
     showToast(error.message);
   }
 }
@@ -2436,6 +2637,16 @@ async function logout() {
   state.events = [];
   state.activities = [];
   state.feed = [];
+  state.feedUnread = 0;
+  state.notificationPublicKey = "";
+  state.notificationPreferences = {
+    configured: false,
+    enabled: false,
+    frequency: "daily",
+    deliveryTime: "18:00",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Brussels",
+    categories: { feedPosts: true, feedReplies: true },
+  };
   state.tasks = [];
   if ("caches" in window) {
     for (const key of await caches.keys()) await caches.delete(key);
@@ -2461,7 +2672,7 @@ async function boot() {
     state.parcName = result.parcName;
     if (result.branding) state.branding = { ...state.branding, ...result.branding };
     if (state.setupRequired) return renderSetup();
-    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
+    await Promise.all([loadAreas(), loadBeds(), loadEvents(), loadActivities(), loadFeed(), loadNotificationPreferences(), loadTasks(), loadMembers(), loadPublicSiteSettings()]);
     renderApp();
     const eventId = Number(params.get("event"));
     if (eventId) openEvent(eventId);

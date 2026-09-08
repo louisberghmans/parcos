@@ -2,6 +2,7 @@
 .agents
 .codex
 .env
+node_modules
 data
 prototype
 supabase

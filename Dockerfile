@@ -1,6 +1,6 @@
 FROM node:24.17.0-alpine@sha256:156b55f92e98ccd5ef49578a8cea0df4679826564bad1c9d4ef04462b9f0ded6
 
-ARG PARCOS_VERSION=1.4.0
+ARG PARCOS_VERSION=1.4.1
 LABEL org.opencontainers.image.title="ParcOS" \
       org.opencontainers.image.description="Self-hosted operating app for community parks and gardens" \
       org.opencontainers.image.source="https://github.com/louisberghmans/parcos" \
@@ -12,15 +12,19 @@ ENV NODE_ENV=production \
     PORT=3000 \
     PARCOS_DATA_DIR=/data
 
-COPY package.json server.mjs backup.mjs restore.mjs icon.svg ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts \
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx
+
+COPY server.mjs backup.mjs restore.mjs icon.svg ./
+COPY src ./src
 COPY public ./public
 COPY assets ./assets
 
-# npm is not needed at runtime (the app has no third-party packages). Removing
-# it also removes node-gyp's vulnerable undici 6.25.0 dependency.
-RUN rm -rf /usr/local/lib/node_modules/npm \
-    && rm -f /usr/local/bin/npm /usr/local/bin/npx \
-    && mkdir -p /data /restore-target /restore-staging \
+# npm is not needed at runtime; only the locked production modules remain.
+RUN mkdir -p /data /restore-target /restore-staging \
     && chown -R node:node /app /data /restore-target /restore-staging
 USER node
 

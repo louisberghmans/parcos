@@ -312,6 +312,16 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   const boundedPost = boundedDiscussion.body.posts.find((post) => post.id === memberFeedPost.body.post.id);
   assert.equal(boundedPost.replyCount, 52);
   assert.equal(boundedPost.replies.length, 50);
+  assert.equal(boundedDiscussion.body.unreadCount, 1);
+  const readWithoutCsrf = await request(baseUrl, "/api/feed/read", { method: "POST", headers: { cookie: memberCookie }, body: "{}" });
+  assert.equal(readWithoutCsrf.response.status, 403);
+  const readFeed = await request(baseUrl, "/api/feed/read", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: "{}",
+  });
+  assert.equal(readFeed.response.status, 200);
+  assert.equal((await request(baseUrl, "/api/feed", { headers: { cookie: memberCookie } })).body.unreadCount, 0);
   const memberCannotDeleteReply = await request(baseUrl, `/api/feed/replies/${adminReply.body.post.replies[0].id}`, {
     method: "DELETE",
     headers: { cookie: memberCookie, "x-csrf-token": redeem.body.csrfToken },
@@ -338,6 +348,7 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(memberCannotDeleteAnnouncement.response.status, 403);
   const orderedFeed = await request(baseUrl, "/api/feed", { headers: { cookie: memberCookie } });
   assert.deepEqual(orderedFeed.body.posts.map((post) => post.id), [announcement.body.post.id, memberFeedPost.body.post.id]);
+  assert.equal(orderedFeed.body.unreadCount, 1);
   const moderatedPost = await request(baseUrl, `/api/feed/posts/${memberFeedPost.body.post.id}`, {
     method: "DELETE",
     headers: { cookie: adminCookie, "x-csrf-token": login.body.csrfToken },
@@ -707,18 +718,35 @@ test("fresh install uses the forwarded public origin once and protects the membe
   assert.equal(memberDirectory.response.status, 403);
 });
 
-test("schema migrations apply once and upgrade databases missing task or feed tables", () => {
+test("schema migrations apply once and upgrade databases missing task, feed, read-state, or notification tables", () => {
   const dataDir = mkdtempSync(join(tmpdir(), "parcos-migration-test-"));
   let app;
   try {
     app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
-    const migrations = app.db.prepare("select version, name from schema_migrations").all();
+    const migrations = app.db.prepare("select version, name from schema_migrations order by version").all();
     const existingAdmin = app.db.prepare("select id, username from members where role = 'admin'").get();
-    assert.equal(migrations.length, 2);
+    assert.equal(migrations.length, 4);
     assert.equal(migrations[0].version, 1);
     assert.equal(migrations[0].name, "first_class_tasks");
     assert.equal(migrations[1].version, 2);
     assert.equal(migrations[1].name, "garden_feed");
+    assert.equal(migrations[2].version, 3);
+    assert.equal(migrations[2].name, "feed_read_state");
+    assert.equal(migrations[3].version, 4);
+    assert.equal(migrations[3].name, "daily_push_notifications");
+    app.db.exec("drop table push_subscriptions; drop table notification_preferences; delete from schema_migrations where version = 4");
+    app.close();
+
+    app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations where version = 4").get().count, 1);
+    assert.ok(app.db.prepare("select name from sqlite_master where type = 'table' and name = 'notification_preferences'").get());
+    assert.ok(app.db.prepare("select name from sqlite_master where type = 'table' and name = 'push_subscriptions'").get());
+    app.db.exec("drop table feed_read_state; delete from schema_migrations where version = 3");
+    app.close();
+
+    app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations where version = 3").get().count, 1);
+    assert.ok(app.db.prepare("select name from sqlite_master where type = 'table' and name = 'feed_read_state'").get());
     app.db.exec("drop table feed_replies; drop table feed_posts; delete from schema_migrations where version = 2");
     app.close();
 
@@ -736,7 +764,7 @@ test("schema migrations apply once and upgrade databases missing task or feed ta
     app.close();
 
     app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
-    assert.equal(app.db.prepare("select count(*) as count from schema_migrations").get().count, 2);
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations").get().count, 4);
   } finally {
     try { app?.close(); } catch { /* Already closed. */ }
     rmSync(dataDir, { recursive: true, force: true });
