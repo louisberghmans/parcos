@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.3 - 2026-09-08
+
+- Added administrator controls to promote members to coordinators and demote
+  coordinators to members from the member directory.
+- Kept role changes server-authorized and CSRF-protected, prevented changes to
+  administrator accounts, and applied changed permissions to existing sessions
+  on their next request.
+- Added French, Dutch, and English role-management controls with a narrow-screen
+  layout and refreshed the offline application shell.
+
 ## 1.3.2 - 2026-08-21
 
 - Added first-class daily tasks connected to an area, bed, event, or no location,

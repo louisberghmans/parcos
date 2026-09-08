@@ -203,6 +203,61 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(redeem.response.status, 201);
   const memberCookie = cookieFrom(redeem.response);
 
+  const roleWithoutCsrf = await request(baseUrl, `/api/members/${redeem.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ role: "coordinator" }),
+  });
+  assert.equal(roleWithoutCsrf.response.status, 403);
+  const memberRoleChange = await request(baseUrl, `/api/members/${redeem.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ role: "coordinator" }),
+  });
+  assert.equal(memberRoleChange.response.status, 403);
+  const invalidRoleChange = await request(baseUrl, `/api/members/${redeem.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ role: "admin" }),
+  });
+  assert.equal(invalidRoleChange.response.status, 400);
+  const protectedAdminRole = await request(baseUrl, `/api/members/${login.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ role: "member" }),
+  });
+  assert.equal(protectedAdminRole.response.status, 400);
+  const missingMemberRole = await request(baseUrl, "/api/members/999999/role", {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ role: "member" }),
+  });
+  assert.equal(missingMemberRole.response.status, 404);
+  const promotedMember = await request(baseUrl, `/api/members/${redeem.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ role: "coordinator" }),
+  });
+  assert.equal(promotedMember.response.status, 200);
+  assert.equal(promotedMember.body.member.role, "coordinator");
+  const coordinatorDirectory = await request(baseUrl, "/api/members", { headers: { cookie: memberCookie } });
+  assert.equal(coordinatorDirectory.response.status, 200);
+  const coordinatorRoleChange = await request(baseUrl, `/api/members/${redeem.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ role: "member" }),
+  });
+  assert.equal(coordinatorRoleChange.response.status, 403);
+  const demotedCoordinator = await request(baseUrl, `/api/members/${redeem.body.member.id}/role`, {
+    method: "PATCH",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ role: "member" }),
+  });
+  assert.equal(demotedCoordinator.response.status, 200);
+  assert.equal(demotedCoordinator.body.member.role, "member");
+  const demotedDirectory = await request(baseUrl, "/api/members", { headers: { cookie: memberCookie } });
+  assert.equal(demotedDirectory.response.status, 403);
+
   const memberAreas = await request(baseUrl, "/api/areas", { headers: { cookie: memberCookie } });
   assert.equal(memberAreas.body.areas.some((area) => area.name === "Pépinière"), false);
   assert.equal(memberAreas.body.areas.some((area) => area.name === "Verger"), true);

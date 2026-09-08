@@ -1343,7 +1343,7 @@ function renderProfile() {
       </form>
     </section>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
-    <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">Profils</p><h2>Les membres</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span>${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">Nouvel accès</button>` : ""}</div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
+    <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Profils", "Profiles", "Profielen")}</p><h2>${t("Les membres", "Members", "Leden")}</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span><div class="member-admin-actions">${state.member.role === "admin" && member.role !== "admin" ? `<form class="member-role-form" data-member-role-form="${member.id}"><label class="sr-only" for="member-role-${member.id}">${t("Type de membre", "Member type", "Ledentype")}</label><select id="member-role-${member.id}" name="role"><option value="member" ${member.role === "member" ? "selected" : ""}>${t("Membre", "Member", "Lid")}</option><option value="coordinator" ${member.role === "coordinator" ? "selected" : ""}>${t("Coordinateur", "Coordinator", "Coördinator")}</option></select><button class="reset-link-button" type="submit">${t("Enregistrer", "Save", "Opslaan")}</button></form>` : ""}${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">${t("Nouvel accès", "New access", "Nieuwe toegang")}</button>` : ""}</div></div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? publicSiteAdminSettings() : ""}
     ${state.member.role === "admin" ? brandingSettings() : ""}
     ${state.member.role === "admin" ? `<section class="panel backup-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Administration", "Administration", "Beheer")}</p><h2>${t("Sauvegarde complète", "Complete backup", "Volledige back-up")}</h2></div></div><p class="muted">${t("Cette exportation contient toutes les données privées de ParcOS, les mots de passe hachés et les médias téléversés. Conservez-la dans un emplacement sûr.", "This export contains all private ParcOS data, password hashes, and uploaded media. Store it securely.", "Deze export bevat alle privégegevens van ParcOS, wachtwoord-hashes en geüploade media. Bewaar hem veilig.")}</p><form id="complete-backup-form" class="form-stack compact-form"><label>${t("Mot de passe actuel", "Current password", "Huidig wachtwoord")}<input name="currentPassword" type="password" autocomplete="current-password" required></label><button class="button secondary" type="submit">${t("Télécharger la sauvegarde complète", "Download complete backup", "Volledige back-up downloaden")}</button></form><div id="backup-result"></div></section>` : ""}
@@ -1428,6 +1428,7 @@ function bindShell() {
   document.querySelector("#translation-export")?.addEventListener("click", exportTranslations);
   document.querySelector("#translation-import-form")?.addEventListener("submit", importTranslationsFile);
   document.querySelectorAll("[data-reset-member]").forEach((button) => button.addEventListener("click", () => createResetLink(Number(button.dataset.resetMember))));
+  document.querySelectorAll("[data-member-role-form]").forEach((form) => form.addEventListener("submit", changeMemberRole));
   document.querySelector("#logout-button")?.addEventListener("click", logout);
 }
 
@@ -2283,6 +2284,24 @@ async function createResetLink(memberId) {
       showToast("Lien de récupération copié.");
     });
   } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function changeMemberRole(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const memberId = Number(form.dataset.memberRoleForm);
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const role = new FormData(form).get("role");
+    await api(`/api/members/${memberId}/role`, { method: "PATCH", body: JSON.stringify({ role }) });
+    await loadMembers();
+    renderApp();
+    showToast(t("Type de membre enregistré.", "Member type saved.", "Ledentype opgeslagen."));
+  } catch (error) {
+    button.disabled = false;
     showToast(error.message);
   }
 }
