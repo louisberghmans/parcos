@@ -32,6 +32,8 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
 
   const anonymousBeds = await request(baseUrl, "/api/beds");
   assert.equal(anonymousBeds.response.status, 401);
+  const anonymousFeed = await request(baseUrl, "/api/feed");
+  assert.equal(anonymousFeed.response.status, 401);
   const initialBranding = await request(baseUrl, "/api/public/branding");
   assert.equal(initialBranding.response.status, 200);
   assert.deepEqual(initialBranding.body.branding, { login: null, public: null });
@@ -257,6 +259,92 @@ test("members, events, permissions, garden updates and recovery", async (t) => {
   assert.equal(demotedCoordinator.body.member.role, "member");
   const demotedDirectory = await request(baseUrl, "/api/members", { headers: { cookie: memberCookie } });
   assert.equal(demotedDirectory.response.status, 403);
+
+  const emptyFeed = await request(baseUrl, "/api/feed", { headers: { cookie: memberCookie } });
+  assert.deepEqual(emptyFeed.body.posts, []);
+  const feedWithoutCsrf = await request(baseUrl, "/api/feed", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ body: "No CSRF" }),
+  });
+  assert.equal(feedWithoutCsrf.response.status, 403);
+  const blankFeedPost = await request(baseUrl, "/api/feed", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ body: "   " }),
+  });
+  assert.equal(blankFeedPost.response.status, 400);
+  const memberAnnouncement = await request(baseUrl, "/api/feed", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ body: "Forged announcement", type: "announcement" }),
+  });
+  assert.equal(memberAnnouncement.response.status, 403);
+  const feedImage = readFileSync(new URL("../assets/potager-kale.jpg", import.meta.url)).toString("base64");
+  const memberFeedPost = await request(baseUrl, "/api/feed", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ body: "Premières tomates du jardin.", type: "question", dataUrl: `data:image/jpeg;base64,${feedImage}` }),
+  });
+  assert.equal(memberFeedPost.response.status, 201);
+  assert.equal(memberFeedPost.body.post.author.displayName, "Test Member");
+  assert.equal(memberFeedPost.body.post.type, "question");
+  assert.match(memberFeedPost.body.post.imageUrl, /^\/media\/feed-/);
+  const anonymousFeedImage = await fetch(`${baseUrl}${memberFeedPost.body.post.imageUrl}`);
+  assert.equal(anonymousFeedImage.status, 401);
+  const privateFeedImage = await fetch(`${baseUrl}${memberFeedPost.body.post.imageUrl}`, { headers: { cookie: memberCookie } });
+  assert.equal(privateFeedImage.status, 200);
+  assert.equal(privateFeedImage.headers.get("cache-control"), "private, no-store");
+  const adminReply = await request(baseUrl, `/api/feed/posts/${memberFeedPost.body.post.id}/replies`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ body: "Bravo, gardons-en pour les graines." }),
+  });
+  assert.equal(adminReply.response.status, 201);
+  assert.equal(adminReply.body.post.replies[0].author.displayName, login.body.member.displayName);
+  const insertReply = app.db.prepare(`insert into feed_replies (post_id, body, author_id, created_at, updated_at)
+    values (?, ?, ?, ?, ?)`);
+  for (let index = 0; index < 51; index += 1) {
+    const timestamp = new Date(Date.now() + index).toISOString();
+    insertReply.run(memberFeedPost.body.post.id, `Bounded reply ${index}`, redeem.body.member.id, timestamp, timestamp);
+  }
+  const boundedDiscussion = await request(baseUrl, "/api/feed", { headers: { cookie: memberCookie } });
+  const boundedPost = boundedDiscussion.body.posts.find((post) => post.id === memberFeedPost.body.post.id);
+  assert.equal(boundedPost.replyCount, 52);
+  assert.equal(boundedPost.replies.length, 50);
+  const memberCannotDeleteReply = await request(baseUrl, `/api/feed/replies/${adminReply.body.post.replies[0].id}`, {
+    method: "DELETE",
+    headers: { cookie: memberCookie, "x-csrf-token": redeem.body.csrfToken },
+  });
+  assert.equal(memberCannotDeleteReply.response.status, 403);
+  const editedFeedPost = await request(baseUrl, `/api/feed/posts/${memberFeedPost.body.post.id}`, {
+    method: "PATCH",
+    headers: { cookie: memberCookie, "content-type": "application/json", "x-csrf-token": redeem.body.csrfToken },
+    body: JSON.stringify({ body: "Premières tomates partagées.", type: "update" }),
+  });
+  assert.equal(editedFeedPost.response.status, 200);
+  assert.equal(editedFeedPost.body.post.body, "Premières tomates partagées.");
+  const announcement = await request(baseUrl, "/api/feed", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "x-csrf-token": login.body.csrfToken },
+    body: JSON.stringify({ body: "Permanence samedi matin.", type: "announcement" }),
+  });
+  assert.equal(announcement.response.status, 201);
+  assert.equal(announcement.body.post.type, "announcement");
+  const memberCannotDeleteAnnouncement = await request(baseUrl, `/api/feed/posts/${announcement.body.post.id}`, {
+    method: "DELETE",
+    headers: { cookie: memberCookie, "x-csrf-token": redeem.body.csrfToken },
+  });
+  assert.equal(memberCannotDeleteAnnouncement.response.status, 403);
+  const orderedFeed = await request(baseUrl, "/api/feed", { headers: { cookie: memberCookie } });
+  assert.deepEqual(orderedFeed.body.posts.map((post) => post.id), [announcement.body.post.id, memberFeedPost.body.post.id]);
+  const moderatedPost = await request(baseUrl, `/api/feed/posts/${memberFeedPost.body.post.id}`, {
+    method: "DELETE",
+    headers: { cookie: adminCookie, "x-csrf-token": login.body.csrfToken },
+  });
+  assert.equal(moderatedPost.response.status, 200);
+  assert.equal((await fetch(`${baseUrl}${memberFeedPost.body.post.imageUrl}`, { headers: { cookie: memberCookie } })).status, 404);
+  assert.equal(app.db.prepare("select count(*) as count from feed_replies where post_id = ?").get(memberFeedPost.body.post.id).count, 0);
 
   const memberAreas = await request(baseUrl, "/api/areas", { headers: { cookie: memberCookie } });
   assert.equal(memberAreas.body.areas.some((area) => area.name === "Pépinière"), false);
@@ -619,15 +707,26 @@ test("fresh install uses the forwarded public origin once and protects the membe
   assert.equal(memberDirectory.response.status, 403);
 });
 
-test("schema migrations apply once and upgrade a database without the tasks table", () => {
+test("schema migrations apply once and upgrade databases missing task or feed tables", () => {
   const dataDir = mkdtempSync(join(tmpdir(), "parcos-migration-test-"));
   let app;
   try {
     app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
     const migrations = app.db.prepare("select version, name from schema_migrations").all();
-    assert.equal(migrations.length, 1);
+    const existingAdmin = app.db.prepare("select id, username from members where role = 'admin'").get();
+    assert.equal(migrations.length, 2);
     assert.equal(migrations[0].version, 1);
     assert.equal(migrations[0].name, "first_class_tasks");
+    assert.equal(migrations[1].version, 2);
+    assert.equal(migrations[1].name, "garden_feed");
+    app.db.exec("drop table feed_replies; drop table feed_posts; delete from schema_migrations where version = 2");
+    app.close();
+
+    app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations where version = 2").get().count, 1);
+    assert.ok(app.db.prepare("select name from sqlite_master where type = 'table' and name = 'feed_posts'").get());
+    assert.ok(app.db.prepare("select name from sqlite_master where type = 'table' and name = 'feed_replies'").get());
+    assert.deepEqual(app.db.prepare("select id, username from members where id = ?").get(existingAdmin.id), existingAdmin);
     app.db.exec("drop table tasks; delete from schema_migrations where version = 1");
     app.close();
 
@@ -637,7 +736,7 @@ test("schema migrations apply once and upgrade a database without the tasks tabl
     app.close();
 
     app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
-    assert.equal(app.db.prepare("select count(*) as count from schema_migrations").get().count, 1);
+    assert.equal(app.db.prepare("select count(*) as count from schema_migrations").get().count, 2);
   } finally {
     try { app?.close(); } catch { /* Already closed. */ }
     rmSync(dataDir, { recursive: true, force: true });

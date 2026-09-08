@@ -1,4 +1,4 @@
-const CACHE = "parcos-shell-v10";
+const CACHE = "parcos-shell-v11";
 const SHELL = ["/", "/styles.css", "/app.js", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

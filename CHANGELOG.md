@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0 - 2026-09-08
+
+- Made the private garden feed the centerpiece of Home, ahead of compact next
+  actions and the existing garden and calendar summaries.
+- Added member updates, questions, coordinator announcements, optional private
+  photos, and one-level discussions with author and coordinator moderation.
+- Added ordered migration 2 for feed posts and replies while preserving
+  existing data, and included feed photos in complete backup validation.
+- Kept the feed and its media authenticated-only, enforced CSRF on every write,
+  bounded initial discussions for mobile performance, and added French, Dutch,
+  and English controls.
+
 ## 1.3.3 - 2026-09-08
 
 - Added administrator controls to promote members to coordinators and demote

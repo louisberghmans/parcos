@@ -11,6 +11,8 @@ This file describes the production data shape used by ParcOS and the CSV workflo
 | `beds` | Individual beds inside an area. | `area_id`, `code`, `display_number`, `garden`, `section`, `crop`, `variety`, `status`, `note`, `harvest_note` |
 | `events` | Member, coordinator, or public events. | `title`, `description`, `location`, `event_type`, `state`, `audience`, `starts_at`, `ends_at`, `capacity` |
 | `tasks` | Daily work connected to an area, bed, event, or no location. | `title`, `description`, `status`, `priority`, `due_at`, location foreign keys, claim/completion fields |
+| `feed_posts` | Private garden-wide member updates, questions, announcements, and optional photos. | `post_type`, `body`, `image_path`, `image_content_type`, `author_id`, timestamps |
+| `feed_replies` | One-level discussions attached to feed posts. | `post_id`, `body`, `author_id`, timestamps |
 | `event_registrations` | Member event attendance. | `event_id`, `member_id`, participant counts, `status` |
 | `public_event_registrations` | Non-member attendance for public event links. | `event_id`, `guest_name`, `guest_contact`, participant counts, `status` |
 | `invites` | Member invite links. | `token_hash`, `role`, `created_by`, `expires_at`, `used_at` |
@@ -21,7 +23,9 @@ This file describes the production data shape used by ParcOS and the CSV workflo
 
 ParcOS applies pending migrations in version order when it starts. Each migration runs in a transaction and is recorded in `schema_migrations` only after it succeeds. Startup stops rather than opening a database created by a newer, unknown schema version.
 
-The first versioned migration adds `tasks` and its indexes. Existing installations receive this table automatically while keeping their current members, areas, beds, events, activity, and media data.
+The first versioned migration adds `tasks` and its indexes. The second adds the private garden feed and its replies. Existing installations receive these tables automatically while keeping their current members, areas, beds, events, activity, and media data.
+
+Feed photos remain private uploaded media. They are included in complete backups and validated during restore in the same way as avatars, bed photos, and harvest photos.
 
 ## CSV import
 
@@ -58,6 +62,6 @@ Set the `entity` column to one of these values:
 
 `role`: `member`, `coordinator`.
 
-`preferredLocale`: `fr`, `en`.
+`preferredLocale`: `fr`, `nl`, `en`.
 
 Dates must be parseable by the browser and server. ISO format is recommended, for example `2026-09-12T10:00:00+02:00`.
