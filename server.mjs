@@ -2092,6 +2092,21 @@ export function createApp(options = {}) {
           return json(res, 201, { inviteUrl: `${requestOrigin(req, baseUrl, trustProxy)}/?invite=${encodeURIComponent(token)}`, expiresAt });
         }
 
+        const memberRoleMatch = /^\/api\/members\/(\d+)\/role$/.exec(path);
+        if (memberRoleMatch && req.method === "PATCH") {
+          requireCsrf(req, session);
+          if (session.member.role !== "admin") throw new HttpError(403, "Accès administrateur requis.");
+          const memberId = Number(memberRoleMatch[1]);
+          const target = db.prepare("select * from members where id = ?").get(memberId);
+          if (!target) throw new HttpError(404, "Membre introuvable.");
+          if (target.role === "admin") throw new HttpError(400, "Le rôle administrateur ne peut pas être modifié ici.");
+          const body = await readJson(req);
+          const role = String(body.role ?? "");
+          if (!("member" === role || "coordinator" === role)) throw new HttpError(400, "Type de membre invalide.");
+          db.prepare("update members set role = ?, updated_at = ? where id = ?").run(role, now(), memberId);
+          return json(res, 200, { member: memberJson(db.prepare("select * from members where id = ?").get(memberId)) });
+        }
+
         const resetMatch = /^\/api\/members\/(\d+)\/reset-link$/.exec(path);
         if (resetMatch && req.method === "POST") {
           requireCsrf(req, session);
