@@ -17,6 +17,7 @@ import { dirname, extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
+import { validPushEndpoint } from "./src/services/push-network.mjs";
 import {
   DEFAULT_NOTIFICATION_TIME,
   DEFAULT_NOTIFICATION_TIME_ZONE,
@@ -379,13 +380,7 @@ function notificationPreferenceInput(body) {
 
 function pushSubscriptionInput(body) {
   const endpoint = String(body.endpoint ?? "").trim();
-  let parsedEndpoint;
-  try {
-    parsedEndpoint = new URL(endpoint);
-  } catch {
-    throw new HttpError(400, "Abonnement de notification invalide.");
-  }
-  if (endpoint.length > 2048 || parsedEndpoint.protocol !== "https:" || parsedEndpoint.username || parsedEndpoint.password || parsedEndpoint.hash) {
+  if (!validPushEndpoint(endpoint)) {
     throw new HttpError(400, "Abonnement de notification invalide.");
   }
   const p256dh = String(body.keys?.p256dh ?? "").trim();

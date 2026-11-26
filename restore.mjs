@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { restoreBackup } from "./backup.mjs";
 
 function usage() {
-  return "Usage: node restore.mjs <backup.tar.gz> --target <stopped-data-directory> [--force] [--staging-dir <directory>]";
+  return "Usage: node restore.mjs <backup.tar.gz> --target <stopped-data-directory> [--force] [--staging-dir <directory>] [--max-expanded-bytes <bytes>]";
 }
 
 function parseArguments(argv) {
@@ -13,6 +13,7 @@ function parseArguments(argv) {
     if (argument === "--force") values.force = true;
     else if (argument === "--target") values.targetDir = argv[++index];
     else if (argument === "--staging-dir") values.stagingDir = argv[++index];
+    else if (argument === "--max-expanded-bytes") values.maxExpandedBytes = Number(argv[++index]);
     else if (!argument.startsWith("-") && !values.archivePath) values.archivePath = argument;
     else throw new Error(usage());
   }

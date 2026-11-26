@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Updated the Node.js baseline, CI and pinned container to security release
+  24.22.3; retained the audited dependency lock (no known npm advisories).
+- Blocked Web Push requests to private/reserved addresses, including DNS
+  rebinding at connection time, and bounded notification socket timeouts.
+- Bounded restore decompression and manifest size before installing data, with
+  an explicit expanded-size override for trusted larger backups.
+- Added accessible FR/NL/EN paging for assigned, urgent and available tasks,
+  so work beyond the first six cards can be reached.
+- Reconciled the product brief and proposed roadmap with the 26 November full
+  specification. Seasonal demand-driven planning is the next product direction;
+  the full planner and workspace redesign are not shipped by this change.
+
 ## 1.4.1 - 2026-09-08
 
 - Added a discoverable ParcOS installation action when the browser exposes its

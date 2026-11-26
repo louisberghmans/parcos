@@ -1,4 +1,5 @@
 import webPush from "web-push";
+import { pushAgent, validPushEndpoint } from "./push-network.mjs";
 
 export const DEFAULT_NOTIFICATION_TIME = "18:00";
 export const DEFAULT_NOTIFICATION_TIME_ZONE = "Europe/Brussels";
@@ -59,7 +60,11 @@ export function permanentPushFailure(error) {
 }
 
 export async function sendWebPush(subscription, payload, vapidDetails) {
+  // Recheck persisted subscriptions, including those restored from old backups.
+  if (!validPushEndpoint(subscription.endpoint)) throw new Error("Invalid push destination.");
   return webPush.sendNotification(subscription, JSON.stringify(payload), {
+    agent: pushAgent,
+    timeout: 10000,
     TTL: 12 * 60 * 60,
     urgency: "normal",
     vapidDetails,

@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -45,6 +46,17 @@ function traversalArchive(archive) {
   const tar = gunzipSync(archive);
   tar.fill(0, 0, 100);
   tar.write("../escape", 0, "utf8");
+  tar.fill(0x20, 148, 156);
+  const checksum = tar.subarray(0, 512).reduce((sum, byte) => sum + byte, 0);
+  tar.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8, "ascii");
+  return gzipSync(tar);
+}
+
+function oversizedEntryArchive(archive, size, padded = false) {
+  const original = gunzipSync(archive);
+  const tar = padded ? Buffer.alloc(512 + size + 1024) : Buffer.from(original);
+  if (padded) original.copy(tar, 0, 0, 512);
+  tar.write(`${size.toString(8).padStart(11, "0")}\0`, 124, 12, "ascii");
   tar.fill(0x20, 148, 156);
   const checksum = tar.subarray(0, 512).reduce((sum, byte) => sum + byte, 0);
   tar.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8, "ascii");
@@ -225,6 +237,22 @@ test("complete backup exports securely and restores a validated standalone insta
   const archive = Buffer.from(await backupResponse.arrayBuffer());
   assert.ok(archive.length > 0);
   writeFileSync(archivePath, archive);
+
+  const limitedTarget = join(root, "limited-target");
+  mkdirSync(limitedTarget);
+  writeFileSync(join(limitedTarget, "keep.txt"), "preserved");
+  await assert.rejects(restoreBackup({ archivePath, targetDir: limitedTarget, force: true, maxExpandedBytes: 1024 }), /maximum expanded size/);
+  assert.equal(readFileSync(join(limitedTarget, "keep.txt"), "utf8"), "preserved");
+  assert.equal(readdirSync(root).some((name) => name.startsWith(".parcos-restore-")), false, "failed restore cleans staging");
+  for (const maxExpandedBytes of [NaN, Infinity, -1, 1.5]) {
+    await assert.rejects(restoreBackup({ archivePath, targetDir: limitedTarget, force: true, maxExpandedBytes }), /safe integer/);
+  }
+  const oversizedPath = join(root, "oversized-entry.tar.gz");
+  writeFileSync(oversizedPath, oversizedEntryArchive(archive, 1024 ** 3));
+  await assert.rejects(restoreBackup({ archivePath: oversizedPath, targetDir: limitedTarget, force: true }), /entry exceeds/);
+  writeFileSync(oversizedPath, oversizedEntryArchive(archive, 16 * 1024 ** 2 + 1, true));
+  await assert.rejects(restoreBackup({ archivePath: oversizedPath, targetDir: limitedTarget, force: true }), /manifest exceeds/);
+  assert.equal(readFileSync(join(limitedTarget, "keep.txt"), "utf8"), "preserved");
 
   sourceApp.close();
   sourceApp = null;

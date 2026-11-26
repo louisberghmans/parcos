@@ -1,200 +1,126 @@
-# ParcOS MVP product brief
+# ParcOS product brief
+
+Reconciled 26 November 2026 against application 1.4.1 and the
+[full product specification](ParcOS-Full-Product-Specification.md). That
+specification is the authority for product direction. Requirements below are
+targets unless explicitly described as shipped. Proposed designs and open
+decisions are not implemented capabilities or delivery promises.
 
 ## Product promise
 
-ParcOS helps a communal garden coordinate itself without requiring members to
-learn farm-management software or coordinators to maintain spreadsheets.
+ParcOS is a private-first, open-source, self-hostable operating system for
+community gardens. Volunteers should understand where things are, what is
+happening, what needs doing, what is growing, and what happened previously.
+Coordinators should plan the food members want with credible space, timing,
+seed, material and labour constraints.
 
-Two coordinators maintain the trusted garden state. Members can quickly learn
-what needs doing, what may be harvested, what is happening next, and who is
-currently present.
+The central loop is **seasonal recipes → weekly food preferences → demand →
+backward harvest planning → space allocation → seeds and materials → nursery
+and growing → maintenance → measured harvest → learning and sharing**.
+Operational decisions follow Observe → Decide → Plan → Execute → Record.
+Plans, proposed AI actions and forecast yields must remain distinct from
+recorded historical facts.
 
-## People and permissions
+## People, workspaces and privacy
 
-ParcOS is a members-only application. Membership is invitation-only and does
-not depend on email or SMS. A coordinator creates a one-time invitation link;
-the member chooses a username and password and receives an individual profile.
-If access is lost, a coordinator creates a one-time recovery link for that
-existing profile.
+Invitation-only username/password membership, recovery links, member,
+coordinator and administrator roles are shipped. No mandatory email or SMS.
+The separate optional public park page, explicitly published public events and
+guest registration are also shipped and must be preserved. Private areas and
+member data remain protected on the server, including linked records and media.
 
-### Visitor
+The target interface has four **manually selected** workspaces:
 
-- No access to the ParcOS member application
-- Public event information may later be published as a separate surface
+| Workspace | Purpose |
+| --- | --- |
+| Community | Conversations, recipes, personal food calendar, progress and gatherings. |
+| Contributor | My work, available tasks, sessions, map/list, instructions and Quick Log. |
+| Coordinator | Annual plan, crop calendar, nursery, space, yields, labour, inventory and exceptions. |
+| Administration | Accounts, permissions, installation configuration, privacy, backups and health. |
 
-### Member
+Changing workspace does not grant permissions. Coordinators work across enabled
+domains and retain existing invitation/recovery rights. Administrator-only
+controls belong in Administration rather than personal Profile. Exact navigation
+and defaults require prototype review. Each operational record should have one
+canonical detail route, and task lists must expose all relevant permitted work.
 
-- Join or leave events in one tap
-- View the garden directory and harvest guidance
-- Claim tasks and record contributions
-- Check in at the garden
-- Comment or ask questions where enabled
+## Growing food and caring for places
 
-### Coordinator
+The target includes a reviewed species/variety/seed catalogue, cultivation
+profiles with provenance and uncertainty, roughly 200 rights-cleared seasonal
+recipes, weekly member choices, portions and ingredient demand. Deterministic
+backward scheduling and bed assignment produce explainable drafts, unmet-demand
+diagnostics and human-approved plan revisions. Quantified harvest forecasts,
+actual measurements and weekly workload are core requirements.
 
-- Everything a member can do
-- Create and manage events, recurring sessions, tasks, plantings, and beds
-- Set event capacity and registration rules
-- Record attendance and contact registered participants
-- Publish announcements and knowledge
-- Review and confirm AI-proposed changes
+Physical beds retain stable identity independently of geometry and cultivation.
+Versioned geometry starts from existing plans or measured subsets; maps and a
+list alternative both matter. Unknown usable area, dates and yields stay unknown.
+Do not treat the pilot's approximate footprint as measured growing area.
 
-## Core navigation
+Batches track direct sowing and transplant crops, nursery containers, partial
+transfers/losses, successions, reviewed intercropping and rotation. Printable
+labels connect physical plants to authenticated records. Preserve old bed crop
+text, notes, photos, tutorials, activities and harvest text during additive,
+ordered migrations; do not invent historical dates.
 
-1. **Today** — garden feed and contextual conversations first, followed by a
-   compact view of the next event and urgent or assigned work
-2. **Calendar** — agenda and month views, filters, event registration
-3. **Garden** — photographic place and bed cards, crops, state, tasks, and
-   harvest information; maps are optional orientation aids
-4. **Learn** — searchable articles, videos, and resolved garden knowledge
-5. **Profile** — registrations, tasks, contributions, badges, and preferences
+Enabled areas are configurable: vegetable gardens, children's garden, nursery,
+coop, compost and infrastructure. Pilot names are examples, not mandatory
+installation defaults. No child profiles or sensitive child records are required.
 
-## Calendar and registration
+## Shared operational primitives
 
-Calendar and registration in the first private release are for invited members.
-Public guest registration is deferred until it can be exposed separately from
-private garden operations.
+Tasks, events, notifications, inventory and permissions serve all domains.
+Extend the shipped claim/complete flow toward multiple commitments, time
+windows, instructions, dependencies and optional actual effort. Planned work,
+participation commitments and recorded interventions remain distinct.
 
-Calendar entries can represent:
+Preserve shipped event audiences, capacity, waitlists, registration, iCalendar
+and sharing. Complete event-day attendance, registration windows, recurrence,
+cancellation and work-session workflows incrementally. Age-group counts do not
+require children's names or exact ages.
 
-- Volunteer work sessions
-- Workshops and training
-- Community events
-- School visits
-- Coordinator planning meetings
-- Seasonal milestones
+Material quantities, stock, reservations, shortages and procurement lists are
+in scope. Financial/budget management, prices, payments, cost per recipe and
+commercial purchasing are excluded. Coop care requires human-approved schedules,
+coverage, escalation and a manual contingency before relying on notifications.
 
-Each event supports:
+Preserve feed updates/questions/announcements, replies, photos, unread state,
+moderation and optional daily push. Context links, edits, pinning, resolved
+questions and moderation audit remain unfinished commitments. Education starts
+with task-linked instructions; searchable knowledge and positive individual and
+collective recognition follow their own design work, without rankings or pressure.
 
-- Title, description, location, start and end time
-- Event type and audience
-- Optional capacity and waitlist
-- Registration opening and closing times
-- One-tap registration for signed-in members
-- Participant counts by age group: adults (18+), teenagers (13–17), children
-  (6–12), and young children (0–5), without collecting children's names or
-  exact ages
-- Accessibility and preparation notes
-- Repeating schedules, with individual occurrences editable
-- Cancellation and attendee notification
-- Calendar download/subscription using iCalendar
-- A WhatsApp-ready share link and generated summary
-- Coordinator attendee list and attendance recording
+## Optional assistance
 
-### Registration experience
+AI may draft, translate, summarize, extract proposed data and offer grounded
+help to permitted members. It must never silently modify trusted state. Every
+write requires explicit review, current authorization and stale/replay checks.
+Keep manual translation and all non-AI workflows functional.
 
-Returning member:
+Use local fixtures and mocked endpoints until external processing is expressly
+approved. Account identities, credentials, contact details and guest data never
+enter provider context. Free text can contain personal information; provider
+privacy claims and free-text policy need review. No permanent raw chat or silent
+profiling. Only explicitly approved local preferences are inspectable, editable
+and wipeable. Voice is a separate April 2027 experiment, not a planner dependency.
 
-1. Open event from ParcOS or a shared link.
-2. Tap **I'm joining**.
-3. See immediate confirmation and **Add to calendar**.
+## Architecture and delivery
 
-New member:
+Retain Node.js, built-in SQLite/WAL, static mobile-first browser UI, HTTP API,
+private media, one Docker image and one persistent data volume. Improve module
+boundaries incrementally. Scale infrastructure only after measured need.
 
-1. Receive a one-time invitation link from a coordinator.
-2. Choose a display name, username, and password.
-3. Enter the private member application with an individual profile.
+Each slice preserves existing data and permissions, completes FR/NL/EN,
+supports phone and keyboard use, targets WCAG 2.2 AA, and passes `npm run check`.
+Backups and supported migrations require regression coverage. No live OVH
+changes are authorized by the specification.
 
-### Event states
+See the [roadmap](roadmap.md) for proposed dependency order and the full spec
+§19 for unresolved agronomy, catalogue rights, allocation, care, AI, recognition
+and UX decisions. Start with small reviewed datasets and a usable seasonal
+journey; do not delay production planning until every detail is settled.
 
-- Draft
-- Published
-- Cancelled
-- Completed
-
-Registration states:
-
-- Going
-- Waitlisted
-- Cancelled
-- Attended
-- No-show
-
-## Garden operations
-
-The initial hierarchy is:
-
-```text
-Ferme du Parc Parmentier
-├── Grand Potager
-│   └── Zone
-│       └── Bed
-├── Potager des enfants
-├── Compost
-├── Pépinière
-├── Poulailler
-└── Infrastructure
-```
-
-Beds and other places have map geometry, an active date range, photos, and a
-current operational state. Historical geometry is preserved when the garden
-layout changes between seasons.
-
-The primary mobile wayfinding experience is a list of cards. Each card shows a
-real thumbnail, stable code and number, garden/section breadcrumb, current
-planting, operational state, and last update. A plan is never required to find
-or open a bed.
-
-Plantings connect crops to places and date ranges. Activities form the durable
-history: planted, watered, observed, harvested, cleared, moved, or maintained.
-
-## AI interaction rules
-
-AI is an input and summarisation layer, not the source of truth.
-
-- Natural-language and voice input are converted into proposed structured actions.
-- Every proposed write is shown for confirmation.
-- Confirmed changes record the person, time, source, and before/after values.
-- Plant-health suggestions are clearly presented as guidance, not diagnosis.
-- AI may draft event descriptions, reminders, translations, and WhatsApp updates.
-- AI never silently changes bed, planting, harvest, task, or attendance state.
-
-## First usable milestone
-
-A member can:
-
-- Sign in to an individual profile without email or SMS
-- Open the application on a phone
-- See the next work session
-- Register in one tap
-- View harvest-ready beds
-- Choose an available task
-- Check in at the garden
-
-A coordinator can:
-
-- Invite a member and recover a member's access
-- Add a current bed photograph from a phone
-- Create and publish an event
-- Set capacity and view registrations
-- Create a task connected to a bed
-- Change a bed's state
-- Publish a short harvest instruction
-- Generate a WhatsApp-ready daily or weekly update
-
-## Explicitly deferred
-
-- General-purpose private chat, including direct messages, arbitrary group
-  chats, typing indicators, and presence; ParcOS first supports garden-wide and
-  contextual feed conversations
-- Continuous location tracking
-- Complex yield accounting
-- Competitive leaderboards
-- Native iOS and Android applications
-- Automated AI writes without confirmation
-- Passkeys (the first self-hosted release uses usernames and passwords)
-- Public/guest event registration
-
-## First self-hosted architecture
-
-The first testable production slice is distributed as one Docker image:
-
-- Node.js HTTP application and static mobile web interface
-- Built-in SQLite database with WAL mode
-- Private uploaded-photo storage on the same persistent Docker volume
-- Server-side sessions, scrypt password hashes, CSRF protection, and role-based
-  write permissions
-
-This deliberately minimizes server administration for the first real garden
-test. The HTTP API forms a migration boundary for PostgreSQL when usage,
-redundancy, or concurrent-write needs justify operating a separate database.
+Advanced drone/GIS, general-purpose private chat, continuous location tracking,
+native apps, autonomous AI writes and unnecessary platform migrations remain
+outside the initial delivery. Passkeys remain deferred.

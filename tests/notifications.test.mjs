@@ -130,6 +130,12 @@ test("members save preferences before consent and receive at most one private da
     headers: writeHeaders,
     body: JSON.stringify({ ...subscription, endpoint: "http://push.example.test/not-secure" }),
   })).response.status, 400);
+  for (const endpoint of ["https://127.0.0.1/push", "https://169.254.169.254/push", "https://[::1]/push"]) {
+    assert.equal((await request(baseUrl, "/api/notifications/subscriptions", {
+      method: "POST", headers: writeHeaders, body: JSON.stringify({ ...subscription, endpoint }),
+    })).response.status, 400);
+  }
+  assert.equal(app.db.prepare("select count(*) as count from push_subscriptions").get().count, 0);
   const enabled = await request(baseUrl, "/api/notifications/subscriptions", {
     method: "POST",
     headers: writeHeaders,
