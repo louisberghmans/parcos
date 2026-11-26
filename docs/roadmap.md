@@ -1,39 +1,18 @@
 # ParcOS roadmap
 
-Last updated: 2026-08-22
+Last reconciled: 26 November 2026. Baseline: application 1.4.1, HEAD b5cfb1e.
 
-ParcOS is a private-first operating app for community parks and vegetable
-gardens. Each release below has one primary outcome. A feature belongs in a
-version only when it strengthens that outcome; otherwise it waits.
+The [full product specification](ParcOS-Full-Product-Specification.md) supersedes
+the earlier feed-first sequencing, limited planting history and optional-map
+position. Desired weekly harvest now drives planning, constrained by physical
+space, crop timing, seeds/materials and volunteer work. The specification's
+revision 2.0 is not an application version.
 
-Version numbers describe product milestones, not delivery dates. Patch releases
-may still be used for focused fixes, security work, and release hardening.
-
-## Product direction
-
-ParcOS should feel like a shared garden conversation with useful actions
-attached, not a collection of management dashboards.
-
-The **Today** page will therefore put the garden feed first. Members should see
-what people have said, asked, noticed, or completed before secondary summaries.
-Tasks, events, beds, and harvest information remain important, but Today should
-link to those records instead of repeating every screen in stacked cards.
-
-## Scope rules
-
-- **One outcome per version.** Avoid unrelated feature bundles.
-- **Conversation before administration.** Member communication and next actions
-  come before statistics, hero imagery, and coordinator controls.
-- **Progressive detail.** Today stays short; Calendar and Garden hold operational
-  detail.
-- **Private by default.** A post, reply, event, image, or other record inherits
-  its private context unless a coordinator explicitly publishes it.
-- **Human confirmed.** Assistance may propose changes, but a person confirms
-  changes to trusted garden data.
-- **Small and self-hostable.** Keep the one-container Node and SQLite deployment
-  until measured usage proves that more infrastructure is necessary.
-- **Accessible and multilingual.** New workflows must work in French, Dutch,
-  and English and target WCAG 2.2 AA.
+Each delivery should have one demonstrable outcome, tested upgrades, FR/NL/EN,
+mobile/keyboard accessibility, server authorization and human-confirmed writes.
+Keep one Node.js/SQLite container until measured needs justify more complexity.
+Existing public opt-in features and private-by-default boundaries remain intact.
+No production deployment is authorized by this roadmap.
 
 ## Shipped versions
 
@@ -49,166 +28,67 @@ link to those records instead of repeating every screen in stacked cards.
 | `1.3.0` | Add an explicitly published public park surface while strengthening private-by-default event and member boundaries. |
 | `1.3.1` | Make complete backups, offline restores, health checks, and container releases dependable. |
 | `1.3.2` | Make daily work actionable with first-class tasks, fast claim/completion flows, and versioned database migrations. |
+| `1.3.3` | Let coordinators manage member accounts and recover access within role boundaries. |
+| `1.4.0` | Ship garden posts, questions, announcements, replies, photos and moderation. |
+| `1.4.1` | Add app installation, persistent unread state and opt-in daily Web Push. |
 
-## 1.4.0 — Garden feed and conversations
+The [changelog](../CHANGELOG.md) retains release history. Earlier roadmap
+acceptance criteria were targets, not proof of completion: feed context links,
+editing/pinning/resolution and moderation audit still need work.
 
-**Feature goal:** make Today the place where members catch up and talk about
-the garden, without turning ParcOS into a general-purpose chat application.
+## Proposed dependency order
 
-### Member result
+Milestones below are work packages, not approved release numbers or promises of
+delivery dates. Ship small independent slices, and prove a seasonal journey
+before expanding catalogues or optimizing algorithms.
 
-A member opens ParcOS, immediately sees the latest relevant conversation, can
-post an update or question, and can reply without navigating through every bed,
-event, or task.
+| Milestone | Outcome | Exit condition |
+| --- | --- | --- |
+| M0 — Reconcile and protect | Verify HEAD, docs, security baseline, local demo, tests and backup/restore; record gaps and migration plan. | Existing behavior verified or limitations recorded; no live changes. |
+| M1 — UX architecture | Prototype four manually selected workspaces, canonical routes, task/admin separation, responsive task/bed screens and seasonal journeys. | Review actual mobile/desktop flows; preserve existing functions and permissions. |
+| M2 — Agricultural foundations | Reviewed species/variety/supplier/profile data, physical bed metadata/map, batch lifecycle and normalized harvests. | Small reviewed dataset, mapped subset, direct-sown/transplanted batches; safe legacy compatibility. |
+| M3 — Food choices and draft plan | Recipe ingredients, weekly portions/choices, demand and deterministic backward schedules. | Choices produce explainable draft batches; impossible timing and missing data stay explicit. |
+| M4 — Space and approved plan | Bed/nursery allocation, succession, reviewed intercropping/rotation, forecast/workload and revisions. | Human-approved feasible mapped subset, diagnostics and idempotent linked work. |
+| M5 — Operational execution | Multi-member tasks, instructions, sessions/attendance, labels, nursery moves, inventory and procurement quantities, notifications. | Approved plan → sow → transplant → harvest, with actual versus forecast. Build minimal primitives alongside M2–M4. |
+| M6 — Crop coverage and readiness | Expand toward roughly 200 rights-cleared recipes, permitted imports, local profiles and actual 2027 planning. | Owner validates assumptions, shortages and feasible plan; manual fallback remains usable. |
+| M7 — Coop and recurring work | Shared recurring care, stock/eggs, deadlines and coverage/escalation. | Human-approved care policy and contingency; uncovered work is visible. |
+| AI-A — Shared service and translation | Optional provider adapter, revision-aware translation, local jobs and glossary. | Mocked tests first; explicit external processing/provider policy gate. Does not block planning. |
+| AI-B — Grounded text assistant | Permitted read tools, confirmed operational writes and explicit wipeable local preferences. | Authorization, stale/replay and privacy tests; no permanent raw chat. |
+| AI-C — Voice | Independent April 2027 experiment with configurable STT/TTS and text fallback. | Owner listening/latency/privacy review; no assumed provider or hardware capability. |
+| L — Skills and recognition | Individual learning and collective achievements. | Separate owner-reviewed taxonomy/visibility; no rankings or punitive streaks. |
+| K — Knowledge and search | Reusable task guidance, library, resolved questions, permission-aware search and summaries. | Discoverable contextual instructions; preserve remaining feed commitments. |
+| Scale — conditional | Database, storage or hosting changes only for measured limits. | Evidence and tested migration/restore path; small self-hosting retained. |
 
-### Coordinator result
+Event-day attendance, registration windows, recurrence and completion from the
+old roadmap now belong in M5. Knowledge/search remains K, with task instructions
+earlier. Assistance is optional and available within member permissions rather
+than coordinator-only. Financial/budget features remain excluded.
 
-A coordinator can publish and pin an announcement, answer questions in context,
-and moderate a conversation without copying it into an external chat.
+## First seasonal integration journey
 
-### Included
+Use synthetic, explicitly labeled fixture values and a small reviewed catalogue
+before real agronomic planning. A member selects a seasonal recipe and week;
+quantified demand produces direct-sown and transplant crop drafts. A coordinator
+reviews space, nursery, expected yield, workload and shortages before approval.
+Volunteers claim work, print labels, record sowing/transplanting and measured
+harvest; results compare with the approved forecast. Restore preserves records,
+media, identities and permissions. All manual workflows work with AI disabled.
 
-- Put the feed immediately below the compact Today header, before tasks, events,
-  harvest summaries, imagery, or statistics.
-- Replace the separate Quick Log and recent-activity blocks with one feed
-  composer and one chronological stream.
-- Support four intentional post types: update, question, announcement, and
-  automatically generated activity.
-- Add replies so a discussion stays attached to its originating post.
-- Allow posts to reference an area, bed, task, or event and open that context in
-  one tap.
-- Add unread state, a visible reply count, coordinator pinning, and resolved
-  questions.
-- Let authors edit or remove their own posts and let coordinators moderate any
-  post, with a minimal audit record.
-- Preserve private-area and member-only access rules for posts, replies, and
-  linked records.
-- Show a compact **Next actions** section after the feed for assigned or urgent
-  work and the next event; keep the full lists in Garden and Calendar.
-- Provide translated interface copy and keyboard/screen-reader usable controls
-  in French, Dutch, and English.
+This is a sequence of vertical slices, not a claim that one short task delivers
+the whole planner. Real surveying and rights-cleared catalogue curation can
+proceed alongside implementation.
 
-### Deliberately not included
+## Decisions and proposed timing
 
-- One-to-one private messages, arbitrary group chats, typing indicators, online
-  presence, reactions, read receipts per person, or end-to-end encryption.
-- Email, push, SMS, or WhatsApp delivery. The in-app unread state comes first.
-- A second notification centre or a separate messaging navigation item.
-- Feed ranking, engagement scores, streaks, or infinite scrolling.
+Use the full specification §19 (D01–D14) as the decision register: measurements,
+catalogue rights and agronomy, portions/distribution, planning assumptions,
+labels, task/time policies, stock discrepancies, animal care, UX defaults,
+external AI/free text, memory/backup retention, recognition, voice and estimates.
+Do not silently resolve these through schemas or fabricated coefficients.
 
-### Done when
+The target is a usable 2027 growing-season plan. Late-2026 foundation/design and
+early-2027 planning/operations are proposals to reassess after reconciliation;
+only the April 2027 voice experiment has an explicit owner timing target.
 
-- A phone user can read, post, and reply from the top of Today in under a minute.
-- A question and its answer remain discoverable from both the feed and linked
-  garden context.
-- Members cannot infer posts or replies from private areas they cannot access.
-- Today no longer repeats large task, calendar, garden, image, and statistics
-  panels before the conversation.
-
-## 1.5.0 — Event-day operations
-
-**Feature goal:** support running an event from registration through completion,
-not only announcing it.
-
-### Included
-
-- Fast attendee check-in plus attended and no-show states.
-- Registration opening and closing dates.
-- Visible waitlist promotion and cancellation status.
-- Recurring sessions with individually editable occurrences.
-- An event completion flow with attendance, notes, and a feed summary.
-- Optional confirmation text and a coordinator contact workflow that does not
-  expose member details publicly.
-
-### Done when
-
-A coordinator can run a work session from a phone and finish with an accurate
-attendance record and a concise update visible to the appropriate members.
-
-## 1.6.0 — Planting and harvest lifecycle
-
-**Feature goal:** preserve what grows in each bed across seasons.
-
-### Included
-
-- Planting records with crop, variety, start date, expected harvest window, and
-  end date.
-- A current bed summary derived from active planting records.
-- Links from watering, weeding, clearing, planting, mulching, pruning,
-  observation, and harvest activity to the relevant planting.
-- Seasonal archives and lightweight planting import/export.
-- Feed updates for meaningful planting and harvest transitions without flooding
-  the conversation with routine changes.
-
-### Done when
-
-A member can understand what is growing now and what happened in prior seasons,
-and a coordinator no longer has to overwrite a bed description to record change.
-
-## 1.7.0 — Garden knowledge and search
-
-**Feature goal:** make the garden's accumulated instructions and discussions
-easy to find and reuse.
-
-### Included
-
-- Administrator-authored articles and short guidance in Learn.
-- Links between guidance and relevant posts, tasks, beds, plantings, and events.
-- Search across articles, conversations, events, tasks, crops, and beds with
-  permission-aware results.
-- Convert a resolved feed question into draft guidance while retaining a link
-  to its source discussion.
-- Generate privacy-safe, WhatsApp-ready weekly summaries for a coordinator to
-  review and copy.
-
-### Done when
-
-A member can find an earlier answer or garden instruction without asking the
-same question in an external chat.
-
-## 1.8.0 — Assisted coordination
-
-**Feature goal:** reduce coordinator writing and triage work without silently
-changing trusted data.
-
-### Included
-
-- Draft event descriptions, task summaries, announcements, and seasonal notes.
-- Convert free-form posts and notes into proposed structured tasks or planting
-  updates.
-- Show the source, proposed before/after values, and confirmation step for every
-  assisted write.
-- Record the reviewer and timestamp for accepted or rejected proposals.
-
-### Done when
-
-Assistance saves preparation time, every write remains understandable and
-reversible, and disabling assistance leaves all core workflows intact.
-
-## 2.0.0 — Scale only when evidence requires it
-
-**Feature goal:** change the deployment or data architecture only for measured
-reliability, concurrency, or hosting needs that the `1.x` design cannot meet.
-
-Possible work includes PostgreSQL, external object storage, background jobs, or
-multiple application instances. None is committed until real installations
-provide thresholds and migration requirements. A `2.0.0` plan must preserve a
-documented path from SQLite backups and must not make small self-hosting an
-afterthought.
-
-## Product questions to validate during 1.4.0
-
-- Does one garden-wide feed plus contextual threads cover real conversations,
-  or do users need narrower area subscriptions?
-- Which automatic activities are meaningful enough for the feed, and which are
-  noise?
-- How many unread items should Today show before older conversation moves to a
-  dedicated history view?
-- Do coordinators need to restrict an announcement to coordinators, a private
-  area, or an event audience?
-- Which current Today panels can be removed entirely after **Next actions** is
-  introduced?
-
-Feedback and implementation proposals are welcome through GitHub issues. Tie a
-proposal to one version outcome, describe the real garden workflow, and state
-the privacy impact of any new surface.
+See [implementation reconciliation](implementation-reconciliation.md) for this
+branch's actual checks, gaps and next bounded slice.

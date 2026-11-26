@@ -1,5 +1,16 @@
 # ParcOS engineering instructions
 
+## Current product authority (26 November 2026)
+
+The owner has adopted `docs/ParcOS-Full-Product-Specification.md` as the current
+product authority. Where product scope or sequencing below conflicts with that
+specification, follow the specification: reconcile/protect first, prototype the
+workspace architecture, then build the seasonal demand-driven cultivation path
+with the spatial foundation alongside it. The old map-first sequencing is no
+longer binding. Preserve the engineering, data-safety, security and release
+discipline below. See the reconciled product brief and roadmap for the summary;
+do not confuse target requirements with shipped behavior.
+
 ## 1. Mission
 
 ParcOS is a practical operating system for Parc Parmentier and similar communal

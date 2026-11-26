@@ -88,7 +88,7 @@ PARCOS_ADMIN_PASSWORD=a-long-local-password npm start
 npm test
 ```
 
-Node 24.17 or newer is required. Set `PARCOS_SEED_DEMO=true` only when you
+Node 24.22.3 or newer is required. Set `PARCOS_SEED_DEMO=true` only when you
 explicitly want the historical demo dataset.
 
 ## Roadmap

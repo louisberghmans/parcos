@@ -1,6 +1,6 @@
 # Complete backup and offline restore
 
-ParcOS 1.3.2 uses the versioned `parcos-backup-v1` format for complete
+ParcOS uses the versioned `parcos-backup-v1` format for complete
 administrator exports. A backup is a gzip-compressed tar archive containing:
 
 - `manifest.json`
@@ -9,8 +9,10 @@ administrator exports. A backup is a gzip-compressed tar archive containing:
 
 The manifest records the format and application versions, UTC creation time,
 database name, upload count and size, and the size and SHA-256 checksum of every
-database or upload file. Symbolic links, SQLite WAL/SHM files, secrets,
-configuration files, temporary files, and older backups are not included.
+database or upload file. Symbolic links, SQLite WAL/SHM files, deployment
+configuration/environment files, temporary files, and older backups are not
+included. Secrets stored inside SQLite, including the VAPID private key,
+password hashes and session/token hashes, are included: protect the archive.
 
 ## Download a backup
 
@@ -26,7 +28,7 @@ chat or email attachment.
 
 ## Test a restore with local Node
 
-Stop any ParcOS process that uses the target. Use Node 24.17 or newer and a new
+Stop any ParcOS process that uses the target. Use Node 24.22.3 or newer and a new
 directory that is not the production data directory.
 
 Linux or macOS:
@@ -91,7 +93,10 @@ docker compose run --rm --no-deps `
   --staging-dir /restore-staging
 ```
 
-Start a separate hardened test container on loopback port `18080`:
+Build the reviewed source locally with `docker build -t parcos:restore-test .`.
+Use a version compatible with the backup schema; never start an older image
+against restored data from a newer schema. Start a separate hardened test
+container on loopback port `18080`:
 
 ```sh
 docker run --rm --name parcos-restore-test-app \
@@ -100,7 +105,7 @@ docker run --rm --name parcos-restore-test-app \
   --cap-drop ALL --security-opt no-new-privileges:true \
   -e PARCOS_ADMIN_PASSWORD='use-the-existing-admin-password' \
   -v parcos-restore-test:/data \
-  ghcr.io/louisberghmans/parcos:1.3.2
+  parcos:restore-test
 ```
 
 PowerShell:
@@ -112,7 +117,7 @@ docker run --rm --name parcos-restore-test-app `
   --cap-drop ALL --security-opt "no-new-privileges:true" `
   -e "PARCOS_ADMIN_PASSWORD=use-the-existing-admin-password" `
   -v "parcos-restore-test:/data" `
-  "ghcr.io/louisberghmans/parcos:1.3.2"
+  "parcos:restore-test"
 ```
 
 ## Verify and remove the local copy
@@ -151,6 +156,16 @@ Remove-Item -LiteralPath $restorePath -Recurse -Force
 
 ## Refusals, replacement, and real disaster recovery
 
+Restore stops before writing more than 10 GiB of decompressed archive data.
+Extraction checks entry lengths against the archive and caps the manifest at
+16 MiB before reading it into memory, with at most 100,000 archive entries.
+A rejected archive leaves the target
+untouched and removes its staging files. Allow space for both the decompressed
+archive and extracted files (approximately twice the expanded size), plus any
+existing target data. These limits do not replace checking available disk.
+For a trusted larger backup, explicitly set `--max-expanded-bytes <bytes>`;
+choose a smaller limit on constrained systems. The minimum is 1024 bytes.
+
 The restore command refuses a non-empty target by default. `--force` explicitly
 authorizes replacement, but should be used only after checking the resolved
 target and keeping a separate safety copy. It also refuses a target containing
@@ -165,7 +180,7 @@ production proxy, verify it, and only then deliberately switch the production
 deployment to that replacement. ParcOS never invokes the restore command
 automatically.
 
-Explicit database migrations, high availability, horizontal scaling,
+High availability, horizontal scaling,
 distributed locking/rate limiting, media quotas and retention, live UI
 restoration, and production auto-deployment remain deferred. The backup process
 is single-instance and relies on the current one-container Node/SQLite

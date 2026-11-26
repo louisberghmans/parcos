@@ -1,3 +1,5 @@
+import { renderTaskGroup } from "./app/tasks/task-group.js";
+
 const app = document.querySelector("#app");
 const modalRoot = document.querySelector("#modal-root");
 const toastRoot = document.querySelector("#toast-root");
@@ -25,6 +27,7 @@ const state = {
     categories: { feedPosts: true, feedReplies: true },
   },
   tasks: [],
+  taskPages: { assigned: 0, urgent: 0, available: 0 },
   branding: { login: null, today: null, event: null, public: null },
   publicSite: {
     enabled: false,
@@ -1130,7 +1133,9 @@ function feedPostCard(post) {
 }
 
 function taskGroup(label, tasks, kind) {
-  return `<section class="task-group ${kind}"><div class="task-group-title"><strong>${escapeHtml(label)}</strong><span>${tasks.length}</span></div><div class="task-list">${tasks.slice(0, 6).map(taskCard).join("")}</div></section>`;
+  return renderTaskGroup(label, tasks, kind, {
+    requestedPage: state.taskPages[kind], t, escapeHtml, renderCard: taskCard,
+  });
 }
 
 function taskCard(task) {
@@ -1504,6 +1509,12 @@ function bindShell() {
   document.querySelectorAll("[data-delete-feed-post]").forEach((button) => button.addEventListener("click", () => deleteFeedPost(button)));
   document.querySelectorAll("[data-delete-feed-reply]").forEach((button) => button.addEventListener("click", () => deleteFeedReply(button)));
   document.querySelector("#create-task")?.addEventListener("click", renderCreateTaskForm);
+  document.querySelectorAll("[data-task-page]").forEach((button) => button.addEventListener("click", () => {
+    const kind = button.dataset.taskGroup;
+    state.taskPages[kind] = Number(button.dataset.taskPage);
+    renderApp();
+    document.querySelector(`#task-group-${kind}-title`)?.focus();
+  }));
   document.querySelectorAll("[data-task-action]").forEach((button) => button.addEventListener("click", () => updateTaskAction(button)));
   document.querySelector("#manage-areas")?.addEventListener("click", renderAreasManager);
   document.querySelector("#add-bed")?.addEventListener("click", renderCreateBedForm);
@@ -2648,6 +2659,7 @@ async function logout() {
     categories: { feedPosts: true, feedReplies: true },
   };
   state.tasks = [];
+  state.taskPages = { assigned: 0, urgent: 0, available: 0 };
   if ("caches" in window) {
     for (const key of await caches.keys()) await caches.delete(key);
   }

@@ -163,6 +163,11 @@ textarea { min-height: 95px; padding: 12px 13px; resize: vertical; }
 .task-group-title { display: flex; align-items: center; justify-content: space-between; color: var(--forest-700); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .task-group-title span { min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 999px; background: var(--forest-100); }
 .task-list { display: grid; gap: 8px; }
+.task-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.task-pagination .button { padding: 0 12px; min-height: 46px; }
+.task-pagination .button:disabled { cursor: default; }
+.task-pagination [role="status"] { font-size: 12px; white-space: nowrap; }
+.task-group-title strong:focus { outline: 2px solid var(--forest-700); outline-offset: 4px; }
 .task-card { padding: 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); box-shadow: 0 4px 14px rgba(23,63,50,.04); }
 .task-card.urgent { border-color: #d99a78; background: #fffaf5; }
 .task-card-copy { min-width: 0; display: grid; gap: 5px; }

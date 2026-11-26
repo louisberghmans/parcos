@@ -1,5 +1,5 @@
-const CACHE = "parcos-shell-v13";
-const SHELL = ["/", "/styles.css", "/app.js", "/icon.svg", "/manifest.webmanifest"];
+const CACHE = "parcos-shell-v14";
+const SHELL = ["/", "/styles.css", "/app.js", "/app/tasks/task-group.js", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));

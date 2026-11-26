@@ -23,12 +23,14 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, posix, relative, resolve, sep } from "node:path";
 import { finished, pipeline } from "node:stream/promises";
+import { Transform } from "node:stream";
 import { createGunzip, createGzip } from "node:zlib";
 import { backup, DatabaseSync } from "node:sqlite";
 
 export const BACKUP_FORMAT = "parcos-backup-v1";
 export const BACKUP_FORMAT_VERSION = 1;
 export const RUNNING_MARKER = ".parcos-running.json";
+export const DEFAULT_MAX_EXPANDED_BYTES = 10 * 1024 ** 3;
 
 function checksumFile(path) {
   const hash = createHash("sha256");
@@ -245,6 +247,7 @@ function readExactly(fd, buffer, position) {
 
 function extractTar(tarPath, outputDir) {
   const fd = openSync(tarPath, "r");
+  const archiveSize = statSync(tarPath).size;
   const entries = new Map();
   let position = 0;
   let zeroBlocks = 0;
@@ -280,12 +283,15 @@ function extractTar(tarPath, outputDir) {
       if (!["0", "5"].includes(type)) throw new Error("Archive links and special entries are not supported.");
       const archivePath = safeArchivePath(rawPath, type === "5");
       if (entries.has(archivePath)) throw new Error("Archive contains duplicate entries.");
+      if (entries.size >= 100000) throw new Error("Archive exceeds 100000 entries.");
       if (!(archivePath === "manifest.json" || archivePath === "parcos.db" || archivePath === "uploads" || archivePath.startsWith("uploads/"))) {
         throw new Error("Archive contains an unexpected entry.");
       }
       if (type === "5" && archivePath !== "uploads") throw new Error("Archive contains an unexpected directory.");
       if (type === "0" && archivePath === "uploads") throw new Error("Archive uploads entry has the wrong type.");
       const size = tarNumber(header, 124, 12);
+      if (!Number.isSafeInteger(size) || size < 0 || size > archiveSize - position) throw new Error("Archive entry exceeds the available data.");
+      if (archivePath === "manifest.json" && size > 16 * 1024 ** 2) throw new Error("Backup manifest exceeds 16 MiB.");
       if (type === "5" && size !== 0) throw new Error("Archive directory has an invalid size.");
       const target = resolve(outputDir, ...archivePath.split("/"));
       const safeRoot = resolve(outputDir);
@@ -430,7 +436,11 @@ export async function restoreBackup({
   targetDir,
   force = false,
   stagingDir = null,
+  maxExpandedBytes = DEFAULT_MAX_EXPANDED_BYTES,
 }) {
+  if (!Number.isSafeInteger(maxExpandedBytes) || maxExpandedBytes < 1024) {
+    throw new Error("Maximum expanded size must be a safe integer of at least 1024 bytes.");
+  }
   const source = resolve(archivePath);
   const target = resolve(targetDir);
   if (!existsSync(source) || !statSync(source).isFile()) throw new Error("Backup archive was not found.");
@@ -445,7 +455,15 @@ export async function restoreBackup({
   const tarPath = join(workDir, "backup.tar");
   mkdirSync(stageDir, { mode: 0o700 });
   try {
-    await pipeline(createReadStream(source), createGunzip(), createWriteStream(tarPath, { flags: "wx", mode: 0o600 }));
+    let expandedBytes = 0;
+    const sizeLimit = new Transform({
+      transform(chunk, _encoding, callback) {
+        expandedBytes += chunk.length;
+        if (expandedBytes > maxExpandedBytes) return callback(new Error("Backup exceeds the maximum expanded size."));
+        callback(null, chunk);
+      },
+    });
+    await pipeline(createReadStream(source), createGunzip(), sizeLimit, createWriteStream(tarPath, { flags: "wx", mode: 0o600 }));
     const entries = extractTar(tarPath, stageDir);
     const manifest = validatedManifest(stageDir, entries);
     const database = validateDatabase(stageDir);

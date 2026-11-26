@@ -1,6 +1,11 @@
 # ParcOS database structure and admin import workflow
 
-This file describes the production data shape used by ParcOS and the CSV workflow admins can use for launch testing.
+This file describes the repository's implemented data shape and the CSV workflow
+admins can use for launch testing; it is not an inspection of a live deployment.
+The [full product specification](ParcOS-Full-Product-Specification.md) describes
+the target crop/batch/planning model. Those proposed entities are not tables or
+supported imports yet. Future additive migrations must preserve stable bed IDs,
+legacy crop/variety/status and free-text harvests without inventing dates.
 
 ## Core tables
 
