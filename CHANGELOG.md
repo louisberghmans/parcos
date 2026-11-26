@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.2 - 2026-11-26
 
 - Updated the Node.js baseline, CI and pinned container to security release
   24.22.3; retained the audited dependency lock (no known npm advisories).

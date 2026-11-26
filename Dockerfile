@@ -1,6 +1,6 @@
 FROM node:24.22.3-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 
-ARG PARCOS_VERSION=1.4.1
+ARG PARCOS_VERSION=1.4.2
 LABEL org.opencontainers.image.title="ParcOS" \
       org.opencontainers.image.description="Self-hosted operating app for community parks and gardens" \
       org.opencontainers.image.source="https://github.com/louisberghmans/parcos" \
