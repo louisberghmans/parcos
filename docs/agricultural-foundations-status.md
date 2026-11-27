@@ -19,6 +19,26 @@ The [recipe contract](agriculture-recipe-contract.md) defines authenticated
 reads, ingredient mapping, units and missing-data semantics. Coordinate future
 migration numbers when integrating the recipe branch.
 
-Next checkpoint: store physical bed measurements and versioned geometry
-against existing bed IDs. Add a garden plan and an accessible list view.
+## B. Physical garden checkpoint
+
+Migration 6 adds physical measurements, geometry revisions and garden
+facilities keyed to existing beds and areas. Areas can contain nursery,
+bench, tray, greenhouse and other facilities, with optional capacity. The
+plan provides a keyboard-accessible garden map and bed list, including
+unmapped beds. Measurements can remain incomplete and record approximation
+and provenance.
+
+Coordinators can preview and confirm a JSON plan. The shape is
+`{"validFrom":"2026-01-01","source":{"title":"Survey"},"sourceRevision":"1","features":[{"bedCode":"BED-01","points":[[0,0],[1,0],[1,1],[0,1]]}]}`.
+Use normalized coordinates in the same area frame for all polygons, with
+origin at the top left. Convert SVG-derived points to this frame before
+import. New revisions take effect on their validity start date. Existing
+measurements and bed records retain their original identity.
+
+All 15 tests passed, including schema upgrade, version boundaries, preview,
+legacy field preservation and restricted area reads. Actual measurements and
+polygons remain to be entered by the garden.
+
+Next checkpoint: connect reviewed crops to batches, nursery and bed allocations,
+and measured harvests through the existing operational application.
 

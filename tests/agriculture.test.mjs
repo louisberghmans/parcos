@@ -21,7 +21,7 @@ async function fixture(t) {
   const settings = { dataDir: directory, adminUsername: "admin", adminPassword: "test-admin-password", seedDemoData: true, notificationScheduler: false };
   let app = createApp(settings);
   const bed = app.db.prepare("select id, code, crop, variety from beds order by id limit 1").get();
-  app.db.exec("drop table cultivation_profile_revisions; drop table cultivation_profiles; drop table agricultural_varieties; drop table agricultural_crops; drop table agricultural_taxa; delete from schema_migrations where version = 5");
+  app.db.exec("drop table garden_resources; drop table bed_geometry; drop table bed_physical; drop table cultivation_profile_revisions; drop table cultivation_profiles; drop table agricultural_varieties; drop table agricultural_crops; drop table agricultural_taxa; delete from schema_migrations where version > 4");
   app.close();
   app = createApp(settings);
   assert.deepEqual(app.db.prepare("select id, code, crop, variety from beds where id = ?").get(bed.id), bed);
@@ -97,5 +97,53 @@ test("catalogue upgrades, previews atomically, searches three locales and retain
   } finally {
     restoredApp.close();
   }
+});
+
+test("physical data and geometry history retain bed identity and enforce area access", async (t) => {
+  const { app, request, auth, bed } = await fixture(t);
+  const areaId = app.db.prepare("select area_id from beds where id = ?").get(bed.id).area_id;
+  const areaPath = "/agriculture/areas/" + areaId;
+  const bedPath = "/agriculture/beds/" + bed.id + "/physical";
+  const edit = (body) => request(bedPath, { method: "PUT", body, auth });
+  assert.equal((await request(bedPath, { auth })).value.physical, null);
+  assert.equal((await edit({ grossM2: 3, usableM2: 5 })).status, 400);
+  const result = await edit({ lengthM: 20, confidence: "approximate" });
+  assert.equal(result.value.physical.lengthM, 20);
+  assert.equal(result.value.physical.usableM2, null);
+  assert.equal((await edit({ lengthM: 30 })).status, 409);
+  assert.equal((await edit({ lengthM: 20, usableM2: 15, confidence: "measured", source: provenance, revision: 1 })).status, 200);
+
+  const original = { validFrom: "2025-01-01", source: provenance, sourceRevision: "synthetic-1",
+    features: [{ bedCode: bed.code, points: [[0, 0], [1, 0], [1, 1], [0, 1]] }] };
+  const savePlan = (body) => request(areaPath + "/geometry", { method: "POST", body, auth });
+  assert.equal((await savePlan({ ...original, preview: true })).status, 200);
+  assert.equal((await request(bedPath, { auth })).value.geometry.length, 0);
+  assert.equal((await savePlan(original)).status, 200);
+  assert.equal((await savePlan({ ...original, sourceRevision: "synthetic-2" })).status, 409);
+  assert.equal((await savePlan({ ...original, validFrom: "2026-01-01", sourceRevision: "synthetic-2" })).status, 200);
+  const state = (date) => request(areaPath + "/plan?date=" + date, { auth });
+  const before = (await state("2025-12-31")).value.beds.find(({ id }) => id === bed.id);
+  const after = (await state("2026-01-01")).value.beds.find(({ id }) => id === bed.id);
+  assert.equal(before.geometry.validTo, "2026-01-01");
+  assert.equal(before.geometry.sourceRevision, "synthetic-1");
+  assert.equal(after.geometry.sourceRevision, "synthetic-2");
+  assert.equal(after.legacyCrop, bed.crop);
+  assert.equal((await request(bedPath, { auth })).value.geometry.length, 2);
+  const resource = await request(areaPath + "/resources", { method: "PUT", auth,
+    body: { type: "tray", code: "test-tray", name: "Test tray", capacity: 40, capacityUnit: "cell" } });
+  assert.equal(resource.value.resource.capacity, 40);
+  assert.equal((await state("2026-01-01")).value.resources[0].id, resource.value.resource.id);
+
+  const invite = await request("/invites", { method: "POST", auth, body: { role: "member" } });
+  const redeemed = await request("/invites/redeem", { method: "POST", body: {
+    token: new URL(invite.value.inviteUrl).searchParams.get("invite"), username: "garden.member",
+    displayName: "Garden Member", password: "test-member-password",
+  } });
+  const member = { cookie: redeemed.cookie, token: redeemed.value.csrfToken };
+  app.db.prepare("update garden_areas set members_can_access = 0 where id = ?").run(areaId);
+  assert.equal((await request(areaPath + "/plan", { auth: member })).status, 404);
+  assert.equal((await request(bedPath, { auth: member })).status, 404);
+  assert.equal((await request(areaPath + "/plan", { auth })).status, 200);
+  assert.deepEqual(app.db.prepare("pragma foreign_key_check").all(), []);
 });
 

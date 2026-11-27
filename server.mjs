@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
 import { validPushEndpoint } from "./src/services/push-network.mjs";
 import { catalogueMigration } from "./src/domain/agriculture/catalogue.mjs";
+import { gardenMigration } from "./src/domain/agriculture/garden.mjs";
 import { AgricultureError } from "./src/domain/agriculture/validation.mjs";
 import { agricultureRoute } from "./src/domain/agriculture/routes.mjs";
 import {
@@ -613,7 +614,7 @@ const schemaMigrations = [
   },
 ];
 
-schemaMigrations.push(catalogueMigration);
+schemaMigrations.push(catalogueMigration, gardenMigration);
 
 function applySchemaMigrations(db) {
   db.exec(`create table if not exists schema_migrations (
@@ -2208,6 +2209,7 @@ export function createApp(options = {}) {
         if (path.startsWith("/api/agriculture/")) {
           return await agricultureRoute({
             db, req, path, url, session,
+            bedAccess: (id) => requireBedAccess(findBed(db, id), session),
             authorize() {
               requireCoordinator(session);
               if (req.method !== "GET") requireCsrf(req, session);

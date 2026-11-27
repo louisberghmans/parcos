@@ -17,4 +17,11 @@
 .ag-card details details { margin-inline-start: .6rem; border-top: 1px solid #d4ddd3; }
 .ag-card .ag-records { list-style: none; padding: 0; display: grid; gap: .5rem; }
 .ag-card .ag-records button { text-align: start; min-height: 44px; }
+.ag-map { display: block; width: min(100%, 36rem); height: auto; margin-inline: auto; background: #f1f4e9; border-radius: .7rem; }
+.ag-map polygon { fill: #bed9b4; stroke: #34593b; stroke-width: 3; }
+.ag-map a:is(:hover, :focus) polygon { fill: #e6cf90; stroke-width: 6; }
+.ag-map text { fill: #1c3c2a; font-size: 24px; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.ag-definitions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .3rem 1rem; }
+.ag-definitions dt { font-weight: 600; }
+.ag-definitions dd { margin: 0; }
 

@@ -1,5 +1,6 @@
 import { renderTaskGroup } from "./app/tasks/task-group.js";
 import { mountCatalogue } from "./app/agriculture/catalogue.js";
+import { mountGarden } from "./app/agriculture/garden.js";
 import { agriculturePage, availableWorkspaces } from "./app/agriculture/workspaces.js";
 
 const app = document.querySelector("#app");
@@ -1041,7 +1042,7 @@ function shell(content) {
   };
   const destinations = {
     community: '<a href="#/crops">' + t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus") + "</a>",
-    contributor: '<button type="button" data-page="garden">' + t("Les potagers", "Garden beds", "Tuinbedden") + "</button>",
+    contributor: '<a href="#/garden-plan">' + t("Plan du jardin", "Garden plan", "Tuinplan") + "</a>",
     coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") + "</a>",
     administration: '<button type="button" data-page="profile">' + t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") + "</button>",
   };
@@ -1072,7 +1073,12 @@ function renderApp() {
   app.innerHTML = shell(page);
   bindShell();
   applyTranslations(app);
-  if (route) {
+  if (route === "garden-plan") {
+    mountGarden(document.querySelector("#agriculture-page"), {
+      api, t, escapeHtml, manage: isCoordinator(), areas: state.areas, beds: state.beds,
+      bedId: Number(location.hash.split("/")[3]) || null,
+    });
+  } else if (route) {
     mountCatalogue(document.querySelector("#agriculture-page"), {
       api, t, escapeHtml, locale: currentLocale(), manage: route === "catalogue-admin",
       cropId: route === "catalogue" ? location.hash.split("/")[2] : null,
@@ -1081,7 +1087,11 @@ function renderApp() {
 }
 
 window.addEventListener("hashchange", () => {
-  if (state.member && location.pathname === "/") renderApp();
+  if (state.member && location.pathname === "/") {
+    closeModal();
+    renderApp();
+    document.querySelector("#agriculture-page")?.scrollIntoView();
+  }
 });
 
 function renderToday() {
@@ -1386,6 +1396,7 @@ function renderGarden() {
   const area = state.areas.find((item) => item.id === state.selectedAreaId) || state.areas[0];
   const bedCountLabel = (count) => t(`${count} planche${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "den"}`);
   return `<section class="page garden-page">
+    <div><a class="button secondary" href="#/garden-plan${area ? "/" + area.id : ""}">${t("Plan du jardin", "Garden plan", "Tuinplan")}</a></div>
     <div class="page-title"><div><p class="eyebrow">${t("Cultiver ensemble", "Growing together", "Samen tuinieren")}</p><h1>Les potagers</h1><p class="lede">${t("Les cultures et les travaux de chaque planche.", "Crops and work for every bed.", "Gewassen en werk voor elk bed.")}</p></div>${isCoordinator() ? '<button class="round-add" id="manage-areas" aria-label="Gérer les lieux">⚙</button>' : ""}</div>
     <div class="area-switcher">${state.areas.map((item) => `<button data-area-id="${item.id}" class="${item.id === area?.id ? "active" : ""}"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(bedCountLabel(item.bedCount))}</small></span>${!item.membersCanAccess ? `<em>${t("Coordination", "Coordination")}</em>` : ""}</button>`).join("")}</div>
     ${area ? `<div class="area-intro"><div><p class="eyebrow">${area.membersCanAccess ? t("Accessible aux membres", "Accessible to members") : t("Accès coordinateurs", "Coordinator access")}</p><h2>${escapeHtml(area.name)}</h2><p>${escapeHtml(area.description || t("Lieu du potager partagé.", "Shared garden place."))}</p></div>${isCoordinator() ? `<button class="button secondary" id="add-bed">+ ${t("Ajouter une planche", "Add a bed")}</button>` : ""}</div>` : ""}
@@ -2265,6 +2276,7 @@ function renderBedSheet(editing = false) {
     <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
     <div class="sheet-content">
       <div class="bed-identifier">${escapeHtml(bed.code)}</div>
+      <a class="button secondary" href="#/garden-plan/beds/${bed.id}">${t("Mesures et plan", "Measurements and map", "Metingen en kaart")}</a>
       <div class="detail-title"><div class="detail-title-copy"><h2 id="bed-title">${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</h2><p>${escapeHtml(bed.variety || t("Aucune culture renseignée", "No crop listed"))}</p><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>${isCoordinator() && !editing ? `<div class="detail-title-actions"><button class="round-tool-button" id="edit-bed-button" type="button" aria-label="${t("Modifier la planche", "Edit bed")}" title="${t("Modifier la planche", "Edit bed")}">${editIcon()}</button><label class="round-tool-button file-button" aria-label="${t("Ajouter une photo", "Add a photo")}" title="${t("Ajouter une photo", "Add a photo")}">${cameraIcon()}<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}</div>
       ${!editing ? `<div class="bed-actions"><div class="section-heading compact"><div><p class="eyebrow">${t("Action rapide", "Quick action", "Snelle actie")}</p><h3>${t("Que venez-vous de faire ?", "What did you just do?", "Wat hebt u net gedaan?")}</h3></div></div><div class="bed-action-grid">${quickActions}</div></div>` : ""}
       ${editing ? bedEditForm(bed) : `<div class="detail-section note-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Notes", "Notes")}</p><h3>${t("Commentaires horodatés", "Timestamped comments")}</h3></div><span class="count-pill">${notes.length}</span></div><div class="note-list">${noteList}</div></div>${bed.harvestNote ? `<div class="harvest-note"><small>${t("Dernière consigne de récolte", "Latest harvest instruction")}</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}

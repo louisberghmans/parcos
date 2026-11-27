@@ -1,9 +1,11 @@
 import { catalogue, catalogueCsv, catalogueTypes, importCatalogue, methods, parameterUnits, profileHistory, quantityUnits, saveRecord } from "./catalogue.mjs";
 import { AgricultureError } from "./validation.mjs";
+import { gardenRoute } from "./garden.mjs";
 
 export async function agricultureRoute(context) {
   const { db, req, path, url, readJson, json, text, authorize } = context;
   const manage = ["coordinator", "admin"].includes(context.session.member.role);
+  if (/^\/api\/agriculture\/(areas|beds)\//.test(path)) return gardenRoute(context, manage);
   if (path === "/api/agriculture/catalogue" && req.method === "GET") {
     const query = (url.searchParams.get("q") ?? "").slice(0, 160);
     const edit = url.searchParams.get("manage") === "1";
