@@ -1,0 +1,468 @@
+{
+  "exportFormat": "cuisine-libre-authorized-export-sample-v1",
+  "syntheticFixture": true,
+  "note": "SYNTHETIC FIXTURE ONLY — Live https://www.cuisine-libre.org/ returned HTTP 404 on 2026-11-27. Replace with an authorized export supplied by Romy Duhem-Verdière once available.",
+  "recipes": [
+    {
+      "upstreamId": "synth-cl-001",
+      "slug": "veloute-courgettes-potager",
+      "recipeKey": "synthetic:veloute-courgettes-potager",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-veloute-courgettes",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Fixture synthétique ParcOS",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "rightsEvidence": "Synthetic test fixture created for ParcOS pipeline verification (not live Cuisine Libre content)",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "cookedVerification": "unverified",
+      "title": "Velouté de courgettes du potager",
+      "summary": "Un velouté simple et généreux qui valorise une belle récolte de courgettes d'été.",
+      "steps": [
+        "Laver et couper 800 g de courgettes en cubes sans les peler si elles sont jeunes.",
+        "Faire revenir 1 oignon et 2 gousses d'ail dans 2 c. à s. d'huile d'olive pendant 5 minutes.",
+        "Ajouter les courgettes, 300 g de pommes de terre en dés et 1 l d'eau ou de bouillon.",
+        "Laisser mijoter 20 minutes à couvert, puis mixer finement et rectifier l'assaisonnement."
+      ],
+      "baseServings": 4,
+      "prepMinutes": 15,
+      "cookMinutes": 25,
+      "restMinutes": 0,
+      "seasons": ["summer"],
+      "category": "soup",
+      "tags": ["weekday", "family", "summer-harvest"],
+      "dietary": ["vegetarian", "gluten_free"],
+      "ingredients": [
+        { "ingredientKey": "courgette", "originalText": "800 g de courgettes", "quantity": 800, "unit": "g", "ediblePart": "fruit", "role": "garden", "required": true },
+        { "ingredientKey": "potato", "originalText": "300 g de pommes de terre", "quantity": 300, "unit": "g", "ediblePart": "tuber", "role": "garden", "required": true },
+        { "ingredientKey": "onion", "originalText": "1 oignon jaune", "quantity": 1, "unit": "piece", "ediblePart": "bulb", "role": "garden", "required": true },
+        { "ingredientKey": "garlic", "originalText": "2 gousses d'ail", "quantity": 2, "unit": "clove", "ediblePart": "clove", "role": "garden", "required": false },
+        { "ingredientKey": "olive_oil", "originalText": "2 c. à s. d'huile d'olive", "quantity": 2, "unit": "tbsp", "role": "pantry", "required": true },
+        { "ingredientKey": "salt", "originalText": "Sel et poivre", "quantity": null, "unit": "to_taste", "role": "pantry", "required": false }
+      ],
+      "media": [
+        {
+          "mediaKey": "courgette-soup-photo",
+          "localAsset": null,
+          "sourceUrl": null,
+          "licenseId": "CC-BY-4.0",
+          "credit": "Synthetic placeholder metadata (no binary image bundled)",
+          "alt": {
+            "fr": "Bol de velouté de courgettes vert tendre",
+            "nl": "Kom zachte groene courgettesoep",
+            "en": "Bowl of creamy green zucchini soup"
+          }
+        }
+      ],
+      "translations": {
+        "nl": {
+          "title": "Fluwelige courgettesoep uit de moestuin",
+          "summary": "Een eenvoudige, royale soep om een flinke zomeroogst aan courgettes te verwerken.",
+          "steps": [
+            "Was en snijd 800 g courgettes in blokjes; schillen is niet nodig als ze jong zijn.",
+            "Stoof 1 ajuin en 2 teentjes look gedurende 5 minuten aan in 2 eetlepels olijfolie.",
+            "Voeg de courgettes, 300 g aardappelblokjes en 1 l water of bouillon toe.",
+            "Laat 20 minuten afgedekt sudderen, mix fijn en breng op smaak met peper en zout."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        },
+        "en": {
+          "title": "Garden Zucchini Velouté",
+          "summary": "A simple, generous soup that makes great use of an abundant summer zucchini harvest.",
+          "steps": [
+            "Wash and dice 800 g of zucchini without peeling if they are tender.",
+            "Sauté 1 onion and 2 cloves of garlic in 2 tbsp olive oil for 5 minutes.",
+            "Add the zucchini, 300 g diced potatoes, and 1 l of water or broth.",
+            "Simmer covered for 20 minutes, blend until smooth, and season to taste."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        }
+      }
+    },
+    {
+      "upstreamId": "synth-cl-002",
+      "slug": "tarte-poireaux-bettes",
+      "recipeKey": "synthetic:tarte-poireaux-bettes",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-tarte-poireaux-bettes",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Fixture synthétique ParcOS",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "rightsEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "cookedVerification": "unverified",
+      "title": "Tarte rustique aux poireaux et bettes",
+      "summary": "Une tarte familiale d'automne qui utilise à la fois les côtes et les feuilles de bettes.",
+      "steps": [
+        "Préchauffer le four à 190 °C et foncer un moule avec la pâte brisée.",
+        "Émincer 500 g de poireaux et 400 g de bettes (côtes en dés, feuilles en lanières).",
+        "Faire fondre les légumes à feu doux 15 minutes dans 20 g de beurre.",
+        "Battre 3 œufs avec 200 ml de crème, verser sur les légumes et cuire 35 minutes."
+      ],
+      "baseServings": 6,
+      "prepMinutes": 20,
+      "cookMinutes": 50,
+      "restMinutes": 5,
+      "seasons": ["autumn", "winter"],
+      "category": "tart_savory",
+      "tags": ["family", "rustic"],
+      "dietary": ["vegetarian"],
+      "ingredients": [
+        { "ingredientKey": "leek", "originalText": "500 g de poireaux", "quantity": 500, "unit": "g", "ediblePart": "stem_and_leaf", "role": "garden", "required": true },
+        { "ingredientKey": "chard", "originalText": "400 g de bettes", "quantity": 400, "unit": "g", "ediblePart": "leaf_and_stalk", "role": "garden", "required": true },
+        { "ingredientKey": "butter", "originalText": "20 g de beurre", "quantity": 20, "unit": "g", "role": "pantry", "required": true },
+        { "ingredientKey": "cream", "originalText": "200 ml de crème", "quantity": 200, "unit": "ml", "role": "pantry", "required": true }
+      ],
+      "media": [
+        {
+          "mediaKey": "unverified-image-quarantined",
+          "localAsset": "photos/should-be-quarantined.jpg",
+          "licenseId": "UNKNOWN",
+          "credit": "Unknown photographer"
+        }
+      ],
+      "translations": {
+        "nl": {
+          "title": "Rustieke taart met prei en snijbiet",
+          "summary": "Een gezinstaart voor de herfst waarin zowel de stelen als de bladeren van de snijbiet verwerkt worden.",
+          "steps": [
+            "Verwarm de oven voor op 190 °C en bekleed een taartvorm met kruimeldeeg.",
+            "Snijd 500 g prei in ringen en 400 g snijbiet (stelen in blokjes, bladeren in repen).",
+            "Stoof de groenten 15 minuten zachtjes gaar in 20 g boter.",
+            "Klop 3 eieren los met 200 ml room, giet over de groenten en bak 35 minuten."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        },
+        "en": {
+          "title": "Rustic Leek and Swiss Chard Tart",
+          "summary": "A family autumn tart using both the tender stalks and green leaves of Swiss chard.",
+          "steps": [
+            "Preheat the oven to 190 °C and line a tart tin with shortcrust pastry.",
+            "Slice 500 g of leeks and 400 g of Swiss chard (diced stalks, ribboned leaves).",
+            "Sweat the vegetables gently for 15 minutes in 20 g of butter.",
+            "Whisk 3 eggs with 200 ml cream, pour over the vegetables, and bake for 35 minutes."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        }
+      }
+    },
+    {
+      "upstreamId": "synth-cl-003",
+      "slug": "salade-chou-rave-carottes-printemps",
+      "recipeKey": "synthetic:salade-chou-rave-carottes-printemps",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-salade-chou-rave",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Fixture synthétique ParcOS",
+      "textLicenseId": "CC-BY-4.0",
+      "rightsEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "cookedVerification": "unverified",
+      "title": "Salade croquante de chou-rave et carottes nouvelles",
+      "summary": "Une salade printanière vive et croquante qui met le chou-rave à l'honneur.",
+      "steps": [
+        "Peler 450 g de chou-rave et les couper en fins bâtonnets ou les râper grossièrement.",
+        "Laver et râper 300 g de carottes nouvelles.",
+        "Mélanger 3 c. à s. d'huile de colza, 1 c. à s. de vinaigre de cidre et 1 c. à c. de moutarde.",
+        "Enrober les légumes de vinaigrette et servir frais."
+      ],
+      "baseServings": 4,
+      "prepMinutes": 15,
+      "cookMinutes": 0,
+      "restMinutes": 0,
+      "seasons": ["spring"],
+      "category": "salad",
+      "tags": ["weekday", "raw", "spring-harvest"],
+      "dietary": ["vegetarian", "vegan", "gluten_free", "dairy_free"],
+      "ingredients": [
+        { "ingredientKey": "kohlrabi", "originalText": "450 g de chou-rave", "quantity": 450, "unit": "g", "ediblePart": "swollen_stem", "role": "garden", "required": true },
+        { "ingredientKey": "carrot", "originalText": "300 g de carottes nouvelles", "quantity": 300, "unit": "g", "ediblePart": "root", "role": "garden", "required": true },
+        { "ingredientKey": "rapeseed_oil", "originalText": "3 c. à s. d'huile de colza", "quantity": 3, "unit": "tbsp", "role": "pantry", "required": true },
+        { "ingredientKey": "cider_vinegar", "originalText": "1 c. à s. de vinaigre de cidre", "quantity": 1, "unit": "tbsp", "role": "pantry", "required": true }
+      ],
+      "media": [],
+      "translations": {
+        "nl": {
+          "title": "Krokante salade van koolrabi en jonge wortelen",
+          "summary": "Een frisse, knapperige lentesalade met koolrabi in de hoofdrol.",
+          "steps": [
+            "Schil 450 g koolrabi en snijd in fijne reepjes of rasp grof.",
+            "Was en rasp 300 g jonge wortelen.",
+            "Meng 3 eetlepels koolzaadolie, 1 eetlepel appelciderazijn en 1 koffielepel mosterd.",
+            "Schep de groenten om met de vinaigrette en serveer koel."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        },
+        "en": {
+          "title": "Crunchy Kohlrabi and Young Carrot Salad",
+          "summary": "A bright, crisp spring salad highlighting fresh garden kohlrabi.",
+          "steps": [
+            "Peel 450 g of kohlrabi and cut into fine matchsticks or coarsely grate.",
+            "Wash and grate 300 g of young carrots.",
+            "Whisk 3 tbsp rapeseed oil, 1 tbsp cider vinegar, and 1 tsp mustard.",
+            "Toss the vegetables with the dressing and serve chilled."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        }
+      }
+    },
+    {
+      "upstreamId": "synth-cl-004",
+      "slug": "gratin-celeri-rave-topinambours",
+      "recipeKey": "synthetic:gratin-celeri-rave-topinambours",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-gratin-celeri-topinambours",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Fixture synthétique ParcOS",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "rightsEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "cookedVerification": "unverified",
+      "title": "Gratin d'hiver au céleri-rave et topinambours",
+      "summary": "Un gratin fondant et parfumé pour cuisiner les racines et tubercules d'hiver.",
+      "steps": [
+        "Préchauffer le four à 180 °C.",
+        "Peler et trancher finement 600 g de céleri-rave et 400 g de topinambours.",
+        "Disposer en couches dans un plat huilé avec 1 gousse d'ail écrasée et 250 ml de crème.",
+        "Enfourner 45 minutes jusqu'à ce que la lame d'un couteau s'enfonce sans résistance."
+      ],
+      "baseServings": 4,
+      "prepMinutes": 20,
+      "cookMinutes": 45,
+      "restMinutes": 5,
+      "seasons": ["winter"],
+      "category": "gratin",
+      "tags": ["comfort", "winter-roots", "family"],
+      "dietary": ["vegetarian", "gluten_free"],
+      "ingredients": [
+        { "ingredientKey": "celeriac", "originalText": "600 g de céleri-rave", "quantity": 600, "unit": "g", "ediblePart": "root", "role": "garden", "required": true },
+        { "ingredientKey": "jerusalem_artichoke", "originalText": "400 g de topinambours", "quantity": 400, "unit": "g", "ediblePart": "tuber", "role": "garden", "required": true },
+        { "ingredientKey": "garlic", "originalText": "1 gousse d'ail", "quantity": 1, "unit": "clove", "ediblePart": "clove", "role": "garden", "required": false },
+        { "ingredientKey": "cream", "originalText": "250 ml de crème liquide", "quantity": 250, "unit": "ml", "role": "pantry", "required": true }
+      ],
+      "media": [],
+      "translations": {
+        "nl": {
+          "title": "Wintergratin van knolselder en aardpeer",
+          "summary": "Een zachte, geurige ovenschotel voor winterse wortel- en knolgroenten.",
+          "steps": [
+            "Verwarm de oven voor op 180 °C.",
+            "Schil en snijd 600 g knolselder en 400 g aardperen in dunne plakjes.",
+            "Schik in laagjes in een ingevette schotel met 1 geplet teentje look en 250 ml room.",
+            "Bak 45 minuten in de oven tot een mes er moeiteloos in glijdt."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        },
+        "en": {
+          "title": "Winter Celeriac and Jerusalem Artichoke Gratin",
+          "summary": "A comforting, tender winter bake celebrating garden roots and tubers.",
+          "steps": [
+            "Preheat the oven to 180 °C.",
+            "Peel and thinly slice 600 g of celeriac and 400 g of Jerusalem artichokes.",
+            "Layer in an oiled baking dish with 1 crushed clove of garlic and 250 ml cream.",
+            "Bake for 45 minutes until easily pierced with a knife."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        }
+      }
+    },
+    {
+      "upstreamId": "synth-cl-005",
+      "slug": "poelee-haricots-verts-tomates",
+      "recipeKey": "synthetic:poelee-haricots-verts-tomates",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-haricots-tomates",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Fixture synthétique ParcOS",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "rightsEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "cookedVerification": "unverified",
+      "title": "Poêlée méditerranéenne de haricots verts et tomates",
+      "summary": "Un accompagnement d'été parfumé au basilic; exemple avec une herbe non convertie en masse.",
+      "steps": [
+        "Équeuter 600 g de haricots verts et les blanchir 6 minutes dans l'eau bouillante salée.",
+        "Couper 500 g de tomates mûres en quartiers.",
+        "Faire revenir les haricots et les tomates 10 minutes à l'huile d'olive avec du basilic frais."
+      ],
+      "baseServings": 4,
+      "prepMinutes": 15,
+      "cookMinutes": 16,
+      "restMinutes": 0,
+      "seasons": ["summer"],
+      "category": "side",
+      "tags": ["mediterranean", "weekday"],
+      "dietary": ["vegetarian", "vegan", "gluten_free", "dairy_free"],
+      "ingredients": [
+        { "ingredientKey": "green_bean", "originalText": "600 g de haricots verts", "quantity": 600, "unit": "g", "ediblePart": "fresh_pod", "role": "garden", "required": true },
+        { "ingredientKey": "tomato", "originalText": "500 g de tomates mûres", "quantity": 500, "unit": "g", "ediblePart": "fruit", "role": "garden", "required": true },
+        { "ingredientKey": "basil", "originalText": "1 bouquet de basilic", "quantity": 1, "unit": "bunch", "ediblePart": "leaf", "role": "garden", "required": true },
+        { "ingredientKey": "olive_oil", "originalText": "2 c. à s. d'huile d'olive", "quantity": 2, "unit": "tbsp", "role": "pantry", "required": true }
+      ],
+      "media": [],
+      "translations": {
+        "nl": {
+          "title": "Mediterrane pan van prinsessenbonen en tomaten",
+          "summary": "Een zomers bijgerecht met basilicum; voorbeeld met een nog niet geconverteerde kruidenbos.",
+          "steps": [
+            "Haal de puntjes van 600 g prinsessenbonen en blancheer ze 6 minuten in gezouten kokend water.",
+            "Snijd 500 g rijpe tomaten in partjes.",
+            "Stoof de bonen en tomaten 10 minuten in olijfolie met verse basilicum."
+          ],
+          "reviewStatus": "machine_unreviewed",
+          "provenance": "synthetic_demo_unreviewed"
+        }
+      }
+    },
+    {
+      "upstreamId": "synth-cl-006",
+      "slug": "potimarron-roti-betteraves-automne",
+      "recipeKey": "synthetic:potimarron-roti-betteraves-automne",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-potimarron-betteraves",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Fixture synthétique ParcOS",
+      "textLicenseId": "CC0-1.0",
+      "rightsEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "cookedVerification": "unverified",
+      "title": "Potimarron et betteraves rôtis au four",
+      "summary": "Des légumes d'automne caramélisés au four, faciles à préparer pour toute la tablée.",
+      "steps": [
+        "Préchauffer le four à 200 °C.",
+        "Couper 700 g de potimarron (avec la peau) et 400 g de betteraves pelées en quartiers réguliers.",
+        "Mélanger avec 3 c. à s. d'huile d'olive et rôtir 35 minutes en retournant à mi-cuisson."
+      ],
+      "baseServings": 4,
+      "prepMinutes": 15,
+      "cookMinutes": 35,
+      "restMinutes": 0,
+      "seasons": ["autumn"],
+      "category": "main",
+      "tags": ["family", "sheet-pan", "autumn-harvest"],
+      "dietary": ["vegetarian", "vegan", "gluten_free", "dairy_free"],
+      "ingredients": [
+        { "ingredientKey": "squash", "originalText": "700 g de potimarron", "quantity": 700, "unit": "g", "ediblePart": "fruit", "role": "garden", "required": true },
+        { "ingredientKey": "beetroot", "originalText": "400 g de betteraves rouges", "quantity": 400, "unit": "g", "ediblePart": "root", "role": "garden", "required": true },
+        { "ingredientKey": "olive_oil", "originalText": "3 c. à s. d'huile d'olive", "quantity": 3, "unit": "tbsp", "role": "pantry", "required": true }
+      ],
+      "media": [],
+      "translations": {
+        "nl": {
+          "title": "Geroosterde pompoen en rode biet uit de oven",
+          "summary": "Gekaramelliseerde herfstgroenten uit de oven, makkelijk klaar te maken voor de hele tafel.",
+          "steps": [
+            "Verwarm de oven voor op 200 °C.",
+            "Snijd 700 g pompoen (met schil) en 400 g geschilde rode biet in gelijke partjes.",
+            "Meng met 3 eetlepels olijfolie en rooster 35 minuten; schep halverwege om."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        },
+        "en": {
+          "title": "Oven-Roasted Squash and Beetroot",
+          "summary": "Caramelized autumn vegetables roasted on one tray for an easy group meal.",
+          "steps": [
+            "Preheat the oven to 200 °C.",
+            "Cut 700 g of winter squash (unpeeled) and 400 g of peeled beetroot into even wedges.",
+            "Toss with 3 tbsp olive oil and roast for 35 minutes, turning halfway through."
+          ],
+          "reviewStatus": "reviewed",
+          "provenance": "synthetic_editorial"
+        }
+      }
+    },
+    {
+      "upstreamId": "synth-cl-001",
+      "slug": "veloute-courgettes-potager-dup",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-veloute-courgettes",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Duplicate row test",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "rightsEvidence": "Duplicate test record",
+      "title": "Velouté de courgettes du potager",
+      "steps": ["Step 1"],
+      "baseServings": 4,
+      "seasons": ["summer"],
+      "ingredients": [
+        { "ingredientKey": "courgette", "originalText": "800 g courgettes", "quantity": 800, "unit": "g", "role": "garden", "required": true }
+      ]
+    },
+    {
+      "upstreamId": "synth-cl-nc-blocked",
+      "slug": "ratatouille-nc-restricted",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-nc",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "upstream",
+      "author": "Restricted Author",
+      "textLicenseId": "CC-BY-NC-4.0",
+      "rightsEvidence": "Synthetic NC restriction test",
+      "title": "Ratatouille sous licence NC (doit être exclue)",
+      "steps": ["Ne doit pas être importée automatiquement."],
+      "baseServings": 4,
+      "seasons": ["summer"],
+      "ingredients": [
+        { "ingredientKey": "aubergine", "originalText": "400 g aubergines", "quantity": 400, "unit": "g", "role": "garden", "required": true }
+      ]
+    },
+    {
+      "upstreamId": "synth-cl-unknown-link",
+      "slug": "tarte-tomates-licence-inconnue",
+      "recipeKey": "synthetic:tarte-tomates-licence-inconnue",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-unknown-license",
+      "sourceLocale": "fr",
+      "sourceRevision": "1.0",
+      "origin": "synthetic",
+      "author": "Auteur à vérifier",
+      "textLicenseId": "UNKNOWN",
+      "rightsEvidence": "License unclear — quarantined as link-only candidate pending maintainer confirmation",
+      "workflowStatus": "approved",
+      "collection": "curated",
+      "title": "Tarte aux tomates anciennes (candidat lien seul)",
+      "summary": "Licence non confirmée : conservée uniquement comme référence vers la source originale.",
+      "steps": ["Ce texte ne doit jamais être conservé dans un candidat lien seul."],
+      "baseServings": 4,
+      "seasons": ["summer"],
+      "category": "tart_savory",
+      "ingredients": [
+        { "ingredientKey": "tomato", "originalText": "600 g tomates", "quantity": 600, "unit": "g", "role": "garden", "required": true }
+      ],
+      "translations": {
+        "nl": {
+          "title": "Taart met oude tomatenrassen (enkel link)",
+          "summary": "Licentie nog te bevestigen: enkel bewaard als verwijzing naar de originele bron.",
+          "steps": [],
+          "reviewStatus": "reviewed"
+        },
+        "en": {
+          "title": "Heirloom Tomato Tart (link-only candidate)",
+          "summary": "Unconfirmed license: kept only as a direct link to the original source without copying instructions.",
+          "steps": [],
+          "reviewStatus": "reviewed"
+        }
+      }
+    }
+  ]
+}

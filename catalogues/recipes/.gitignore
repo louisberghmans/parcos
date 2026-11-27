@@ -1,0 +1,7 @@
+# Local operator staging, raw upstream dumps, private submissions and credentials
+# Never commit unverified third-party dumps or private member submissions.
+staging/
+raw/
+private-submissions/
+*.secret.*
+*.local.json

@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parcos.local/schemas/recipe-bundle.v1.schema.json",
+  "title": "ParcOS Portable Recipe Catalogue Bundle v1",
+  "description": "Portable, SQLite-independent v1 contract for ParcOS recipes, provenance, per-asset rights, structured culinary ingredients, crop crosswalk references, and multilingual content.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "catalogueVersion",
+    "createdAt",
+    "sourceManifest",
+    "recipes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "parcos-recipe-bundle-v1"
+    },
+    "catalogueVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "checksumSha256": {
+      "type": ["string", "null"]
+    },
+    "sourceManifest": {
+      "type": "object",
+      "required": ["sources", "softwareLicense", "contentLicensingNote"],
+      "properties": {
+        "softwareLicense": { "type": "string" },
+        "contentLicensingNote": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sourceId", "name", "url", "acquiredAt", "method"],
+            "properties": {
+              "sourceId": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": ["string", "null"] },
+              "acquiredAt": { "type": "string" },
+              "method": { "type": "string" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "ingredientReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ingredientKey", "names"],
+        "properties": {
+          "ingredientKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "names": {
+            "type": "object",
+            "properties": {
+              "fr": { "type": "string" },
+              "nl": { "type": "string" },
+              "en": { "type": "string" }
+            }
+          },
+          "cropKeys": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "mappingStatus": {
+            "enum": ["reviewed", "proposed", "unresolved", "not_applicable"]
+          }
+        }
+      }
+    },
+    "recipes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "recipeKey",
+          "revision",
+          "origin",
+          "sourceLocale",
+          "rights",
+          "content",
+          "ingredients",
+          "editorial"
+        ],
+        "properties": {
+          "recipeKey": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+:[a-z0-9][a-z0-9_-]{1,78}$"
+          },
+          "upstreamId": { "type": ["string", "null"] },
+          "sourceUrl": { "type": ["string", "null"] },
+          "archiveUrl": { "type": ["string", "null"] },
+          "sourceLocale": { "enum": ["fr", "nl", "en"] },
+          "revision": { "type": "string", "minLength": 1 },
+          "parentRevision": { "type": ["string", "null"] },
+          "origin": { "enum": ["upstream", "community", "original", "synthetic"] },
+          "authorCredit": { "type": ["string", "null"] },
+          "rights": {
+            "type": "object",
+            "required": ["status", "licenseId", "sourceEvidence"],
+            "properties": {
+              "status": { "enum": ["cleared", "link_only", "review_required", "excluded", "local_only"] },
+              "licenseId": { "type": "string" },
+              "licenseUrl": { "type": ["string", "null"] },
+              "attribution": { "type": ["string", "null"] },
+              "sourceEvidence": { "type": "string" },
+              "modifications": { "type": ["string", "null"] },
+              "importedAt": { "type": ["string", "null"] },
+              "publicExportOptIn": {
+                "type": ["object", "null"],
+                "properties": {
+                  "granted": { "type": "boolean" },
+                  "licenseId": { "type": ["string", "null"] },
+                  "creditName": { "type": ["string", "null"] },
+                  "grantedAt": { "type": ["string", "null"] }
+                }
+              }
+            }
+          },
+          "content": {
+            "type": "object",
+            "required": ["baseServings", "seasons", "locales"],
+            "properties": {
+              "baseServings": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+              "prepMinutes": { "type": ["number", "null"], "minimum": 0 },
+              "cookMinutes": { "type": ["number", "null"], "minimum": 0 },
+              "restMinutes": { "type": ["number", "null"], "minimum": 0 },
+              "seasons": {
+                "type": "array",
+                "items": { "enum": ["spring", "summer", "autumn", "winter"] }
+              },
+              "category": { "type": ["string", "null"] },
+              "tags": { "type": "array", "items": { "type": "string" } },
+              "dietary": { "type": "array", "items": { "type": "string" } },
+              "foodSafetyNote": { "type": ["object", "null"] },
+              "locales": { "type": "object" }
+            }
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["ingredientKey", "originalText", "role", "required"],
+              "properties": {
+                "ingredientKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+                "originalText": { "type": "string", "minLength": 1 },
+                "quantity": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+                "quantityMax": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+                "unit": { "type": ["string", "null"] },
+                "ediblePart": { "type": ["string", "null"] },
+                "role": { "enum": ["garden", "pantry", "optional", "unknown"] },
+                "required": { "type": "boolean" },
+                "group": { "type": ["string", "null"] },
+                "preparationNote": { "type": ["string", "null"] },
+                "substitutions": { "type": "array", "items": { "type": "string" } },
+                "cropMapping": { "type": ["object", "null"] }
+              }
+            }
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["mediaKey", "type", "rights"],
+              "properties": {
+                "mediaKey": { "type": "string" },
+                "type": { "const": "image" },
+                "localAsset": { "type": ["string", "null"] },
+                "sourceUrl": { "type": ["string", "null"] },
+                "source": { "type": "string" },
+                "rights": { "type": "object" },
+                "alt": { "type": "object" },
+                "reviewStatus": { "type": "string" }
+              }
+            }
+          },
+          "editorial": {
+            "type": "object",
+            "required": ["workflowStatus", "collection"],
+            "properties": {
+              "workflowStatus": { "enum": ["draft", "submitted", "changes_requested", "approved", "rejected", "withdrawn", "archived"] },
+              "collection": { "enum": ["curated", "community"] },
+              "cookedVerification": { "enum": ["unverified", "cooked_feedback", "tested_reviewed"] },
+              "planningReady": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
