@@ -18,6 +18,9 @@ import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
 import { validPushEndpoint } from "./src/services/push-network.mjs";
+import { catalogueMigration } from "./src/domain/agriculture/catalogue.mjs";
+import { AgricultureError } from "./src/domain/agriculture/validation.mjs";
+import { agricultureRoute } from "./src/domain/agriculture/routes.mjs";
 import {
   DEFAULT_NOTIFICATION_TIME,
   DEFAULT_NOTIFICATION_TIME_ZONE,
@@ -609,6 +612,8 @@ const schemaMigrations = [
     },
   },
 ];
+
+schemaMigrations.push(catalogueMigration);
 
 function applySchemaMigrations(db) {
   db.exec(`create table if not exists schema_migrations (
@@ -2200,6 +2205,19 @@ export function createApp(options = {}) {
 
         const session = requireSession(db, req);
 
+        if (path.startsWith("/api/agriculture/")) {
+          return await agricultureRoute({
+            db, req, path, url, session,
+            authorize() {
+              requireCoordinator(session);
+              if (req.method !== "GET") requireCsrf(req, session);
+            },
+            readJson: () => readJson(req),
+            json: (status, value) => json(res, status, value),
+            text: (status, body, type, headers) => text(res, status, body, type, headers),
+          });
+        }
+
         if (req.method === "GET" && path === "/api/me") {
           return json(res, 200, { member: session.member, csrfToken: session.csrfToken, branding: brandingJson(db), ...setupInfo(db) });
         }
@@ -3229,6 +3247,9 @@ export function createApp(options = {}) {
       const staticPath = ["/", "/public"].includes(path) ? "index.html" : path.slice(1);
       return serveFile(res, publicDir, staticPath, "no-cache");
     } catch (error) {
+      if (!res.headersSent && error instanceof AgricultureError) {
+        return json(res, error.status, { error: error.message, code: error.code, field: error.field });
+      }
       const status = error instanceof HttpError ? error.status : 500;
       if (status === 500) console.error(error);
       if (!res.headersSent) return json(res, status, { error: status === 500 ? "Erreur interne du serveur." : error.message });

@@ -1,4 +1,6 @@
 import { renderTaskGroup } from "./app/tasks/task-group.js";
+import { mountCatalogue } from "./app/agriculture/catalogue.js";
+import { agriculturePage, availableWorkspaces } from "./app/agriculture/workspaces.js";
 
 const app = document.querySelector("#app");
 const modalRoot = document.querySelector("#modal-root");
@@ -747,7 +749,9 @@ async function api(path, options = {}) {
       state.csrfToken = null;
       renderLogin();
     }
-    throw new Error(payload.error || "Une erreur est survenue.");
+    throw Object.assign(new Error(payload.error || "Une erreur est survenue."), {
+      status: response.status, code: payload.code, field: payload.field,
+    });
   }
   return payload;
 }
@@ -1026,12 +1030,29 @@ async function renderPublicEvent(id, error = "") {
 }
 
 function shell(content) {
+  const allowed = availableWorkspaces(state.member.role);
+  const saved = localStorage.getItem("parcos_workspace");
+  const workspace = allowed.includes(saved) ? saved : "community";
+  const workspaces = {
+    community: t("Communauté", "Community", "Gemeenschap"),
+    contributor: t("Contribution", "Contributor", "Bijdragen"),
+    coordinator: t("Coordination", "Coordinator", "Coördinatie"),
+    administration: t("Administration", "Administration", "Beheer"),
+  };
+  const destinations = {
+    community: '<a href="#/crops">' + t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus") + "</a>",
+    contributor: '<button type="button" data-page="garden">' + t("Les potagers", "Garden beds", "Tuinbedden") + "</button>",
+    coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") + "</a>",
+    administration: '<button type="button" data-page="profile">' + t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") + "</button>",
+  };
   return `<div class="app-shell">
     <header class="topbar">
       <button class="brand-button" data-page="today"><span class="brand-mark small">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></button>
       <div class="topbar-actions"><button class="language-toggle" id="language-toggle" type="button" aria-label="Changer de langue">${languageToggleLabel()}</button><button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button></div>
     </header>
-    <main class="main-content">${content}</main>
+    <main class="main-content"><div class="workspace-bar"><label for="workspace-select">${t("Espace", "Workspace", "Werkruimte")}</label>
+      <select id="workspace-select">${allowed.map((id) => `<option value="${id}" ${id === workspace ? "selected" : ""}>${workspaces[id]}</option>`).join("")}</select>
+      ${destinations[workspace]}</div>${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
       <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>${t("Accueil", "Home", "Start")}${state.feedUnread ? `<em class="nav-notification-badge" aria-label="${state.feedUnread} ${t("nouveautés", "new items", "nieuwe items")}">${Math.min(state.feedUnread, 99)}</em>` : ""}</button>
       <button data-page="agenda" class="${state.page === "agenda" ? "active" : ""}"><span>□</span>Agenda</button>
@@ -1045,11 +1066,23 @@ function shell(content) {
 function renderApp() {
   if (!state.member) return renderLogin();
   if (state.setupRequired) return renderSetup();
-  const page = state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() : renderToday();
+  const route = agriculturePage(location.hash);
+  const page = route ? '<section id="agriculture-page" class="page agriculture-page"></section>' :
+    state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() : renderToday();
   app.innerHTML = shell(page);
   bindShell();
   applyTranslations(app);
+  if (route) {
+    mountCatalogue(document.querySelector("#agriculture-page"), {
+      api, t, escapeHtml, locale: currentLocale(), manage: route === "catalogue-admin",
+      cropId: route === "catalogue" ? location.hash.split("/")[2] : null,
+    });
+  }
 }
+
+window.addEventListener("hashchange", () => {
+  if (state.member && location.pathname === "/") renderApp();
+});
 
 function renderToday() {
   const harvest = state.beds.filter((bed) => bed.status === "harvest");
@@ -1468,7 +1501,16 @@ function applicationSettingsPanel() {
 }
 
 function bindShell() {
+  document.querySelector("#workspace-select")?.addEventListener("change", (event) => {
+    const workspace = event.target.value;
+    localStorage.setItem("parcos_workspace", workspace);
+    state.page = { community: "today", contributor: "garden", coordinator: "garden", administration: "profile" }[workspace];
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    renderApp();
+    document.querySelector("#workspace-select")?.focus();
+  });
   document.querySelectorAll("[data-page]").forEach((button) => button.addEventListener("click", () => {
+    if (agriculturePage(location.hash)) history.replaceState(null, "", location.pathname + location.search);
     state.page = button.dataset.page;
     renderApp();
     window.scrollTo({ top: 0, behavior: "smooth" });
