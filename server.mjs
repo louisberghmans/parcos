@@ -18,6 +18,12 @@ import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
 import { validPushEndpoint } from "./src/services/push-network.mjs";
+import { catalogueMigration } from "./src/domain/agriculture/catalogue.mjs";
+import { gardenMigration, today as agricultureDay } from "./src/domain/agriculture/garden.mjs";
+import { batchVisible, cultivationMigration, harvestInput } from "./src/domain/agriculture/cultivation.mjs";
+import { operationsMigration } from "./src/domain/agriculture/operations.mjs";
+import { AgricultureError, key as agricultureKey } from "./src/domain/agriculture/validation.mjs";
+import { agricultureRoute } from "./src/domain/agriculture/routes.mjs";
 import {
   DEFAULT_NOTIFICATION_TIME,
   DEFAULT_NOTIFICATION_TIME_ZONE,
@@ -56,6 +62,7 @@ const localizedEntities = {
   how_to: { table: "how_to_videos", fields: ["title", "note"] },
   bed_photo: { table: "bed_photos", fields: ["caption"] },
   harvest_photo: { table: "harvest_photos", fields: ["caption"] },
+  agricultural_crop: { table: "agricultural_crop_text", fields: ["description"] },
 };
 
 class HttpError extends Error {
@@ -240,6 +247,10 @@ function harvestJson(row) {
     id: row.id,
     bedId: row.bed_id,
     quantity: row.quantity ?? "",
+    batchId: row.batch_id ?? null,
+    amount: row.amount ?? null,
+    unit: row.unit ?? null,
+    harvestedOn: row.harvested_on ?? null,
     note: row.note ?? "",
     photoUrl: row.photo_path ? `/media/${row.photo_path}` : null,
     memberName: row.member_name ?? "Membre",
@@ -291,6 +302,7 @@ function taskJson(row) {
     claimedBy: row.claimed_by ? { id: row.claimed_by, name: row.claimed_by_name ?? null } : null,
     completedBy: row.completed_by ? { id: row.completed_by, name: row.completed_by_name ?? null } : null,
     sourceActivityId: row.source_activity_id ?? null,
+    cultivationBatchId: row.cultivation_batch_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     claimedAt: row.claimed_at ?? null,
@@ -609,6 +621,8 @@ const schemaMigrations = [
     },
   },
 ];
+
+schemaMigrations.push(catalogueMigration, gardenMigration, cultivationMigration, operationsMigration);
 
 function applySchemaMigrations(db) {
   db.exec(`create table if not exists schema_migrations (
@@ -956,6 +970,9 @@ function backfillLocalizedContent(db) {
   const timestamp = now();
   db.exec("begin immediate");
   try {
+    const crops = db.prepare(`select c.data from agricultural_crops c
+      left join agricultural_crop_text t on t.crop_id = c.id where t.id is null`).all();
+    for (const { data } of crops) saveCropText(db, JSON.parse(data), null, DEFAULT_CONTENT_LOCALE, timestamp);
     for (const [entityType, config] of Object.entries(localizedEntities)) {
       const rows = db.prepare(`select id, ${config.fields.join(", ")} from ${config.table}`).all();
       for (const row of rows) registerLocalizedEntity(db, entityType, row.id, row, DEFAULT_CONTENT_LOCALE, timestamp);
@@ -1027,6 +1044,58 @@ function localizedUpdateValues(db, entityType, entityId, baseRow, submitted, loc
   return canonical;
 }
 
+function saveCropText(db, record, before, locale, timestamp = now()) {
+  const type = "agricultural_crop";
+  let row = db.prepare(`select t.*, c.source_locale from agricultural_crop_text t
+    join localized_content c on c.entity_type = ? and c.entity_id = t.id and c.field = 'description'
+    where t.crop_id = ?`).get(type, record.id);
+  const previous = row && before ? localizedCrop(db, before) : before;
+  const sourceLocale = [row?.source_locale, locale, ...SUPPORTED_LOCALES].find((item) => record.description[item])
+    ?? row?.source_locale;
+  if (!sourceLocale) return;
+  const description = record.description[sourceLocale];
+  const sourceChanged = row && (description !== row.description || sourceLocale !== row.source_locale);
+  if (sourceChanged) {
+    db.prepare("update agricultural_crop_text set description = ? where id = ?").run(description, row.id);
+    db.prepare(`update localized_content set source_locale = ?, source_revision = source_revision + 1, updated_at = ?
+      where entity_type = ? and entity_id = ? and field = 'description'`).run(sourceLocale, timestamp, type, row.id);
+    row = { ...row, description, source_locale: sourceLocale };
+  }
+  if (!row) {
+    const result = db.prepare("insert into agricultural_crop_text (crop_id, description) values (?, ?)").run(record.id, description);
+    row = { id: Number(result.lastInsertRowid), description };
+    registerLocalizedEntity(db, type, row.id, row, sourceLocale, timestamp);
+  }
+  for (const target of SUPPORTED_LOCALES) {
+    if (target === sourceLocale) continue;
+    const translated = record.description[target];
+    if (sourceChanged && translated === previous?.description[target]) continue;
+    if (translated) {
+      db.prepare(`insert into content_translations (entity_type, entity_id, field, locale, value, source_revision, created_at, updated_at)
+        select entity_type, entity_id, field, ?, ?, source_revision, ?, ? from localized_content
+        where entity_type = ? and entity_id = ? and field = 'description'
+        on conflict(entity_type, entity_id, field, locale) do update set
+          value = excluded.value, source_revision = excluded.source_revision, updated_at = excluded.updated_at`)
+        .run(target, translated, timestamp, timestamp, type, row.id);
+    } else if (previous?.description[target]) {
+      db.prepare(`delete from content_translations
+        where entity_type = ? and entity_id = ? and field = 'description' and locale = ?`).run(type, row.id, target);
+    }
+  }
+}
+
+function localizedCrop(db, crop) {
+  const row = db.prepare(`select t.*, c.source_locale, c.source_revision from agricultural_crop_text t
+    join localized_content c on c.entity_type = 'agricultural_crop' and c.entity_id = t.id and c.field = 'description'
+    where t.crop_id = ?`).get(crop.id);
+  if (!row) return crop;
+  const translations = db.prepare(`select locale, value from content_translations
+    where entity_type = 'agricultural_crop' and entity_id = ? and field = 'description' and source_revision = ?`).all(row.id, row.source_revision);
+  const pairs = new Map(translations.map(({ locale, value }) => [locale, value]));
+  return { ...crop, description: Object.fromEntries(SUPPORTED_LOCALES.map((locale) =>
+    [locale, locale === row.source_locale ? row.description : pairs.get(locale) || null])) };
+}
+
 function pendingTranslationExport(db) {
   const exportedAt = now();
   const items = [];
@@ -1080,6 +1149,7 @@ function importTranslations(db, payload) {
     for (const item of payload.items) {
       const translation = String(item?.translation ?? "").trim();
       if (!translation) { result.empty += 1; continue; }
+      if (item.entityType === "agricultural_crop" && translation.length > 2000) { result.invalid += 1; continue; }
       const targetLocale = localeValue(item.targetLocale, "");
       const meta = selectMeta.get(String(item.entityType ?? ""), Number(item.entityId), String(item.field ?? ""));
       if (!meta || !targetLocale || targetLocale === meta.source_locale) { result.invalid += 1; continue; }
@@ -1128,6 +1198,20 @@ function localizedTaskJson(db, row, locale) {
 }
 function localizedBedNoteJson(db, row, locale) { return bedNoteJson(localizedRow(db, "bed_note", row, locale)); }
 function localizedHarvestJson(db, row, locale) { return harvestJson(localizedRow(db, "harvest", row, locale)); }
+function selectHarvests(db, { bedId = null, batchId = null }, locale, session) {
+  const manage = ["coordinator", "admin"].includes(session.member.role);
+  const rows = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name,
+      measure.batch_id, measure.quantity as amount, measure.unit, measure.harvested_on
+    from harvests h
+    left join harvest_photos hp on hp.harvest_id = h.id
+    left join members m on m.id = h.member_id
+    left join harvest_measurements measure on measure.harvest_id = h.id
+    where ${bedId !== null ? "h.bed_id = ?" : "measure.batch_id = ?"}
+    order by coalesce(measure.harvested_on, substr(h.created_at, 1, 10)) desc, h.id desc
+    ${batchId === null ? "limit 30" : ""}`).all(bedId ?? batchId);
+  return rows.map((row) => localizedHarvestJson(db,
+    row.batch_id && !batchVisible(db, row.batch_id, manage) ? { ...row, batch_id: null } : row, locale));
+}
 function localizedHowToJson(db, row, locale) { return howToVideoJson(localizedRow(db, "how_to", row, locale)); }
 
 const seedBeds = [
@@ -1516,6 +1600,23 @@ function taskInput(db, body, existing = {}) {
   return { title, description, status, priority, dueAt, areaId, bedId, eventId };
 }
 
+function insertTask(db, values, session, locale) {
+  const timestamp = now();
+  const result = db.prepare(`insert into tasks
+    (title, description, status, priority, due_at, area_id, bed_id, event_id, created_by,
+     claimed_by, completed_by, created_at, updated_at, claimed_at, completed_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(values.title, values.description, values.status, values.priority, values.dueAt,
+      values.areaId, values.bedId, values.eventId, session.member.id,
+      values.status === "claimed" ? session.member.id : null,
+      values.status === "done" ? session.member.id : null,
+      timestamp, timestamp, values.status === "claimed" ? timestamp : null,
+      values.status === "done" ? timestamp : null);
+  const taskId = Number(result.lastInsertRowid);
+  registerLocalizedEntity(db, "task", taskId, { title: values.title, description: values.description }, locale, timestamp);
+  return taskId;
+}
+
 function taskSelect(db, taskId = null) {
   const where = taskId === null ? "" : "where task.id = ?";
   const parameters = taskId === null ? [] : [taskId];
@@ -1524,8 +1625,9 @@ function taskSelect(db, taskId = null) {
     bed.code as bed_code, bed_area.members_can_access as bed_members_can_access,
     event.title as event_title, event.state as event_state, event.audience as event_audience,
     creator.display_name as creator_name, claimant.display_name as claimed_by_name,
-    completer.display_name as completed_by_name
+    completer.display_name as completed_by_name, cl.batch_id as cultivation_batch_id
     from tasks task
+    left join cultivation_task_links cl on cl.task_id = task.id
     left join garden_areas area on area.id = task.area_id
     left join beds bed on bed.id = task.bed_id
     left join garden_areas bed_area on bed_area.id = bed.area_id
@@ -1536,8 +1638,9 @@ function taskSelect(db, taskId = null) {
     ${where}`).all(...parameters);
 }
 
-function taskIsVisible(row, session) {
+function taskIsVisible(db, row, session) {
   if (["coordinator", "admin"].includes(session.member.role)) return true;
+  if (row.cultivation_batch_id && !batchVisible(db, row.cultivation_batch_id, false)) return false;
   if (row.area_id && !row.area_members_can_access) return false;
   if (row.bed_id && !row.bed_members_can_access) return false;
   if (row.event_id && (row.event_state === "draft" || row.event_audience === "coordinators")) return false;
@@ -1546,7 +1649,7 @@ function taskIsVisible(row, session) {
 
 function findTask(db, taskId, session) {
   const row = taskSelect(db, taskId)[0];
-  if (!row || !taskIsVisible(row, session)) throw new HttpError(404, "Tâche introuvable.");
+  if (!row || !taskIsVisible(db, row, session)) throw new HttpError(404, "Tâche introuvable.");
   return row;
 }
 
@@ -2200,6 +2303,42 @@ export function createApp(options = {}) {
 
         const session = requireSession(db, req);
 
+        if (path.startsWith("/api/agriculture/")) {
+          return await agricultureRoute({
+            db, req, path, url, session,
+            localDay: agricultureDay(req.headers["x-parcos-time-zone"]),
+            localizeCrop: (crop) => localizedCrop(db, crop),
+            saveCropText: (record, before) => saveCropText(db, record, before, locale),
+            bedAccess: (id) => requireBedAccess(findBed(db, id), session),
+            requireWrite: () => requireCsrf(req, session),
+            batchHarvests: (id) => selectHarvests(db, { batchId: id }, locale, session),
+            canonicalBatchUrl: (id) => (configuredBaseUrl || requestOrigin(req, baseUrl, trustProxy)) + "/#/batches/" + id,
+            createOperationTask: (body) => insertTask(db, taskInput(db, body), session, locale),
+            operationTaskDescription(template) {
+              return [
+                [localeText(locale, "Sécurité", "Veiligheid", "Safety"), template.safety],
+                [localeText(locale, "Critères de fin", "Afrondcriteria", "Completion criteria"), template.completion],
+                [localeText(locale, "Instructions", "Instructies", "Instructions"), template.instructions],
+                [localeText(locale, "Matériel", "Materialen", "Materials"), template.materials.join(", ")],
+                [localeText(locale, "Outils", "Gereedschap", "Tools"), template.tools.join(", ")],
+              ].filter(([, value]) => value).map(([label, value]) => label + " · " + value).join("\n");
+            },
+            recordBatchActivity(bedId, kind) {
+              const body = localeText(locale, "Opération de culture enregistrée", "Teelthandeling vastgelegd", "Cultivation operation recorded");
+              const result = db.prepare("insert into activities (bed_id, member_id, activity_type, note, created_at) values (?, ?, ?, ?, ?)")
+                .run(bedId, session.member.id, `cultivation_${kind}`, body, now());
+              registerLocalizedEntity(db, "activity", Number(result.lastInsertRowid), { note: body }, locale);
+            },
+            authorize() {
+              requireCoordinator(session);
+              if (req.method !== "GET") requireCsrf(req, session);
+            },
+            readJson: () => readJson(req),
+            json: (status, value) => json(res, status, value),
+            text: (status, body, type, headers) => text(res, status, body, type, headers),
+          });
+        }
+
         if (req.method === "GET" && path === "/api/me") {
           return json(res, 200, { member: session.member, csrfToken: session.csrfToken, branding: brandingJson(db), ...setupInfo(db) });
         }
@@ -2734,7 +2873,7 @@ export function createApp(options = {}) {
 
         if (req.method === "GET" && path === "/api/tasks") {
           const tasks = taskSelect(db)
-            .filter((task) => taskIsVisible(task, session))
+            .filter((task) => taskIsVisible(db, task, session))
             .sort((a, b) => {
               const activeA = ["open", "claimed"].includes(a.status) ? 0 : 1;
               const activeB = ["open", "claimed"].includes(b.status) ? 0 : 1;
@@ -2752,21 +2891,9 @@ export function createApp(options = {}) {
           requireCsrf(req, session);
           requireCoordinator(session);
           const values = taskInput(db, await readJson(req));
-          const timestamp = now();
           db.exec("begin immediate");
           try {
-            const result = db.prepare(`insert into tasks
-              (title, description, status, priority, due_at, area_id, bed_id, event_id, created_by,
-               claimed_by, completed_by, created_at, updated_at, claimed_at, completed_at)
-              values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-              .run(values.title, values.description, values.status, values.priority, values.dueAt,
-                values.areaId, values.bedId, values.eventId, session.member.id,
-                values.status === "claimed" ? session.member.id : null,
-                values.status === "done" ? session.member.id : null,
-                timestamp, timestamp, values.status === "claimed" ? timestamp : null,
-                values.status === "done" ? timestamp : null);
-            const taskId = Number(result.lastInsertRowid);
-            registerLocalizedEntity(db, "task", taskId, { title: values.title, description: values.description }, locale, timestamp);
+            const taskId = insertTask(db, values, session, locale);
             db.exec("commit");
             return json(res, 201, { task: localizedTaskJson(db, findTask(db, taskId, session), locale) });
           } catch (error) {
@@ -2972,11 +3099,7 @@ export function createApp(options = {}) {
               const localized = localizedRow(db, "bed_photo", photo, locale);
               return { id: localized.id, url: `/media/${localized.path}`, caption: localized.caption, createdAt: localized.created_at };
             });
-          const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
-            from harvests h
-            left join harvest_photos hp on hp.harvest_id = h.id
-            left join members m on m.id = h.member_id
-            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map((row) => localizedHarvestJson(db, row, locale));
+          const harvests = selectHarvests(db, { bedId }, locale, session);
           const notes = db.prepare(`select n.*, m.display_name as member_name
             from bed_notes n left join members m on m.id = n.member_id
             where n.bed_id = ? order by n.created_at desc, n.id desc limit 50`).all(bedId).map((row) => localizedBedNoteJson(db, row, locale));
@@ -3117,30 +3240,45 @@ export function createApp(options = {}) {
         if (harvestMatch && req.method === "POST") {
           requireCsrf(req, session);
           const bedId = Number(harvestMatch[1]);
-          const bed = requireBedAccess(findBed(db, bedId), session);
           const body = await readJson(req);
-          const photo = photoData(body.dataUrl);
-          const filename = `harvest-${bedId}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}`;
-          const filePath = join(uploadsDir, filename);
+          const bed = requireBedAccess(findBed(db, bedId), session);
+          const measured = harvestInput(db, body, bedId, ["coordinator", "admin"].includes(session.member.role),
+            agricultureDay(req.headers["x-parcos-time-zone"]));
+          const photo = body.dataUrl || !measured ? photoData(body.dataUrl) : null;
+          const filename = photo ? `harvest-${bedId}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}` : null;
+          const filePath = filename ? join(uploadsDir, filename) : null;
           const timestamp = now();
-          writeFileSync(filePath, photo.bytes, { flag: "wx" });
+          const note = String(body.note ?? "").trim().slice(0, 600) || null;
+          const quantity = measured ? null : String(body.quantity ?? "").trim().slice(0, 120) || null;
+          const requestId = measured && body.requestId != null ? agricultureKey(body.requestId, "requestId") : null;
+          const fingerprint = requestId ? sha256(JSON.stringify([bedId, session.member.id, measured.batchId, measured.harvestedOn,
+            measured.amount, measured.unit, note, body.dataUrl || null, body.caption ?? null])) : null;
+          const previous = requestId && db.prepare("select fingerprint from harvest_submission_keys where id = ?").get(requestId);
+          if (previous) {
+            if (previous.fingerprint !== fingerprint) throw new AgricultureError("conflict", "requestId", 409);
+            return json(res, 200, { bed: localizedBedJson(db, bed, locale), harvests: selectHarvests(db, { bedId }, locale, session) });
+          }
+          if (photo) writeFileSync(filePath, photo.bytes, { flag: "wx" });
           try {
             db.exec("begin immediate");
             const result = db.prepare(`insert into harvests (bed_id, member_id, quantity, note, created_at, updated_at)
               values (?, ?, ?, ?, ?, ?)`)
-              .run(bedId, session.member.id, String(body.quantity ?? "").trim().slice(0, 120) || null,
-                String(body.note ?? "").trim().slice(0, 600) || null, timestamp, timestamp);
-            registerLocalizedEntity(db, "harvest", Number(result.lastInsertRowid), {
-              quantity: String(body.quantity ?? "").trim().slice(0, 120) || null,
-              note: String(body.note ?? "").trim().slice(0, 600) || null,
-            }, locale, timestamp);
-            const harvestPhoto = db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
-              values (?, ?, ?, ?, ?, ?)`)
-              .run(result.lastInsertRowid, filename, photo.contentType, String(body.caption ?? "").trim().slice(0, 200) || null, session.member.id, timestamp);
-            registerLocalizedEntity(db, "harvest_photo", Number(harvestPhoto.lastInsertRowid), {
-              caption: String(body.caption ?? "").trim().slice(0, 200) || null,
-            }, locale, timestamp);
-            db.prepare("update beds set status = 'harvest', updated_at = ? where id = ?").run(timestamp, bedId);
+              .run(bedId, session.member.id, quantity, note, timestamp, timestamp);
+            registerLocalizedEntity(db, "harvest", Number(result.lastInsertRowid), { quantity, note }, locale, timestamp);
+            if (measured) {
+              db.prepare("insert into harvest_measurements values (?, ?, ?, ?, ?, ?)")
+                .run(result.lastInsertRowid, measured.batchId, measured.footprintId, measured.amount, measured.unit, measured.harvestedOn);
+              if (requestId) db.prepare("insert into harvest_submission_keys values (?, ?, ?)").run(requestId, result.lastInsertRowid, fingerprint);
+            } else {
+              db.prepare("update beds set status = 'harvest', updated_at = ? where id = ?").run(timestamp, bedId);
+            }
+            if (photo) {
+              const caption = String(body.caption ?? "").trim().slice(0, 200) || null;
+              const harvestPhoto = db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
+                values (?, ?, ?, ?, ?, ?)`)
+                .run(result.lastInsertRowid, filename, photo.contentType, caption, session.member.id, timestamp);
+              registerLocalizedEntity(db, "harvest_photo", Number(harvestPhoto.lastInsertRowid), { caption }, locale, timestamp);
+            }
             const activityNote = localeText(locale, `Récolte ajoutée pour ${bed.code}`, `Oogst toegevoegd voor ${bed.code}`, `Harvest added for ${bed.code}`);
             const activity = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
               values (?, ?, 'harvest_added', ?, ?)`)
@@ -3149,15 +3287,11 @@ export function createApp(options = {}) {
             db.exec("commit");
           } catch (error) {
             db.exec("rollback");
-            rmSync(filePath, { force: true });
+            if (filePath) rmSync(filePath, { force: true });
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Cette photo de recolte existe deja.");
             throw error;
           }
-          const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
-            from harvests h
-            left join harvest_photos hp on hp.harvest_id = h.id
-            left join members m on m.id = h.member_id
-            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map((row) => localizedHarvestJson(db, row, locale));
+          const harvests = selectHarvests(db, { bedId }, locale, session);
           return json(res, 201, { bed: localizedBedJson(db, findBed(db, bedId), locale), harvests });
         }
 
@@ -3229,6 +3363,9 @@ export function createApp(options = {}) {
       const staticPath = ["/", "/public"].includes(path) ? "index.html" : path.slice(1);
       return serveFile(res, publicDir, staticPath, "no-cache");
     } catch (error) {
+      if (!res.headersSent && error instanceof AgricultureError) {
+        return json(res, error.status, { error: error.message, code: error.code, field: error.field });
+      }
       const status = error instanceof HttpError ? error.status : 500;
       if (status === 500) console.error(error);
       if (!res.headersSent) return json(res, status, { error: status === 500 ? "Erreur interne du serveur." : error.message });

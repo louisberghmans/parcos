@@ -1,4 +1,10 @@
 import { renderTaskGroup } from "./app/tasks/task-group.js";
+import { mountCatalogue } from "./app/agriculture/catalogue.js";
+import { mountGarden } from "./app/agriculture/garden.js";
+import { mountCultivation } from "./app/agriculture/cultivation.js";
+import { mountOccupancy, mountOperations } from "./app/agriculture/operations.js";
+import { mountSuppliers } from "./app/agriculture/suppliers.js";
+import { agriculturePage, availableWorkspaces } from "./app/agriculture/workspaces.js";
 
 const app = document.querySelector("#app");
 const modalRoot = document.querySelector("#modal-root");
@@ -736,7 +742,8 @@ function isCoordinator() {
 }
 
 async function api(path, options = {}) {
-  const headers = { "X-Parcos-Locale": currentLocale(), ...(options.headers || {}) };
+  const headers = { "X-Parcos-Locale": currentLocale(), "X-Parcos-Time-Zone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+    ...(options.headers || {}) };
   if (options.body && !(options.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (state.csrfToken && !["GET", "HEAD"].includes(options.method || "GET")) headers["X-CSRF-Token"] = state.csrfToken;
   const response = await fetch(path, { ...options, headers, credentials: "same-origin" });
@@ -747,7 +754,9 @@ async function api(path, options = {}) {
       state.csrfToken = null;
       renderLogin();
     }
-    throw new Error(payload.error || "Une erreur est survenue.");
+    throw Object.assign(new Error(payload.error || "Une erreur est survenue."), {
+      status: response.status, code: payload.code, field: payload.field,
+    });
   }
   return payload;
 }
@@ -1026,12 +1035,34 @@ async function renderPublicEvent(id, error = "") {
 }
 
 function shell(content) {
+  const allowed = availableWorkspaces(state.member.role);
+  const saved = localStorage.getItem("parcos_workspace");
+  const workspace = allowed.includes(saved) ? saved : "community";
+  const workspaces = {
+    community: t("Communauté", "Community", "Gemeenschap"),
+    contributor: t("Contribution", "Contributor", "Bijdragen"),
+    coordinator: t("Coordination", "Coordinator", "Coördinatie"),
+    administration: t("Administration", "Administration", "Beheer"),
+  };
+  const destinations = {
+    community: '<a href="#/crops">' + t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus") + '</a><a href="#/occupancy">' + t("Cultures et récoltes", "Crops and harvests", "Gewassen en oogst") + "</a>",
+    contributor: '<a href="#/garden-plan">' + t("Plan du jardin", "Garden plan", "Tuinplan") + '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") + "</a>",
+    coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") +
+      '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") +
+      '</a><a href="#/occupancy">' + t("Occupation", "Occupancy", "Bezetting") +
+      '</a><a href="#/coordinator/operations">' + t("Opérations", "Operations", "Handelingen") +
+      '</a><a href="#/coordinator/suppliers">' + t("Fournisseurs", "Suppliers", "Leveranciers") +
+      '</a><button type="button" data-page="management">' + t("Comptes membres", "Member accounts", "Ledenaccounts") + "</button>",
+    administration: '<button type="button" data-page="management">' + t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") + "</button>",
+  };
   return `<div class="app-shell">
     <header class="topbar">
       <button class="brand-button" data-page="today"><span class="brand-mark small">P</span><span><strong>ParcOS</strong><small>${escapeHtml(state.parcName)}</small></span></button>
       <div class="topbar-actions"><button class="language-toggle" id="language-toggle" type="button" aria-label="Changer de langue">${languageToggleLabel()}</button><button class="avatar-button" data-page="profile" aria-label="Ouvrir mon profil">${avatarContent(state.member)}</button></div>
     </header>
-    <main class="main-content">${content}</main>
+    <main class="main-content"><div class="workspace-bar"><label for="workspace-select">${t("Espace", "Workspace", "Werkruimte")}</label>
+      <select id="workspace-select">${allowed.map((id) => `<option value="${id}" ${id === workspace ? "selected" : ""}>${workspaces[id]}</option>`).join("")}</select>
+      ${destinations[workspace]}</div>${content}</main>
     <nav class="bottom-nav" aria-label="Navigation principale">
       <button data-page="today" class="${state.page === "today" ? "active" : ""}"><span>⌂</span>${t("Accueil", "Home", "Start")}${state.feedUnread ? `<em class="nav-notification-badge" aria-label="${state.feedUnread} ${t("nouveautés", "new items", "nieuwe items")}">${Math.min(state.feedUnread, 99)}</em>` : ""}</button>
       <button data-page="agenda" class="${state.page === "agenda" ? "active" : ""}"><span>□</span>Agenda</button>
@@ -1045,11 +1076,45 @@ function shell(content) {
 function renderApp() {
   if (!state.member) return renderLogin();
   if (state.setupRequired) return renderSetup();
-  const page = state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() : renderToday();
+  const route = agriculturePage(location.hash);
+  const page = route ? '<section id="agriculture-page" class="page agriculture-page"></section>' :
+    state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() :
+      state.page === "management" ? renderManagement() : renderToday();
   app.innerHTML = shell(page);
   bindShell();
   applyTranslations(app);
+  const agricultureRoot = document.querySelector("#agriculture-page");
+  if (route === "occupancy") {
+    mountOccupancy(agricultureRoot, { api, t, escapeHtml, locale: currentLocale(), areas: state.areas });
+  } else if (route === "operations") {
+    mountOperations(agricultureRoot, { api, t, escapeHtml, locale: currentLocale(), refreshTasks: loadTasks });
+  } else if (route === "suppliers") {
+    mountSuppliers(agricultureRoot, { api, t, escapeHtml, locale: currentLocale() });
+  } else if (route === "garden-plan") {
+    mountGarden(agricultureRoot, {
+      api, t, escapeHtml, manage: isCoordinator(), areas: state.areas, beds: state.beds,
+      bedId: Number(location.hash.split("/")[3]) || null, openBed,
+    });
+  } else if (route === "batches") {
+    mountCultivation(agricultureRoot, {
+      api, t, escapeHtml, locale: currentLocale(), manage: isCoordinator(), beds: state.beds,
+      id: location.hash.split("/")[2] ?? null, compressPhoto,
+    });
+  } else if (route) {
+    mountCatalogue(agricultureRoot, {
+      api, t, escapeHtml, locale: currentLocale(), manage: route === "catalogue-admin",
+      cropId: route === "catalogue" ? location.hash.split("/")[2] : null,
+    });
+  }
 }
+
+window.addEventListener("hashchange", () => {
+  if (state.member && location.pathname === "/") {
+    modalRoot.replaceChildren();
+    renderApp();
+    document.querySelector("#agriculture-page")?.scrollIntoView();
+  }
+});
 
 function renderToday() {
   const harvest = state.beds.filter((bed) => bed.status === "harvest");
@@ -1150,7 +1215,8 @@ function taskCard(task) {
     action = `<span class="task-owner">${escapeHtml(task.claimedBy.name)}</span>`;
   }
   return `<article class="task-card ${task.priority === "urgent" ? "urgent" : ""}">
-    <div class="task-card-copy"><div class="task-meta">${task.priority === "urgent" ? `<span class="urgent-pill">${t("Urgent", "Urgent", "Dringend")}</span>` : ""}${due}${location}</div><strong>${escapeHtml(task.title)}</strong>${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}</div>${action}
+    <div class="task-card-copy"><div class="task-meta">${task.priority === "urgent" ? `<span class="urgent-pill">${t("Urgent", "Urgent", "Dringend")}</span>` : ""}${due}${location}</div><strong>${escapeHtml(task.title)}</strong>${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+      ${task.cultivationBatchId ? `<a class="task-batch-link" href="#/batches/${escapeHtml(task.cultivationBatchId)}">${t("Voir le lot", "View batch", "Partij bekijken")}</a>` : ""}</div>${action}
   </article>`;
 }
 
@@ -1308,11 +1374,14 @@ function thumbnail(bed, large = false) {
 }
 
 function harvestCard(harvest) {
+  const unit = { piece: t("pièce", "piece", "stuk"), bunch: t("botte", "bunch", "bos") }[harvest.unit] ?? harvest.unit;
+  const quantity = harvest.amount == null ? harvest.quantity : `${harvest.amount} ${unit}`;
   return `<article class="harvest-card">
     ${harvest.photoUrl ? `<img src="${escapeHtml(harvest.photoUrl)}" alt="${escapeHtml(t("Photo de récolte", "Harvest photo"))}" loading="lazy">` : ""}
-    <div><strong>${escapeHtml(harvest.quantity || t("Récolte partagée", "Shared harvest"))}</strong>
+    <div><strong>${escapeHtml(quantity || t("Récolte partagée", "Shared harvest"))}</strong>
+      ${harvest.batchId ? `<p><a href="#/batches/${escapeHtml(harvest.batchId)}">${t("Voir le lot", "View batch", "Partij bekijken")}</a></p>` : ""}
       ${harvest.note ? `<p>${escapeHtml(harvest.note)}</p>` : ""}
-      <small>${escapeHtml(harvest.memberName || t("Membre", "Member"))} - ${escapeHtml(relativeDate(harvest.createdAt))}</small>
+      <small>${escapeHtml(harvest.memberName || t("Membre", "Member"))} - ${escapeHtml(harvest.harvestedOn || relativeDate(harvest.createdAt))}</small>
     </div>
   </article>`;
 }
@@ -1353,6 +1422,7 @@ function renderGarden() {
   const area = state.areas.find((item) => item.id === state.selectedAreaId) || state.areas[0];
   const bedCountLabel = (count) => t(`${count} planche${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "s"}`, `${count} bed${count === 1 ? "" : "den"}`);
   return `<section class="page garden-page">
+    <div><a class="button secondary" href="#/garden-plan${area ? "/" + area.id : ""}">${t("Plan du jardin", "Garden plan", "Tuinplan")}</a></div>
     <div class="page-title"><div><p class="eyebrow">${t("Cultiver ensemble", "Growing together", "Samen tuinieren")}</p><h1>Les potagers</h1><p class="lede">${t("Les cultures et les travaux de chaque planche.", "Crops and work for every bed.", "Gewassen en werk voor elk bed.")}</p></div>${isCoordinator() ? '<button class="round-add" id="manage-areas" aria-label="Gérer les lieux">⚙</button>' : ""}</div>
     <div class="area-switcher">${state.areas.map((item) => `<button data-area-id="${item.id}" class="${item.id === area?.id ? "active" : ""}"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(bedCountLabel(item.bedCount))}</small></span>${!item.membersCanAccess ? `<em>${t("Coordination", "Coordination")}</em>` : ""}</button>`).join("")}</div>
     ${area ? `<div class="area-intro"><div><p class="eyebrow">${area.membersCanAccess ? t("Accessible aux membres", "Accessible to members") : t("Accès coordinateurs", "Coordinator access")}</p><h2>${escapeHtml(area.name)}</h2><p>${escapeHtml(area.description || t("Lieu du potager partagé.", "Shared garden place."))}</p></div>${isCoordinator() ? `<button class="button secondary" id="add-bed">+ ${t("Ajouter une planche", "Add a bed")}</button>` : ""}</div>` : ""}
@@ -1416,6 +1486,15 @@ function renderProfile() {
       </form>
     </section>
     ${applicationSettingsPanel()}
+    <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
+  </section>`;
+}
+
+function renderManagement() {
+  if (!isCoordinator()) return renderProfile();
+  return `<section class="page profile-page">
+    <h1>${state.member.role === "admin" ? t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") :
+      t("Comptes membres", "Member accounts", "Ledenaccounts")}</h1>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Profils", "Profiles", "Profielen")}</p><h2>${t("Les membres", "Members", "Leden")}</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span><div class="member-admin-actions">${state.member.role === "admin" && member.role !== "admin" ? `<form class="member-role-form" data-member-role-form="${member.id}"><label class="sr-only" for="member-role-${member.id}">${t("Type de membre", "Member type", "Ledentype")}</label><select id="member-role-${member.id}" name="role"><option value="member" ${member.role === "member" ? "selected" : ""}>${t("Membre", "Member", "Lid")}</option><option value="coordinator" ${member.role === "coordinator" ? "selected" : ""}>${t("Coordinateur", "Coordinator", "Coördinator")}</option></select><button class="reset-link-button" type="submit">${t("Enregistrer", "Save", "Opslaan")}</button></form>` : ""}${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">${t("Nouvel accès", "New access", "Nieuwe toegang")}</button>` : ""}</div></div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? publicSiteAdminSettings() : ""}
@@ -1423,7 +1502,6 @@ function renderProfile() {
     ${state.member.role === "admin" ? `<section class="panel backup-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Administration", "Administration", "Beheer")}</p><h2>${t("Sauvegarde complète", "Complete backup", "Volledige back-up")}</h2></div></div><p class="muted">${t("Cette exportation contient toutes les données privées de ParcOS, les mots de passe hachés et les médias téléversés. Conservez-la dans un emplacement sûr.", "This export contains all private ParcOS data, password hashes, and uploaded media. Store it securely.", "Deze export bevat alle privégegevens van ParcOS, wachtwoord-hashes en geüploade media. Bewaar hem veilig.")}</p><form id="complete-backup-form" class="form-stack compact-form"><label>${t("Mot de passe actuel", "Current password", "Huidig wachtwoord")}<input name="currentPassword" type="password" autocomplete="current-password" required></label><button class="button secondary" type="submit">${t("Télécharger la sauvegarde complète", "Download complete backup", "Volledige back-up downloaden")}</button></form><div id="backup-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel translation-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Traductions du contenu</h2></div></div><p class="muted">Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ <code>translation</code> dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.</p><div class="translation-actions"><button class="button secondary" type="button" id="translation-export">Télécharger le fichier horodaté</button><form id="translation-import-form" class="form-stack compact-form"><label>Fichier JSON traduit<input id="translation-file" type="file" accept=".json,application/json" required></label><button class="button secondary" type="submit">Réimporter les traductions</button></form></div><div id="translation-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
-    <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
 }
 
@@ -1468,7 +1546,16 @@ function applicationSettingsPanel() {
 }
 
 function bindShell() {
+  document.querySelector("#workspace-select")?.addEventListener("change", (event) => {
+    const workspace = event.target.value;
+    localStorage.setItem("parcos_workspace", workspace);
+    state.page = { community: "today", contributor: "garden", coordinator: "garden", administration: "management" }[workspace];
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    renderApp();
+    document.querySelector("#workspace-select")?.focus();
+  });
   document.querySelectorAll("[data-page]").forEach((button) => button.addEventListener("click", () => {
+    if (agriculturePage(location.hash)) history.replaceState(null, "", location.pathname + location.search);
     state.page = button.dataset.page;
     renderApp();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2223,6 +2310,7 @@ function renderBedSheet(editing = false) {
     <div class="bed-sheet-photo">${thumbnail(bed, true)}<span class="large-number">${escapeHtml(String(bed.number).padStart(2, "0"))}</span></div>
     <div class="sheet-content">
       <div class="bed-identifier">${escapeHtml(bed.code)}</div>
+      <a class="button secondary" href="#/garden-plan/beds/${bed.id}">${t("Mesures et plan", "Measurements and map", "Metingen en kaart")}</a>
       <div class="detail-title"><div class="detail-title-copy"><h2 id="bed-title">${escapeHtml(bed.crop || t("Planche disponible", "Available bed"))}</h2><p>${escapeHtml(bed.variety || t("Aucune culture renseignée", "No crop listed"))}</p><span class="status-badge ${status.tone}">${escapeHtml(status.label)}</span></div>${isCoordinator() && !editing ? `<div class="detail-title-actions"><button class="round-tool-button" id="edit-bed-button" type="button" aria-label="${t("Modifier la planche", "Edit bed")}" title="${t("Modifier la planche", "Edit bed")}">${editIcon()}</button><label class="round-tool-button file-button" aria-label="${t("Ajouter une photo", "Add a photo")}" title="${t("Ajouter une photo", "Add a photo")}">${cameraIcon()}<input id="bed-photo-input" type="file" accept="image/jpeg,image/png,image/webp"></label></div>` : ""}</div>
       ${!editing ? `<div class="bed-actions"><div class="section-heading compact"><div><p class="eyebrow">${t("Action rapide", "Quick action", "Snelle actie")}</p><h3>${t("Que venez-vous de faire ?", "What did you just do?", "Wat hebt u net gedaan?")}</h3></div></div><div class="bed-action-grid">${quickActions}</div></div>` : ""}
       ${editing ? bedEditForm(bed) : `<div class="detail-section note-section"><div class="section-heading compact"><div><p class="eyebrow">${t("Notes", "Notes")}</p><h3>${t("Commentaires horodatés", "Timestamped comments")}</h3></div><span class="count-pill">${notes.length}</span></div><div class="note-list">${noteList}</div></div>${bed.harvestNote ? `<div class="harvest-note"><small>${t("Dernière consigne de récolte", "Latest harvest instruction")}</small><p>${escapeHtml(bed.harvestNote)}</p></div>` : ""}
