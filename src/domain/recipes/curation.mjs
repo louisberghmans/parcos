@@ -820,5 +820,5 @@ export function formatCurationReportMarkdown(report) {
     lines.push("");
   }
 
-  return `${lines.join("\n")}\n`;
+  return `${lines.join("\n").trimEnd()}\n`;
 }
