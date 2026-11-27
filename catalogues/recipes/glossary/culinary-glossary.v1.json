@@ -1,0 +1,40 @@
+{
+  "format": "parcos-culinary-glossary-v1",
+  "localeNotes": {
+    "fr": "French (standard culinary French used in Belgium/France)",
+    "nl": "Belgian Dutch (natural Flemish kitchen vocabulary, not Netherlands-only phrasing)",
+    "en": "English (clear metric culinary vocabulary)"
+  },
+  "entries": [
+    { "key": "courgette", "fr": "courgette", "nl": "courgette", "en": "zucchini (courgette)", "alwaysInclude": false },
+    { "key": "tomato", "fr": "tomate", "nl": "tomaat", "en": "tomato", "alwaysInclude": false },
+    { "key": "aubergine", "fr": "aubergine", "nl": "aubergine", "en": "eggplant (aubergine)", "alwaysInclude": false },
+    { "key": "leek", "fr": "poireau", "nl": "prei", "en": "leek", "alwaysInclude": false },
+    { "key": "chard", "fr": "bette / blette", "nl": "snijbiet / warmoes", "en": "Swiss chard", "alwaysInclude": false },
+    { "key": "kohlrabi", "fr": "chou-rave", "nl": "koolrabi", "en": "kohlrabi", "alwaysInclude": false },
+    { "key": "celeriac", "fr": "céleri-rave", "nl": "knolselder", "en": "celeriac", "alwaysInclude": false },
+    { "key": "jerusalem_artichoke", "fr": "topinambour", "nl": "aardpeer", "en": "Jerusalem artichoke", "alwaysInclude": false },
+    { "key": "beetroot", "fr": "betterave rouge", "nl": "rode biet", "en": "beetroot", "alwaysInclude": false },
+    { "key": "carrot", "fr": "carotte", "nl": "wortel", "en": "carrot", "alwaysInclude": false },
+    { "key": "potato", "fr": "pomme de terre", "nl": "aardappel", "en": "potato", "alwaysInclude": false },
+    { "key": "green_bean", "fr": "haricot vert", "nl": "prinsessenboon", "en": "green bean", "alwaysInclude": false },
+    { "key": "dry_bean", "fr": "haricot sec", "nl": "droge boon", "en": "dried bean", "alwaysInclude": false },
+    { "key": "pea", "fr": "petit pois", "nl": "erwt", "en": "pea", "alwaysInclude": false },
+    { "key": "turnip", "fr": "navet", "nl": "raap", "en": "turnip", "alwaysInclude": false },
+    { "key": "squash", "fr": "potimarron / courge", "nl": "pompoen", "en": "winter squash", "alwaysInclude": false },
+    { "key": "cucumber", "fr": "concombre", "nl": "komkommer", "en": "cucumber", "alwaysInclude": false },
+    { "key": "bell_pepper", "fr": "poivron", "nl": "paprika", "en": "bell pepper", "alwaysInclude": false },
+    { "key": "onion", "fr": "oignon", "nl": "ajuin / ui", "en": "onion", "alwaysInclude": false },
+    { "key": "garlic", "fr": "ail", "nl": "look / knoflook", "en": "garlic", "alwaysInclude": false },
+    { "key": "cabbage", "fr": "chou", "nl": "kool", "en": "cabbage", "alwaysInclude": false },
+    { "key": "lettuce", "fr": "laitue", "nl": "sla", "en": "lettuce", "alwaysInclude": false },
+    { "key": "spinach", "fr": "épinard", "nl": "spinazie", "en": "spinach", "alwaysInclude": false },
+    { "key": "basil", "fr": "basilic", "nl": "basilicum", "en": "basil", "alwaysInclude": false },
+    { "key": "parsley", "fr": "persil", "nl": "peterselie", "en": "parsley", "alwaysInclude": false },
+    { "key": "thyme", "fr": "thym", "nl": "tijm", "en": "thyme", "alwaysInclude": false },
+    { "key": "tbsp", "fr": "cuillère à soupe (c. à s.)", "nl": "eetlepel (el)", "en": "tablespoon (tbsp)", "alwaysInclude": true },
+    { "key": "tsp", "fr": "cuillère à café (c. à c.)", "nl": "koffielepel (kl)", "en": "teaspoon (tsp)", "alwaysInclude": true },
+    { "key": "simmer", "fr": "faire mijoter", "nl": "laten sudderen", "en": "simmer", "alwaysInclude": true },
+    { "key": "saute", "fr": "faire revenir", "nl": "aanstoven / aanbakken", "en": "sauté", "alwaysInclude": true }
+  ]
+}

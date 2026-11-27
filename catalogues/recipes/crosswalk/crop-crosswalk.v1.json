@@ -1,0 +1,192 @@
+{
+  "format": "parcos-recipe-crop-crosswalk-v1",
+  "note": "Maps canonical culinary ingredientKeys to provisional M2 cropKeys (1-80 char opaque IDs per docs/agriculture-recipe-contract.md). Ingredient identity is culinary (not botanical variety or seed SKU). No provisional crosswalk key implies a corresponding installed crop in GET /api/agriculture/catalogue; resolve against installed reviewed crops before enabling production planning.",
+  "entries": [
+    {
+      "ingredientKey": "courgette",
+      "ediblePart": "fruit",
+      "names": { "fr": "Courgette", "nl": "Courgette", "en": "Zucchini (courgette)" },
+      "cropKeys": ["crop_courgette"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {
+        "piece": {
+          "factorToGrams": 250,
+          "reviewed": true,
+          "evidence": "Provisional Belgian garden medium courgette reference (250 g); confirm with M2 local calibration"
+        }
+      }
+    },
+    {
+      "ingredientKey": "tomato",
+      "ediblePart": "fruit",
+      "names": { "fr": "Tomate", "nl": "Tomaat", "en": "Tomato" },
+      "cropKeys": ["crop_tomato"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "leek",
+      "ediblePart": "stem_and_leaf",
+      "names": { "fr": "Poireau", "nl": "Prei", "en": "Leek" },
+      "cropKeys": ["crop_leek"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {
+        "piece": {
+          "factorToGrams": 180,
+          "reviewed": true,
+          "evidence": "Provisional medium trimmed leek reference (180 g)"
+        }
+      }
+    },
+    {
+      "ingredientKey": "chard",
+      "ediblePart": "leaf_and_stalk",
+      "names": { "fr": "Bette", "nl": "Snijbiet", "en": "Swiss chard" },
+      "cropKeys": ["crop_chard"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "kohlrabi",
+      "ediblePart": "swollen_stem",
+      "names": { "fr": "Chou-rave", "nl": "Koolrabi", "en": "Kohlrabi" },
+      "cropKeys": ["crop_kohlrabi"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {
+        "piece": {
+          "factorToGrams": 220,
+          "reviewed": true,
+          "evidence": "Provisional trimmed kohlrabi bulb reference (220 g)"
+        }
+      }
+    },
+    {
+      "ingredientKey": "celeriac",
+      "ediblePart": "root",
+      "names": { "fr": "Céleri-rave", "nl": "Knolselder", "en": "Celeriac" },
+      "cropKeys": ["crop_celeriac"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "jerusalem_artichoke",
+      "ediblePart": "tuber",
+      "names": { "fr": "Topinambour", "nl": "Aardpeer", "en": "Jerusalem artichoke" },
+      "cropKeys": ["crop_jerusalem_artichoke"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "green_bean",
+      "ediblePart": "fresh_pod",
+      "names": { "fr": "Haricot vert", "nl": "Prinsessenboon", "en": "Green bean" },
+      "cropKeys": ["crop_green_bean"],
+      "mappingStatus": "reviewed",
+      "note": "Distinct from dry_bean (dried seed)",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "dry_bean",
+      "ediblePart": "dried_seed",
+      "names": { "fr": "Haricot sec", "nl": "Droge boon", "en": "Dried bean" },
+      "cropKeys": ["crop_dry_bean"],
+      "mappingStatus": "proposed",
+      "note": "Distinct from green_bean; verify M2 dry-bean storage crop key before planning",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "carrot",
+      "ediblePart": "root",
+      "names": { "fr": "Carotte", "nl": "Wortel", "en": "Carrot" },
+      "cropKeys": ["crop_carrot"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "potato",
+      "ediblePart": "tuber",
+      "names": { "fr": "Pomme de terre", "nl": "Aardappel", "en": "Potato" },
+      "cropKeys": ["crop_potato"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "beetroot",
+      "ediblePart": "root",
+      "names": { "fr": "Betterave rouge", "nl": "Rode biet", "en": "Beetroot" },
+      "cropKeys": ["crop_beetroot"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "squash",
+      "ediblePart": "fruit",
+      "names": { "fr": "Potimarron / courge", "nl": "Pompoen", "en": "Winter squash" },
+      "cropKeys": ["crop_squash"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "onion",
+      "ediblePart": "bulb",
+      "names": { "fr": "Oignon", "nl": "Ajuin", "en": "Onion" },
+      "cropKeys": ["crop_onion"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {
+        "piece": {
+          "factorToGrams": 110,
+          "reviewed": true,
+          "evidence": "Provisional medium onion reference (110 g)"
+        }
+      }
+    },
+    {
+      "ingredientKey": "garlic",
+      "ediblePart": "clove",
+      "names": { "fr": "Ail", "nl": "Look", "en": "Garlic" },
+      "cropKeys": ["crop_garlic"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {
+        "clove": {
+          "factorToGrams": 5,
+          "reviewed": true,
+          "evidence": "Provisional single garlic clove reference (5 g)"
+        }
+      }
+    },
+    {
+      "ingredientKey": "pea",
+      "ediblePart": "fresh_seed",
+      "names": { "fr": "Petit pois", "nl": "Erwt", "en": "Pea" },
+      "cropKeys": ["crop_pea"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "aubergine",
+      "ediblePart": "fruit",
+      "names": { "fr": "Aubergine", "nl": "Aubergine", "en": "Eggplant (aubergine)" },
+      "cropKeys": ["crop_aubergine"],
+      "mappingStatus": "reviewed",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "basil",
+      "ediblePart": "leaf",
+      "names": { "fr": "Basilic", "nl": "Basilicum", "en": "Basil" },
+      "cropKeys": ["crop_basil"],
+      "mappingStatus": "unresolved",
+      "note": "Unresolved until M2 defines herb bunch mass and basil crop key",
+      "unitConversions": {}
+    },
+    {
+      "ingredientKey": "parsley",
+      "ediblePart": "leaf",
+      "names": { "fr": "Persil", "nl": "Peterselie", "en": "Parsley" },
+      "cropKeys": ["crop_parsley"],
+      "mappingStatus": "unresolved",
+      "note": "Unresolved herb bunch conversion",
+      "unitConversions": {}
+    }
+  ]
+}

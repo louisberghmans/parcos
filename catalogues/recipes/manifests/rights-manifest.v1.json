@@ -1,0 +1,116 @@
+{
+  "catalogueVersion": "0.1.0-synthetic",
+  "contentPolicy": "Per-recipe and per-image rights are tracked independently. No blanket license is applied to imported content.",
+  "excludedRecords": [
+    {
+      "licenseId": "CC-BY-NC-4.0",
+      "reason": "License \"CC-BY-NC-4.0\" (restricted_nc) is not cleared for automatic import/adaptation",
+      "rowNumber": 8,
+      "title": "Ratatouille sous licence NC (doit être exclue)",
+      "upstreamId": "synth-cl-nc-blocked"
+    }
+  ],
+  "format": "parcos-recipe-rights-manifest-v1",
+  "generatedAt": "2026-11-27T23:01:22.471Z",
+  "includedRecords": [
+    {
+      "assetType": "image_excluded",
+      "licenseId": "UNKNOWN",
+      "mediaKey": "unverified-image-quarantined",
+      "reason": "Image excluded (License unknown; quarantine as link-only candidate without copying prose or images); UI will display neutral placeholder",
+      "recipeKey": "synthetic:tarte-poireaux-bettes"
+    },
+    {
+      "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+      "media": [],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:gratin-celeri-rave-topinambours",
+      "revision": "1.0",
+      "rightsStatus": "cleared",
+      "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-gratin-celeri-topinambours",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "textLicenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+      "media": [],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:poelee-haricots-verts-tomates",
+      "revision": "1.0",
+      "rightsStatus": "cleared",
+      "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-haricots-tomates",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "textLicenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+      "media": [],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:potimarron-roti-betteraves-automne",
+      "revision": "1.0",
+      "rightsStatus": "cleared",
+      "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-potimarron-betteraves",
+      "textLicenseId": "CC0-1.0",
+      "textLicenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+      "media": [],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:salade-chou-rave-carottes-printemps",
+      "revision": "1.0",
+      "rightsStatus": "cleared",
+      "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-salade-chou-rave",
+      "textLicenseId": "CC-BY-4.0",
+      "textLicenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+      "media": [],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:tarte-poireaux-bettes",
+      "revision": "1.0",
+      "rightsStatus": "cleared",
+      "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-tarte-poireaux-bettes",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "textLicenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "attribution": "Auteur à vérifier — Cuisine Libre authorized export",
+      "media": [],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:tarte-tomates-licence-inconnue",
+      "revision": "1.0",
+      "rightsStatus": "link_only",
+      "sourceEvidence": "License unclear — quarantined as link-only candidate pending maintainer confirmation",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-unknown-license",
+      "textLicenseId": "UNKNOWN",
+      "textLicenseUrl": null
+    },
+    {
+      "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+      "media": [
+        {
+          "credit": "Synthetic placeholder metadata (no binary image bundled)",
+          "licenseId": "CC-BY-4.0",
+          "localAsset": null,
+          "mediaKey": "courgette-soup-photo"
+        }
+      ],
+      "origin": "synthetic",
+      "recipeKey": "synthetic:veloute-courgettes-potager",
+      "revision": "1.0",
+      "rightsStatus": "cleared",
+      "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification (not live Cuisine Libre content)",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-veloute-courgettes",
+      "textLicenseId": "CC-BY-SA-4.0",
+      "textLicenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    }
+  ],
+  "softwareLicense": "GPL-3.0-or-later"
+}

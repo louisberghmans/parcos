@@ -1,0 +1,1566 @@
+{
+  "catalogueVersion": "0.1.0-synthetic",
+  "checksumSha256": "4cfbd83834db7d7b031e85438f68b66b56516f23b1d4813e8b54ceaf95a52406",
+  "createdAt": "2026-11-27T23:01:22.471Z",
+  "ingredientReferences": [
+    {
+      "cropKeys": [
+        "crop_basil"
+      ],
+      "ingredientKey": "basil",
+      "mappingStatus": "unresolved",
+      "names": {
+        "en": "Basil",
+        "fr": "Basilic",
+        "nl": "Basilicum"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_beetroot"
+      ],
+      "ingredientKey": "beetroot",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Beetroot",
+        "fr": "Betterave rouge",
+        "nl": "Rode biet"
+      }
+    },
+    {
+      "cropKeys": [],
+      "ingredientKey": "butter",
+      "mappingStatus": "not_applicable",
+      "names": {
+        "en": "butter",
+        "fr": "butter",
+        "nl": "butter"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_carrot"
+      ],
+      "ingredientKey": "carrot",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Carrot",
+        "fr": "Carotte",
+        "nl": "Wortel"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_celeriac"
+      ],
+      "ingredientKey": "celeriac",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Celeriac",
+        "fr": "Céleri-rave",
+        "nl": "Knolselder"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_chard"
+      ],
+      "ingredientKey": "chard",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Swiss chard",
+        "fr": "Bette",
+        "nl": "Snijbiet"
+      }
+    },
+    {
+      "cropKeys": [],
+      "ingredientKey": "cider_vinegar",
+      "mappingStatus": "not_applicable",
+      "names": {
+        "en": "cider_vinegar",
+        "fr": "cider_vinegar",
+        "nl": "cider_vinegar"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_courgette"
+      ],
+      "ingredientKey": "courgette",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Zucchini (courgette)",
+        "fr": "Courgette",
+        "nl": "Courgette"
+      }
+    },
+    {
+      "cropKeys": [],
+      "ingredientKey": "cream",
+      "mappingStatus": "not_applicable",
+      "names": {
+        "en": "cream",
+        "fr": "cream",
+        "nl": "cream"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_garlic"
+      ],
+      "ingredientKey": "garlic",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Garlic",
+        "fr": "Ail",
+        "nl": "Look"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_green_bean"
+      ],
+      "ingredientKey": "green_bean",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Green bean",
+        "fr": "Haricot vert",
+        "nl": "Prinsessenboon"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_jerusalem_artichoke"
+      ],
+      "ingredientKey": "jerusalem_artichoke",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Jerusalem artichoke",
+        "fr": "Topinambour",
+        "nl": "Aardpeer"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_kohlrabi"
+      ],
+      "ingredientKey": "kohlrabi",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Kohlrabi",
+        "fr": "Chou-rave",
+        "nl": "Koolrabi"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_leek"
+      ],
+      "ingredientKey": "leek",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Leek",
+        "fr": "Poireau",
+        "nl": "Prei"
+      }
+    },
+    {
+      "cropKeys": [],
+      "ingredientKey": "olive_oil",
+      "mappingStatus": "not_applicable",
+      "names": {
+        "en": "olive_oil",
+        "fr": "olive_oil",
+        "nl": "olive_oil"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_onion"
+      ],
+      "ingredientKey": "onion",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Onion",
+        "fr": "Oignon",
+        "nl": "Ajuin"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_potato"
+      ],
+      "ingredientKey": "potato",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Potato",
+        "fr": "Pomme de terre",
+        "nl": "Aardappel"
+      }
+    },
+    {
+      "cropKeys": [],
+      "ingredientKey": "rapeseed_oil",
+      "mappingStatus": "not_applicable",
+      "names": {
+        "en": "rapeseed_oil",
+        "fr": "rapeseed_oil",
+        "nl": "rapeseed_oil"
+      }
+    },
+    {
+      "cropKeys": [],
+      "ingredientKey": "salt",
+      "mappingStatus": "not_applicable",
+      "names": {
+        "en": "salt",
+        "fr": "salt",
+        "nl": "salt"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_squash"
+      ],
+      "ingredientKey": "squash",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Winter squash",
+        "fr": "Potimarron / courge",
+        "nl": "Pompoen"
+      }
+    },
+    {
+      "cropKeys": [
+        "crop_tomato"
+      ],
+      "ingredientKey": "tomato",
+      "mappingStatus": "reviewed",
+      "names": {
+        "en": "Tomato",
+        "fr": "Tomate",
+        "nl": "Tomaat"
+      }
+    }
+  ],
+  "recipes": [
+    {
+      "archiveUrl": null,
+      "authorCredit": "Fixture synthétique ParcOS",
+      "content": {
+        "baseServings": 4,
+        "category": "gratin",
+        "cookMinutes": 45,
+        "dietary": [
+          "vegetarian",
+          "gluten_free"
+        ],
+        "foodSafetyNote": null,
+        "locales": {
+          "en": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Preheat the oven to 180 °C.",
+              "Peel and thinly slice 600 g of celeriac and 400 g of Jerusalem artichokes.",
+              "Layer in an oiled baking dish with 1 crushed clove of garlic and 250 ml cream.",
+              "Bake for 45 minutes until easily pierced with a knife."
+            ],
+            "summary": "A comforting, tender winter bake celebrating garden roots and tubers.",
+            "title": "Winter Celeriac and Jerusalem Artichoke Gratin"
+          },
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Préchauffer le four à 180 °C.",
+              "Peler et trancher finement 600 g de céleri-rave et 400 g de topinambours.",
+              "Disposer en couches dans un plat huilé avec 1 gousse d'ail écrasée et 250 ml de crème.",
+              "Enfourner 45 minutes jusqu'à ce que la lame d'un couteau s'enfonce sans résistance."
+            ],
+            "summary": "Un gratin fondant et parfumé pour cuisiner les racines et tubercules d'hiver.",
+            "title": "Gratin d'hiver au céleri-rave et topinambours"
+          },
+          "nl": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Verwarm de oven voor op 180 °C.",
+              "Schil en snijd 600 g knolselder en 400 g aardperen in dunne plakjes.",
+              "Schik in laagjes in een ingevette schotel met 1 geplet teentje look en 250 ml room.",
+              "Bak 45 minuten in de oven tot een mes er moeiteloos in glijdt."
+            ],
+            "summary": "Een zachte, geurige ovenschotel voor winterse wortel- en knolgroenten.",
+            "title": "Wintergratin van knolselder en aardpeer"
+          }
+        },
+        "prepMinutes": 20,
+        "restMinutes": 5,
+        "seasons": [
+          "winter"
+        ],
+        "tags": [
+          "comfort",
+          "winter-roots",
+          "family"
+        ]
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [],
+        "planningReady": true,
+        "priorRevisions": [],
+        "shortlistScore": {
+          "breakdown": {
+            "accessibilitySimplicity": 75,
+            "belgianGardenRelevance": 100,
+            "culinaryAppeal": 100,
+            "familyAppeal": 100,
+            "produceQuantityImpact": 100,
+            "seasonalDiversity": 100
+          },
+          "flags": [],
+          "rationale": "concise structured steps; Belgian garden produce (celeriac, jerusalem_artichoke, garlic); substantial produce (~251 g/serving); family/weekday friendly",
+          "rubricNote": "Adjustable editorial shortlist aid; not a taste-test rating or popularity score",
+          "totalScore": 98
+        },
+        "workflowStatus": "approved"
+      },
+      "ingredients": [
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_celeriac"
+            ],
+            "ediblePart": "root",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "root",
+          "group": null,
+          "ingredientKey": "celeriac",
+          "originalText": "600 g de céleri-rave",
+          "preparationNote": null,
+          "quantity": 600,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_jerusalem_artichoke"
+            ],
+            "ediblePart": "tuber",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "tuber",
+          "group": null,
+          "ingredientKey": "jerusalem_artichoke",
+          "originalText": "400 g de topinambours",
+          "preparationNote": null,
+          "quantity": 400,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": {
+              "evidence": "Provisional single garlic clove reference (5 g)",
+              "factorToGrams": 5,
+              "reviewed": true,
+              "unit": "clove"
+            },
+            "cropKeys": [
+              "crop_garlic"
+            ],
+            "ediblePart": "clove",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "clove",
+          "group": null,
+          "ingredientKey": "garlic",
+          "originalText": "1 gousse d'ail",
+          "preparationNote": null,
+          "quantity": 1,
+          "quantityMax": null,
+          "required": false,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "clove"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "cream",
+          "originalText": "250 ml de crème liquide",
+          "preparationNote": null,
+          "quantity": 250,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "ml"
+        }
+      ],
+      "media": [],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:gratin-celeri-rave-topinambours",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+        "status": "cleared"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-gratin-celeri-topinambours",
+      "upstreamId": "synth-cl-004"
+    },
+    {
+      "archiveUrl": null,
+      "authorCredit": "Fixture synthétique ParcOS",
+      "content": {
+        "baseServings": 4,
+        "category": "side",
+        "cookMinutes": 16,
+        "dietary": [
+          "vegetarian",
+          "vegan",
+          "gluten_free",
+          "dairy_free"
+        ],
+        "foodSafetyNote": null,
+        "locales": {
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Équeuter 600 g de haricots verts et les blanchir 6 minutes dans l'eau bouillante salée.",
+              "Couper 500 g de tomates mûres en quartiers.",
+              "Faire revenir les haricots et les tomates 10 minutes à l'huile d'olive avec du basilic frais."
+            ],
+            "summary": "Un accompagnement d'été parfumé au basilic; exemple avec une herbe non convertie en masse.",
+            "title": "Poêlée méditerranéenne de haricots verts et tomates"
+          },
+          "nl": {
+            "provenance": "synthetic_demo_unreviewed",
+            "reviewStatus": "machine_unreviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Haal de puntjes van 600 g prinsessenbonen en blancheer ze 6 minuten in gezouten kokend water.",
+              "Snijd 500 g rijpe tomaten in partjes.",
+              "Stoof de bonen en tomaten 10 minuten in olijfolie met verse basilicum."
+            ],
+            "summary": "Een zomers bijgerecht met basilicum; voorbeeld met een nog niet geconverteerde kruidenbos.",
+            "title": "Mediterrane pan van prinsessenbonen en tomaten"
+          }
+        },
+        "prepMinutes": 15,
+        "restMinutes": 0,
+        "seasons": [
+          "summer"
+        ],
+        "tags": [
+          "mediterranean",
+          "weekday"
+        ]
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [
+          {
+            "code": "missing_unit_conversion",
+            "ingredientKey": "basil",
+            "message": "Required garden ingredient \"basil\" uses \"bunch\" without a reviewed mass conversion factor",
+            "unit": "bunch"
+          },
+          {
+            "code": "unmapped_crop",
+            "ingredientKey": "basil",
+            "mappingStatus": "unresolved",
+            "message": "Required garden ingredient \"basil\" lacks a reviewed M2 crop mapping"
+          }
+        ],
+        "planningReady": false,
+        "priorRevisions": [],
+        "shortlistScore": {
+          "breakdown": {
+            "accessibilitySimplicity": 100,
+            "belgianGardenRelevance": 100,
+            "culinaryAppeal": 100,
+            "familyAppeal": 100,
+            "produceQuantityImpact": 100,
+            "seasonalDiversity": 100
+          },
+          "flags": [
+            "has_unconverted_or_missing_garden_quantity"
+          ],
+          "rationale": "concise structured steps; Belgian garden produce (green_bean, tomato, basil); substantial produce (~275 g/serving); family/weekday friendly; accessible timing (31 min)",
+          "rubricNote": "Adjustable editorial shortlist aid; not a taste-test rating or popularity score",
+          "totalScore": 100
+        },
+        "workflowStatus": "approved"
+      },
+      "ingredients": [
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_green_bean"
+            ],
+            "ediblePart": "fresh_pod",
+            "note": "Distinct from dry_bean (dried seed)",
+            "status": "reviewed"
+          },
+          "ediblePart": "fresh_pod",
+          "group": null,
+          "ingredientKey": "green_bean",
+          "originalText": "600 g de haricots verts",
+          "preparationNote": null,
+          "quantity": 600,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_tomato"
+            ],
+            "ediblePart": "fruit",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "fruit",
+          "group": null,
+          "ingredientKey": "tomato",
+          "originalText": "500 g de tomates mûres",
+          "preparationNote": null,
+          "quantity": 500,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_basil"
+            ],
+            "ediblePart": "leaf",
+            "note": "Unresolved until M2 defines herb bunch mass and basil crop key",
+            "status": "unresolved"
+          },
+          "ediblePart": "leaf",
+          "group": null,
+          "ingredientKey": "basil",
+          "originalText": "1 bouquet de basilic",
+          "preparationNote": null,
+          "quantity": 1,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "bunch"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "olive_oil",
+          "originalText": "2 c. à s. d'huile d'olive",
+          "preparationNote": null,
+          "quantity": 2,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "tbsp"
+        }
+      ],
+      "media": [],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:poelee-haricots-verts-tomates",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+        "status": "cleared"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-haricots-tomates",
+      "upstreamId": "synth-cl-005"
+    },
+    {
+      "archiveUrl": null,
+      "authorCredit": "Fixture synthétique ParcOS",
+      "content": {
+        "baseServings": 4,
+        "category": "main",
+        "cookMinutes": 35,
+        "dietary": [
+          "vegetarian",
+          "vegan",
+          "gluten_free",
+          "dairy_free"
+        ],
+        "foodSafetyNote": null,
+        "locales": {
+          "en": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Preheat the oven to 200 °C.",
+              "Cut 700 g of winter squash (unpeeled) and 400 g of peeled beetroot into even wedges.",
+              "Toss with 3 tbsp olive oil and roast for 35 minutes, turning halfway through."
+            ],
+            "summary": "Caramelized autumn vegetables roasted on one tray for an easy group meal.",
+            "title": "Oven-Roasted Squash and Beetroot"
+          },
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Préchauffer le four à 200 °C.",
+              "Couper 700 g de potimarron (avec la peau) et 400 g de betteraves pelées en quartiers réguliers.",
+              "Mélanger avec 3 c. à s. d'huile d'olive et rôtir 35 minutes en retournant à mi-cuisson."
+            ],
+            "summary": "Des légumes d'automne caramélisés au four, faciles à préparer pour toute la tablée.",
+            "title": "Potimarron et betteraves rôtis au four"
+          },
+          "nl": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Verwarm de oven voor op 200 °C.",
+              "Snijd 700 g pompoen (met schil) en 400 g geschilde rode biet in gelijke partjes.",
+              "Meng met 3 eetlepels olijfolie en rooster 35 minuten; schep halverwege om."
+            ],
+            "summary": "Gekaramelliseerde herfstgroenten uit de oven, makkelijk klaar te maken voor de hele tafel.",
+            "title": "Geroosterde pompoen en rode biet uit de oven"
+          }
+        },
+        "prepMinutes": 15,
+        "restMinutes": 0,
+        "seasons": [
+          "autumn"
+        ],
+        "tags": [
+          "family",
+          "sheet-pan",
+          "autumn-harvest"
+        ]
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [],
+        "planningReady": true,
+        "priorRevisions": [],
+        "shortlistScore": {
+          "breakdown": {
+            "accessibilitySimplicity": 100,
+            "belgianGardenRelevance": 96,
+            "culinaryAppeal": 100,
+            "familyAppeal": 100,
+            "produceQuantityImpact": 100,
+            "seasonalDiversity": 100
+          },
+          "flags": [],
+          "rationale": "concise structured steps; Belgian garden produce (squash, beetroot); substantial produce (~275 g/serving); family/weekday friendly; accessible timing (50 min)",
+          "rubricNote": "Adjustable editorial shortlist aid; not a taste-test rating or popularity score",
+          "totalScore": 99
+        },
+        "workflowStatus": "approved"
+      },
+      "ingredients": [
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_squash"
+            ],
+            "ediblePart": "fruit",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "fruit",
+          "group": null,
+          "ingredientKey": "squash",
+          "originalText": "700 g de potimarron",
+          "preparationNote": null,
+          "quantity": 700,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_beetroot"
+            ],
+            "ediblePart": "root",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "root",
+          "group": null,
+          "ingredientKey": "beetroot",
+          "originalText": "400 g de betteraves rouges",
+          "preparationNote": null,
+          "quantity": 400,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "olive_oil",
+          "originalText": "3 c. à s. d'huile d'olive",
+          "preparationNote": null,
+          "quantity": 3,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "tbsp"
+        }
+      ],
+      "media": [],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:potimarron-roti-betteraves-automne",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "CC0-1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+        "status": "cleared"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-potimarron-betteraves",
+      "upstreamId": "synth-cl-006"
+    },
+    {
+      "archiveUrl": null,
+      "authorCredit": "Fixture synthétique ParcOS",
+      "content": {
+        "baseServings": 4,
+        "category": "salad",
+        "cookMinutes": 0,
+        "dietary": [
+          "vegetarian",
+          "vegan",
+          "gluten_free",
+          "dairy_free"
+        ],
+        "foodSafetyNote": null,
+        "locales": {
+          "en": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Peel 450 g of kohlrabi and cut into fine matchsticks or coarsely grate.",
+              "Wash and grate 300 g of young carrots.",
+              "Whisk 3 tbsp rapeseed oil, 1 tbsp cider vinegar, and 1 tsp mustard.",
+              "Toss the vegetables with the dressing and serve chilled."
+            ],
+            "summary": "A bright, crisp spring salad highlighting fresh garden kohlrabi.",
+            "title": "Crunchy Kohlrabi and Young Carrot Salad"
+          },
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Peler 450 g de chou-rave et les couper en fins bâtonnets ou les râper grossièrement.",
+              "Laver et râper 300 g de carottes nouvelles.",
+              "Mélanger 3 c. à s. d'huile de colza, 1 c. à s. de vinaigre de cidre et 1 c. à c. de moutarde.",
+              "Enrober les légumes de vinaigrette et servir frais."
+            ],
+            "summary": "Une salade printanière vive et croquante qui met le chou-rave à l'honneur.",
+            "title": "Salade croquante de chou-rave et carottes nouvelles"
+          },
+          "nl": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Schil 450 g koolrabi en snijd in fijne reepjes of rasp grof.",
+              "Was en rasp 300 g jonge wortelen.",
+              "Meng 3 eetlepels koolzaadolie, 1 eetlepel appelciderazijn en 1 koffielepel mosterd.",
+              "Schep de groenten om met de vinaigrette en serveer koel."
+            ],
+            "summary": "Een frisse, knapperige lentesalade met koolrabi in de hoofdrol.",
+            "title": "Krokante salade van koolrabi en jonge wortelen"
+          }
+        },
+        "prepMinutes": 15,
+        "restMinutes": 0,
+        "seasons": [
+          "spring"
+        ],
+        "tags": [
+          "weekday",
+          "raw",
+          "spring-harvest"
+        ]
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [],
+        "planningReady": true,
+        "priorRevisions": [],
+        "shortlistScore": {
+          "breakdown": {
+            "accessibilitySimplicity": 100,
+            "belgianGardenRelevance": 96,
+            "culinaryAppeal": 100,
+            "familyAppeal": 100,
+            "produceQuantityImpact": 75,
+            "seasonalDiversity": 100
+          },
+          "flags": [],
+          "rationale": "concise structured steps; Belgian garden produce (kohlrabi, carrot); good produce share (~188 g/serving); family/weekday friendly; accessible timing (15 min)",
+          "rubricNote": "Adjustable editorial shortlist aid; not a taste-test rating or popularity score",
+          "totalScore": 95
+        },
+        "workflowStatus": "approved"
+      },
+      "ingredients": [
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_kohlrabi"
+            ],
+            "ediblePart": "swollen_stem",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "swollen_stem",
+          "group": null,
+          "ingredientKey": "kohlrabi",
+          "originalText": "450 g de chou-rave",
+          "preparationNote": null,
+          "quantity": 450,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_carrot"
+            ],
+            "ediblePart": "root",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "root",
+          "group": null,
+          "ingredientKey": "carrot",
+          "originalText": "300 g de carottes nouvelles",
+          "preparationNote": null,
+          "quantity": 300,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "rapeseed_oil",
+          "originalText": "3 c. à s. d'huile de colza",
+          "preparationNote": null,
+          "quantity": 3,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "tbsp"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "cider_vinegar",
+          "originalText": "1 c. à s. de vinaigre de cidre",
+          "preparationNote": null,
+          "quantity": 1,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "tbsp"
+        }
+      ],
+      "media": [],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:salade-chou-rave-carottes-printemps",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "CC-BY-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+        "status": "cleared"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-salade-chou-rave",
+      "upstreamId": "synth-cl-003"
+    },
+    {
+      "archiveUrl": null,
+      "authorCredit": "Fixture synthétique ParcOS",
+      "content": {
+        "baseServings": 6,
+        "category": "tart_savory",
+        "cookMinutes": 50,
+        "dietary": [
+          "vegetarian"
+        ],
+        "foodSafetyNote": null,
+        "locales": {
+          "en": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Preheat the oven to 190 °C and line a tart tin with shortcrust pastry.",
+              "Slice 500 g of leeks and 400 g of Swiss chard (diced stalks, ribboned leaves).",
+              "Sweat the vegetables gently for 15 minutes in 20 g of butter.",
+              "Whisk 3 eggs with 200 ml cream, pour over the vegetables, and bake for 35 minutes."
+            ],
+            "summary": "A family autumn tart using both the tender stalks and green leaves of Swiss chard.",
+            "title": "Rustic Leek and Swiss Chard Tart"
+          },
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Préchauffer le four à 190 °C et foncer un moule avec la pâte brisée.",
+              "Émincer 500 g de poireaux et 400 g de bettes (côtes en dés, feuilles en lanières).",
+              "Faire fondre les légumes à feu doux 15 minutes dans 20 g de beurre.",
+              "Battre 3 œufs avec 200 ml de crème, verser sur les légumes et cuire 35 minutes."
+            ],
+            "summary": "Une tarte familiale d'automne qui utilise à la fois les côtes et les feuilles de bettes.",
+            "title": "Tarte rustique aux poireaux et bettes"
+          },
+          "nl": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Verwarm de oven voor op 190 °C en bekleed een taartvorm met kruimeldeeg.",
+              "Snijd 500 g prei in ringen en 400 g snijbiet (stelen in blokjes, bladeren in repen).",
+              "Stoof de groenten 15 minuten zachtjes gaar in 20 g boter.",
+              "Klop 3 eieren los met 200 ml room, giet over de groenten en bak 35 minuten."
+            ],
+            "summary": "Een gezinstaart voor de herfst waarin zowel de stelen als de bladeren van de snijbiet verwerkt worden.",
+            "title": "Rustieke taart met prei en snijbiet"
+          }
+        },
+        "prepMinutes": 20,
+        "restMinutes": 5,
+        "seasons": [
+          "autumn",
+          "winter"
+        ],
+        "tags": [
+          "family",
+          "rustic"
+        ]
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [],
+        "planningReady": true,
+        "priorRevisions": [],
+        "shortlistScore": {
+          "breakdown": {
+            "accessibilitySimplicity": 75,
+            "belgianGardenRelevance": 96,
+            "culinaryAppeal": 100,
+            "familyAppeal": 100,
+            "produceQuantityImpact": 75,
+            "seasonalDiversity": 100
+          },
+          "flags": [],
+          "rationale": "concise structured steps; Belgian garden produce (leek, chard); good produce share (~150 g/serving); family/weekday friendly",
+          "rubricNote": "Adjustable editorial shortlist aid; not a taste-test rating or popularity score",
+          "totalScore": 93
+        },
+        "workflowStatus": "approved"
+      },
+      "ingredients": [
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_leek"
+            ],
+            "ediblePart": "stem_and_leaf",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "stem_and_leaf",
+          "group": null,
+          "ingredientKey": "leek",
+          "originalText": "500 g de poireaux",
+          "preparationNote": null,
+          "quantity": 500,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_chard"
+            ],
+            "ediblePart": "leaf_and_stalk",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "leaf_and_stalk",
+          "group": null,
+          "ingredientKey": "chard",
+          "originalText": "400 g de bettes",
+          "preparationNote": null,
+          "quantity": 400,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "butter",
+          "originalText": "20 g de beurre",
+          "preparationNote": null,
+          "quantity": 20,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "cream",
+          "originalText": "200 ml de crème",
+          "preparationNote": null,
+          "quantity": 200,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "ml"
+        }
+      ],
+      "media": [],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:tarte-poireaux-bettes",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification",
+        "status": "cleared"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-tarte-poireaux-bettes",
+      "upstreamId": "synth-cl-002"
+    },
+    {
+      "archiveUrl": null,
+      "authorCredit": "Auteur à vérifier",
+      "content": {
+        "baseServings": null,
+        "category": "tart_savory",
+        "cookMinutes": null,
+        "dietary": [],
+        "foodSafetyNote": null,
+        "locales": {
+          "en": {
+            "provenance": "editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [],
+            "summary": "Unconfirmed license: kept only as a direct link to the original source without copying instructions.",
+            "title": "Heirloom Tomato Tart (link-only candidate)"
+          },
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [],
+            "summary": "Licence non confirmée : conservée uniquement comme référence vers la source originale.",
+            "title": "Tarte aux tomates anciennes (candidat lien seul)"
+          },
+          "nl": {
+            "provenance": "editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [],
+            "summary": "Licentie nog te bevestigen: enkel bewaard als verwijzing naar de originele bron.",
+            "title": "Taart met oude tomatenrassen (enkel link)"
+          }
+        },
+        "prepMinutes": null,
+        "restMinutes": null,
+        "seasons": [
+          "summer"
+        ],
+        "tags": []
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [
+          {
+            "code": "link_only_recipe",
+            "message": "Link-only candidate has no structured recipe text or quantities for demand calculation"
+          },
+          {
+            "code": "missing_base_servings",
+            "message": "Base servings must be defined to scale demand"
+          },
+          {
+            "code": "no_garden_ingredients",
+            "message": "Recipe has no garden-supplied ingredients to drive cultivation demand"
+          }
+        ],
+        "planningReady": false,
+        "priorRevisions": [],
+        "shortlistScore": null,
+        "workflowStatus": "approved"
+      },
+      "ingredients": [],
+      "media": [],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:tarte-tomates-licence-inconnue",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Auteur à vérifier — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "UNKNOWN",
+        "licenseUrl": null,
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "License unclear — quarantined as link-only candidate pending maintainer confirmation",
+        "status": "link_only"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-unknown-license",
+      "upstreamId": "synth-cl-unknown-link"
+    },
+    {
+      "archiveUrl": null,
+      "authorCredit": "Fixture synthétique ParcOS",
+      "content": {
+        "baseServings": 4,
+        "category": "soup",
+        "cookMinutes": 25,
+        "dietary": [
+          "vegetarian",
+          "gluten_free"
+        ],
+        "foodSafetyNote": null,
+        "locales": {
+          "en": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Wash and dice 800 g of zucchini without peeling if they are tender.",
+              "Sauté 1 onion and 2 cloves of garlic in 2 tbsp olive oil for 5 minutes.",
+              "Add the zucchini, 300 g diced potatoes, and 1 l of water or broth.",
+              "Simmer covered for 20 minutes, blend until smooth, and season to taste."
+            ],
+            "summary": "A simple, generous soup that makes great use of an abundant summer zucchini harvest.",
+            "title": "Garden Zucchini Velouté"
+          },
+          "fr": {
+            "conciseAdapted": false,
+            "reviewStatus": "source",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Laver et couper 800 g de courgettes en cubes sans les peler si elles sont jeunes.",
+              "Faire revenir 1 oignon et 2 gousses d'ail dans 2 c. à s. d'huile d'olive pendant 5 minutes.",
+              "Ajouter les courgettes, 300 g de pommes de terre en dés et 1 l d'eau ou de bouillon.",
+              "Laisser mijoter 20 minutes à couvert, puis mixer finement et rectifier l'assaisonnement."
+            ],
+            "summary": "Un velouté simple et généreux qui valorise une belle récolte de courgettes d'été.",
+            "title": "Velouté de courgettes du potager"
+          },
+          "nl": {
+            "provenance": "synthetic_editorial",
+            "reviewStatus": "reviewed",
+            "sourceRevision": "1.0",
+            "steps": [
+              "Was en snijd 800 g courgettes in blokjes; schillen is niet nodig als ze jong zijn.",
+              "Stoof 1 ajuin en 2 teentjes look gedurende 5 minuten aan in 2 eetlepels olijfolie.",
+              "Voeg de courgettes, 300 g aardappelblokjes en 1 l water of bouillon toe.",
+              "Laat 20 minuten afgedekt sudderen, mix fijn en breng op smaak met peper en zout."
+            ],
+            "summary": "Een eenvoudige, royale soep om een flinke zomeroogst aan courgettes te verwerken.",
+            "title": "Fluwelige courgettesoep uit de moestuin"
+          }
+        },
+        "prepMinutes": 15,
+        "restMinutes": 0,
+        "seasons": [
+          "summer"
+        ],
+        "tags": [
+          "weekday",
+          "family",
+          "summer-harvest"
+        ]
+      },
+      "editorial": {
+        "collection": "curated",
+        "cookedVerification": "unverified",
+        "localEditsProtected": false,
+        "planningBlockers": [],
+        "planningReady": true,
+        "priorRevisions": [],
+        "shortlistScore": {
+          "breakdown": {
+            "accessibilitySimplicity": 100,
+            "belgianGardenRelevance": 100,
+            "culinaryAppeal": 100,
+            "familyAppeal": 100,
+            "produceQuantityImpact": 100,
+            "seasonalDiversity": 100
+          },
+          "flags": [],
+          "rationale": "concise structured steps; Belgian garden produce (courgette, potato, onion, garlic); substantial produce (~305 g/serving); family/weekday friendly; accessible timing (40 min)",
+          "rubricNote": "Adjustable editorial shortlist aid; not a taste-test rating or popularity score",
+          "totalScore": 100
+        },
+        "workflowStatus": "approved"
+      },
+      "ingredients": [
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_courgette"
+            ],
+            "ediblePart": "fruit",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "fruit",
+          "group": null,
+          "ingredientKey": "courgette",
+          "originalText": "800 g de courgettes",
+          "preparationNote": null,
+          "quantity": 800,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [
+              "crop_potato"
+            ],
+            "ediblePart": "tuber",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "tuber",
+          "group": null,
+          "ingredientKey": "potato",
+          "originalText": "300 g de pommes de terre",
+          "preparationNote": null,
+          "quantity": 300,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "g"
+        },
+        {
+          "cropMapping": {
+            "conversion": {
+              "evidence": "Provisional medium onion reference (110 g)",
+              "factorToGrams": 110,
+              "reviewed": true,
+              "unit": "piece"
+            },
+            "cropKeys": [
+              "crop_onion"
+            ],
+            "ediblePart": "bulb",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "bulb",
+          "group": null,
+          "ingredientKey": "onion",
+          "originalText": "1 oignon jaune",
+          "preparationNote": null,
+          "quantity": 1,
+          "quantityMax": null,
+          "required": true,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "piece"
+        },
+        {
+          "cropMapping": {
+            "conversion": {
+              "evidence": "Provisional single garlic clove reference (5 g)",
+              "factorToGrams": 5,
+              "reviewed": true,
+              "unit": "clove"
+            },
+            "cropKeys": [
+              "crop_garlic"
+            ],
+            "ediblePart": "clove",
+            "note": null,
+            "status": "reviewed"
+          },
+          "ediblePart": "clove",
+          "group": null,
+          "ingredientKey": "garlic",
+          "originalText": "2 gousses d'ail",
+          "preparationNote": null,
+          "quantity": 2,
+          "quantityMax": null,
+          "required": false,
+          "role": "garden",
+          "substitutions": [],
+          "unit": "clove"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "olive_oil",
+          "originalText": "2 c. à s. d'huile d'olive",
+          "preparationNote": null,
+          "quantity": 2,
+          "quantityMax": null,
+          "required": true,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "tbsp"
+        },
+        {
+          "cropMapping": {
+            "conversion": null,
+            "cropKeys": [],
+            "ediblePart": null,
+            "note": "Pantry ingredient does not drive garden cultivation demand",
+            "status": "not_applicable"
+          },
+          "ediblePart": null,
+          "group": null,
+          "ingredientKey": "salt",
+          "originalText": "Sel et poivre",
+          "preparationNote": null,
+          "quantity": null,
+          "quantityMax": null,
+          "required": false,
+          "role": "pantry",
+          "substitutions": [],
+          "unit": "to_taste"
+        }
+      ],
+      "media": [
+        {
+          "alt": {
+            "en": "Bowl of creamy green zucchini soup",
+            "fr": "Bol de velouté de courgettes vert tendre",
+            "nl": "Kom zachte groene courgettesoep"
+          },
+          "localAsset": null,
+          "mediaKey": "courgette-soup-photo",
+          "reviewStatus": "pending_review",
+          "rights": {
+            "credit": "Synthetic placeholder metadata (no binary image bundled)",
+            "licenseId": "CC-BY-4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification (not live Cuisine Libre content)",
+            "status": "cleared"
+          },
+          "source": "synthetic",
+          "sourceUrl": null,
+          "type": "image"
+        }
+      ],
+      "origin": "synthetic",
+      "parentRevision": null,
+      "recipeKey": "synthetic:veloute-courgettes-potager",
+      "revision": "1.0",
+      "rights": {
+        "attribution": "Fixture synthétique ParcOS — Cuisine Libre authorized export",
+        "importedAt": "2026-11-27T23:01:22.471Z",
+        "licenseId": "CC-BY-SA-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "modifications": null,
+        "publicExportOptIn": null,
+        "sourceEvidence": "Synthetic test fixture created for ParcOS pipeline verification (not live Cuisine Libre content)",
+        "status": "cleared"
+      },
+      "sourceLocale": "fr",
+      "sourceUrl": "https://www.cuisine-libre.org/example-synthetic-veloute-courgettes",
+      "upstreamId": "synth-cl-001"
+    }
+  ],
+  "schemaVersion": "parcos-recipe-bundle-v1",
+  "sourceManifest": {
+    "contentLicensingNote": "Software is licensed under GPL-3.0-or-later. Recipe texts and images carry individual per-record licenses documented in each record and in the rights manifest.",
+    "softwareLicense": "GPL-3.0-or-later",
+    "sources": [
+      {
+        "acquiredAt": "2026-11-27T23:01:22.471Z",
+        "method": "local-json-import",
+        "name": "Cuisine Libre authorized export",
+        "notes": "Local operator import",
+        "sourceId": "cuisine-libre-local-export",
+        "url": "https://www.cuisine-libre.org/"
+      }
+    ]
+  }
+}
