@@ -1,6 +1,7 @@
 import { renderTaskGroup } from "./app/tasks/task-group.js";
 import { mountCatalogue } from "./app/agriculture/catalogue.js";
 import { mountGarden } from "./app/agriculture/garden.js";
+import { mountCultivation } from "./app/agriculture/cultivation.js";
 import { agriculturePage, availableWorkspaces } from "./app/agriculture/workspaces.js";
 
 const app = document.querySelector("#app");
@@ -1042,8 +1043,8 @@ function shell(content) {
   };
   const destinations = {
     community: '<a href="#/crops">' + t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus") + "</a>",
-    contributor: '<a href="#/garden-plan">' + t("Plan du jardin", "Garden plan", "Tuinplan") + "</a>",
-    coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") + "</a>",
+    contributor: '<a href="#/garden-plan">' + t("Plan du jardin", "Garden plan", "Tuinplan") + '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") + "</a>",
+    coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") + '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") + "</a>",
     administration: '<button type="button" data-page="profile">' + t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") + "</button>",
   };
   return `<div class="app-shell">
@@ -1078,6 +1079,11 @@ function renderApp() {
       api, t, escapeHtml, manage: isCoordinator(), areas: state.areas, beds: state.beds,
       bedId: Number(location.hash.split("/")[3]) || null,
     });
+  } else if (route === "batches") {
+    mountCultivation(document.querySelector("#agriculture-page"), {
+      api, t, escapeHtml, locale: currentLocale(), manage: isCoordinator(), beds: state.beds,
+      id: location.hash.split("/")[2] ?? null, compressPhoto,
+    });
   } else if (route) {
     mountCatalogue(document.querySelector("#agriculture-page"), {
       api, t, escapeHtml, locale: currentLocale(), manage: route === "catalogue-admin",
@@ -1088,7 +1094,7 @@ function renderApp() {
 
 window.addEventListener("hashchange", () => {
   if (state.member && location.pathname === "/") {
-    closeModal();
+    modalRoot.replaceChildren();
     renderApp();
     document.querySelector("#agriculture-page")?.scrollIntoView();
   }
@@ -1351,11 +1357,14 @@ function thumbnail(bed, large = false) {
 }
 
 function harvestCard(harvest) {
+  const unit = { piece: t("pièce", "piece", "stuk"), bunch: t("botte", "bunch", "bos") }[harvest.unit] ?? harvest.unit;
+  const quantity = harvest.amount == null ? harvest.quantity : `${harvest.amount} ${unit}`;
   return `<article class="harvest-card">
     ${harvest.photoUrl ? `<img src="${escapeHtml(harvest.photoUrl)}" alt="${escapeHtml(t("Photo de récolte", "Harvest photo"))}" loading="lazy">` : ""}
-    <div><strong>${escapeHtml(harvest.quantity || t("Récolte partagée", "Shared harvest"))}</strong>
+    <div><strong>${escapeHtml(quantity || t("Récolte partagée", "Shared harvest"))}</strong>
+      ${harvest.batchId ? `<p><a href="#/batches/${escapeHtml(harvest.batchId)}">${t("Voir le lot", "View batch", "Partij bekijken")}</a></p>` : ""}
       ${harvest.note ? `<p>${escapeHtml(harvest.note)}</p>` : ""}
-      <small>${escapeHtml(harvest.memberName || t("Membre", "Member"))} - ${escapeHtml(relativeDate(harvest.createdAt))}</small>
+      <small>${escapeHtml(harvest.memberName || t("Membre", "Member"))} - ${escapeHtml(harvest.harvestedOn || relativeDate(harvest.createdAt))}</small>
     </div>
   </article>`;
 }

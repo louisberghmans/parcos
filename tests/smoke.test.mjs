@@ -725,7 +725,7 @@ test("schema migrations apply once and upgrade databases missing task, feed, rea
     app = createApp({ dataDir, adminUsername: "admin", adminPassword: "test-admin-password" });
     const migrations = app.db.prepare("select version, name from schema_migrations order by version").all();
     const existingAdmin = app.db.prepare("select id, username from members where role = 'admin'").get();
-    assert.equal(migrations.length, 6);
+    assert.equal(migrations.length, 7);
     assert.equal(migrations[0].version, 1);
     assert.equal(migrations[0].name, "first_class_tasks");
     assert.equal(migrations[1].version, 2);

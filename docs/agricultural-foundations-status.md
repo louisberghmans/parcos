@@ -39,6 +39,27 @@ All 15 tests passed, including schema upgrade, version boundaries, preview,
 legacy field preservation and restricted area reads. Actual measurements and
 polygons remain to be entered by the garden.
 
-Next checkpoint: connect reviewed crops to batches, nursery and bed allocations,
-and measured harvests through the existing operational application.
+## C. Cultivation lifecycle checkpoint
+
+Migration 7 adds stable batches tied to a cultivation profile revision,
+coordinator-owned spatial reservations, append-only actual operations, and
+measured harvests linked to the existing harvest records. A footprint is a
+lengthwise bed interval with an optional explicit area and an exclusive end
+date. Adjacent and successive reservations coexist. Reviewed combinations
+reuse one footprint across distinct component crops. An explicit release can
+shorten a reserved interval and retains the previously planned end date.
+
+Members with access can record actual work and measured harvests. A batch with
+any restricted location is visible to coordinators and admins. The original
+bed crop and variety text remains available for review. The garden's legacy
+harvest path continues to accept free text and photos.
+
+All 16 tests passed. Coverage includes sowing and partial transfers, retry
+protection for cultivation operations, conservation of viable plant counts,
+private area checks, overlap and release rules, profile linkage, measured
+harvests and backup/restore. Real growing dates and quantities are entered by
+garden contributors.
+
+Next checkpoint: templates and tasks, label printing, occupancy and production
+views, and supplier imports under explicit reviewer control.
 

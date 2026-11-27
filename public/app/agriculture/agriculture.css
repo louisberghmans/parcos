@@ -24,4 +24,5 @@
 .ag-definitions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .3rem 1rem; }
 .ag-definitions dt { font-weight: 600; }
 .ag-definitions dd { margin: 0; }
+.agriculture-page [hidden] { display: none !important; }
 

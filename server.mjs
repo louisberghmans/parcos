@@ -20,6 +20,7 @@ import { createCompleteBackup, RUNNING_MARKER } from "./backup.mjs";
 import { validPushEndpoint } from "./src/services/push-network.mjs";
 import { catalogueMigration } from "./src/domain/agriculture/catalogue.mjs";
 import { gardenMigration } from "./src/domain/agriculture/garden.mjs";
+import { batchVisible, cultivationMigration, harvestInput } from "./src/domain/agriculture/cultivation.mjs";
 import { AgricultureError } from "./src/domain/agriculture/validation.mjs";
 import { agricultureRoute } from "./src/domain/agriculture/routes.mjs";
 import {
@@ -244,6 +245,10 @@ function harvestJson(row) {
     id: row.id,
     bedId: row.bed_id,
     quantity: row.quantity ?? "",
+    batchId: row.batch_id ?? null,
+    amount: row.amount ?? null,
+    unit: row.unit ?? null,
+    harvestedOn: row.harvested_on ?? null,
     note: row.note ?? "",
     photoUrl: row.photo_path ? `/media/${row.photo_path}` : null,
     memberName: row.member_name ?? "Membre",
@@ -614,7 +619,7 @@ const schemaMigrations = [
   },
 ];
 
-schemaMigrations.push(catalogueMigration, gardenMigration);
+schemaMigrations.push(catalogueMigration, gardenMigration, cultivationMigration);
 
 function applySchemaMigrations(db) {
   db.exec(`create table if not exists schema_migrations (
@@ -1134,6 +1139,20 @@ function localizedTaskJson(db, row, locale) {
 }
 function localizedBedNoteJson(db, row, locale) { return bedNoteJson(localizedRow(db, "bed_note", row, locale)); }
 function localizedHarvestJson(db, row, locale) { return harvestJson(localizedRow(db, "harvest", row, locale)); }
+function selectHarvests(db, { bedId = null, batchId = null }, locale, session) {
+  const manage = ["coordinator", "admin"].includes(session.member.role);
+  const rows = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name,
+      measure.batch_id, measure.quantity as amount, measure.unit, measure.harvested_on
+    from harvests h
+    left join harvest_photos hp on hp.harvest_id = h.id
+    left join members m on m.id = h.member_id
+    left join harvest_measurements measure on measure.harvest_id = h.id
+    where ${bedId !== null ? "h.bed_id = ?" : "measure.batch_id = ?"}
+    order by coalesce(measure.harvested_on, substr(h.created_at, 1, 10)) desc, h.id desc
+    ${batchId === null ? "limit 30" : ""}`).all(bedId ?? batchId);
+  return rows.map((row) => localizedHarvestJson(db,
+    row.batch_id && !batchVisible(db, row.batch_id, manage) ? { ...row, batch_id: null } : row, locale));
+}
 function localizedHowToJson(db, row, locale) { return howToVideoJson(localizedRow(db, "how_to", row, locale)); }
 
 const seedBeds = [
@@ -2210,6 +2229,14 @@ export function createApp(options = {}) {
           return await agricultureRoute({
             db, req, path, url, session,
             bedAccess: (id) => requireBedAccess(findBed(db, id), session),
+            requireWrite: () => requireCsrf(req, session),
+            batchHarvests: (id) => selectHarvests(db, { batchId: id }, locale, session),
+            recordBatchActivity(bedId, kind) {
+              const body = localeText(locale, "Opération de culture enregistrée", "Teelthandeling vastgelegd", "Cultivation operation recorded");
+              const result = db.prepare("insert into activities (bed_id, member_id, activity_type, note, created_at) values (?, ?, ?, ?, ?)")
+                .run(bedId, session.member.id, `cultivation_${kind}`, body, now());
+              registerLocalizedEntity(db, "activity", Number(result.lastInsertRowid), { note: body }, locale);
+            },
             authorize() {
               requireCoordinator(session);
               if (req.method !== "GET") requireCsrf(req, session);
@@ -2992,11 +3019,7 @@ export function createApp(options = {}) {
               const localized = localizedRow(db, "bed_photo", photo, locale);
               return { id: localized.id, url: `/media/${localized.path}`, caption: localized.caption, createdAt: localized.created_at };
             });
-          const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
-            from harvests h
-            left join harvest_photos hp on hp.harvest_id = h.id
-            left join members m on m.id = h.member_id
-            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map((row) => localizedHarvestJson(db, row, locale));
+          const harvests = selectHarvests(db, { bedId }, locale, session);
           const notes = db.prepare(`select n.*, m.display_name as member_name
             from bed_notes n left join members m on m.id = n.member_id
             where n.bed_id = ? order by n.created_at desc, n.id desc limit 50`).all(bedId).map((row) => localizedBedNoteJson(db, row, locale));
@@ -3137,30 +3160,35 @@ export function createApp(options = {}) {
         if (harvestMatch && req.method === "POST") {
           requireCsrf(req, session);
           const bedId = Number(harvestMatch[1]);
-          const bed = requireBedAccess(findBed(db, bedId), session);
           const body = await readJson(req);
-          const photo = photoData(body.dataUrl);
-          const filename = `harvest-${bedId}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}`;
-          const filePath = join(uploadsDir, filename);
+          const bed = requireBedAccess(findBed(db, bedId), session);
+          const measured = harvestInput(db, body, bedId, ["coordinator", "admin"].includes(session.member.role));
+          const photo = body.dataUrl || !measured ? photoData(body.dataUrl) : null;
+          const filename = photo ? `harvest-${bedId}-${Date.now()}-${randomBytes(5).toString("hex")}.${photo.extension}` : null;
+          const filePath = filename ? join(uploadsDir, filename) : null;
           const timestamp = now();
-          writeFileSync(filePath, photo.bytes, { flag: "wx" });
+          const note = String(body.note ?? "").trim().slice(0, 600) || null;
+          const quantity = measured ? null : String(body.quantity ?? "").trim().slice(0, 120) || null;
+          if (photo) writeFileSync(filePath, photo.bytes, { flag: "wx" });
           try {
             db.exec("begin immediate");
             const result = db.prepare(`insert into harvests (bed_id, member_id, quantity, note, created_at, updated_at)
               values (?, ?, ?, ?, ?, ?)`)
-              .run(bedId, session.member.id, String(body.quantity ?? "").trim().slice(0, 120) || null,
-                String(body.note ?? "").trim().slice(0, 600) || null, timestamp, timestamp);
-            registerLocalizedEntity(db, "harvest", Number(result.lastInsertRowid), {
-              quantity: String(body.quantity ?? "").trim().slice(0, 120) || null,
-              note: String(body.note ?? "").trim().slice(0, 600) || null,
-            }, locale, timestamp);
-            const harvestPhoto = db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
-              values (?, ?, ?, ?, ?, ?)`)
-              .run(result.lastInsertRowid, filename, photo.contentType, String(body.caption ?? "").trim().slice(0, 200) || null, session.member.id, timestamp);
-            registerLocalizedEntity(db, "harvest_photo", Number(harvestPhoto.lastInsertRowid), {
-              caption: String(body.caption ?? "").trim().slice(0, 200) || null,
-            }, locale, timestamp);
-            db.prepare("update beds set status = 'harvest', updated_at = ? where id = ?").run(timestamp, bedId);
+              .run(bedId, session.member.id, quantity, note, timestamp, timestamp);
+            registerLocalizedEntity(db, "harvest", Number(result.lastInsertRowid), { quantity, note }, locale, timestamp);
+            if (measured) {
+              db.prepare("insert into harvest_measurements values (?, ?, ?, ?, ?, ?)")
+                .run(result.lastInsertRowid, measured.batchId, measured.footprintId, measured.amount, measured.unit, measured.harvestedOn);
+            } else {
+              db.prepare("update beds set status = 'harvest', updated_at = ? where id = ?").run(timestamp, bedId);
+            }
+            if (photo) {
+              const caption = String(body.caption ?? "").trim().slice(0, 200) || null;
+              const harvestPhoto = db.prepare(`insert into harvest_photos (harvest_id, path, content_type, caption, uploaded_by, created_at)
+                values (?, ?, ?, ?, ?, ?)`)
+                .run(result.lastInsertRowid, filename, photo.contentType, caption, session.member.id, timestamp);
+              registerLocalizedEntity(db, "harvest_photo", Number(harvestPhoto.lastInsertRowid), { caption }, locale, timestamp);
+            }
             const activityNote = localeText(locale, `Récolte ajoutée pour ${bed.code}`, `Oogst toegevoegd voor ${bed.code}`, `Harvest added for ${bed.code}`);
             const activity = db.prepare(`insert into activities (bed_id, member_id, activity_type, note, created_at)
               values (?, ?, 'harvest_added', ?, ?)`)
@@ -3169,15 +3197,11 @@ export function createApp(options = {}) {
             db.exec("commit");
           } catch (error) {
             db.exec("rollback");
-            rmSync(filePath, { force: true });
+            if (filePath) rmSync(filePath, { force: true });
             if (String(error.message).includes("UNIQUE constraint failed")) throw new HttpError(409, "Cette photo de recolte existe deja.");
             throw error;
           }
-          const harvests = db.prepare(`select h.*, hp.path as photo_path, m.display_name as member_name
-            from harvests h
-            left join harvest_photos hp on hp.harvest_id = h.id
-            left join members m on m.id = h.member_id
-            where h.bed_id = ? order by h.created_at desc, h.id desc limit 30`).all(bedId).map((row) => localizedHarvestJson(db, row, locale));
+          const harvests = selectHarvests(db, { bedId }, locale, session);
           return json(res, 201, { bed: localizedBedJson(db, findBed(db, bedId), locale), harvests });
         }
 

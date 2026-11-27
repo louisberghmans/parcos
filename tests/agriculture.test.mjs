@@ -16,11 +16,106 @@ const records = [
     parameters: { sowingDepth: { unit: "cm", min: 1, max: 2, constraint: "estimate", review: "reviewed", source: provenance }, yield: null } } },
 ];
 
+test("cultivation traces partial transfers, shared and successive footprints, and actual harvests", async (t) => {
+  const { app, request, auth, bed, directory } = await fixture(t);
+  const otherBed = app.db.prepare("select id from beds where id != ? and area_id = (select area_id from beds where id = ?) order by id limit 1").get(bed.id, bed.id);
+  const areaId = app.db.prepare("select area_id from beds where id = ?").get(bed.id).area_id;
+  const send = (path, body, method = "POST", token = auth) => request(path, { method, body, auth: token });
+  const prefix = "/agriculture";
+  const assertStatus = (result, status) => { assert.equal(result.status, status, JSON.stringify(result.value)); return result.value; };
+  const add = async (path, body, status = 201) => assertStatus(await send(prefix + path, body), status);
+  const get = async (path, token = auth) => (await request(prefix + path, { auth: token })).value;
+  const nurseryProfile = { ...records[3].record, id: "nursery-profile", method: "transplant" };
+  const secondCrop = { ...records[1].record, id: "another-crop", names: { en: "Another crop" } };
+  const secondProfile = { ...records[3].record, id: "other-profile", cropId: secondCrop.id, varietyId: null };
+  await add("/catalogue/import", { records: [...records, { type: "profile", record: nurseryProfile },
+    { type: "crop", record: secondCrop }, { type: "profile", record: secondProfile }] }, 200);
+  const resource = async (code, capacity) => assertStatus(await send(prefix + "/areas/" + areaId + "/resources",
+    { type: "tray", code, name: code, capacity, capacityUnit: "plant" }, "PUT"), 200).resource;
+  const tray1 = await resource("tray-a", 100);
+  const tray2 = await resource("tray-b", 50);
+  const batchFor = async (code, profile, nurseryId = null) => (await add("/batches", {
+    id: code, code, cropId: profile.cropId, varietyId: profile.varietyId, profileId: profile.id, profileRevision: 1,
+    route: profile.method, nurseryId, seedsPlanned: 110, sowPlannedOn: "2025-01-01", harvestExpectedFrom: "2025-02-01",
+  })).batch;
+  const transplant = await batchFor("nursery-test", nurseryProfile, tray1.id);
+  const other = await batchFor("direct-test", secondProfile);
+  const succession = await batchFor("succession-test", records[3].record);
+  const combo = (await add("/combinations", { name: "Test combination", crops: [transplant.cropId, other.cropId],
+    context: "Synthetic", source: provenance, review: "reviewed" })).combination;
+  const allocate = async (batch, allocation, status = 201) => add("/batches/" + batch.id + "/allocations", allocation, status);
+  const planned = { bedId: bed.id, startsOn: "2025-01-01", endsBefore: "2025-06-01", startM: 0, endM: 5, occupiedM2: 5 };
+  const first = (await allocate(transplant, { ...planned, combinationId: combo.id, plantCount: 40 })).allocation;
+  const second = (await allocate(transplant, { ...planned, bedId: otherBed.id, plantCount: 50 })).allocation;
+  await allocate(other, planned, 409);
+  const shared = (await allocate(other, { footprintId: first.id })).allocation;
+  assert.equal(shared.id, first.id);
+  await allocate(other, { ...planned, startM: 5, endM: 8 });
+  await allocate(succession, { ...planned, startsOn: "2025-06-01", endsBefore: null });
+  assert.equal(app.db.prepare("select count(*) as n from bed_footprints where bed_id = ?").get(bed.id).n, 3);
+  assert.equal((await get("/batches/" + transplant.id)).actual.status, "planned");
+  const event = (batch, kind, occurredOn, body = {}, status = 201) =>
+    add("/batches/" + batch.id + "/events", { kind, occurredOn, ...body }, status);
+  await event(transplant, "sow", "2025-01-01", { plants: 110, id: "sow-test" });
+  await event(transplant, "sow", "2025-01-01", { plants: 110, id: "sow-test" });
+  await event(transplant, "germination", "2025-01-10", { germinated: 105, plants: 100 });
+  await event(transplant, "move", "2025-02-01", { fromResourceId: tray1.id, toResourceId: tray2.id, plants: 51 }, 409);
+  await event(transplant, "move", "2025-02-01", { fromResourceId: tray1.id, toResourceId: tray2.id, plants: 50 });
+  await event(transplant, "transplant", "2025-02-02", { fromResourceId: tray1.id, footprintId: first.id, plants: 40 });
+  await event(transplant, "transplant", "2025-02-03", { fromResourceId: tray2.id, footprintId: second.id, plants: 50 });
+  await event(transplant, "transplant", "2025-02-04", { fromResourceId: tray2.id, footprintId: second.id, plants: 1 }, 409);
+  await event(other, "sow", "2025-01-10", { footprintId: shared.id, plants: 15 });
+  const getHarvest = (bedId, value) => send("/beds/" + bedId + "/harvests",
+    { batchId: transplant.id, amount: 0.45, unit: "kg", harvestedOn: "2025-04-01", ...value });
+  assertStatus(await getHarvest(bed.id, { harvestedOn: "2025-01-10" }), 400);
+  assertStatus(await getHarvest(bed.id, { unit: "buckets" }), 400);
+  assertStatus(await getHarvest(bed.id), 201);
+  assertStatus(await getHarvest(otherBed.id, { amount: 7, unit: "piece" }), 201);
+  assertStatus(await send(prefix + "/footprints/" + first.id + "/release", { freeOn: "2025-03-31" }), 409);
+  assertStatus(await send(prefix + "/footprints/" + first.id + "/release", { freeOn: "2025-04-10" }), 200);
+  assertStatus(await getHarvest(bed.id, { harvestedOn: "2025-04-11" }), 400);
+  const detail = await get("/batches/" + transplant.id);
+  assert.equal(detail.actual.status, "growing");
+  assert.equal(detail.actual.transplanted, 90);
+  assert.equal(detail.actual.remaining, 10);
+  assert.deepEqual(detail.actual.nursery, [{ id: tray1.id, plants: 10 }]);
+  assert.equal(detail.events.filter(({ kind }) => kind === "sow").length, 1);
+  assert.deepEqual(detail.harvests.map(({ amount, unit }) => [amount, unit]), [[7, "piece"], [0.45, "kg"]]);
+  assert.equal(app.db.prepare("select crop from beds where id = ?").get(bed.id).crop, bed.crop);
+  assert.equal(app.db.prepare("select count(*) as n from activities where activity_type = 'cultivation_transplant'").get().n, 2);
+
+  const invite = await request("/invites", { method: "POST", auth, body: { role: "member" } });
+  const member = assertStatus(await request("/invites/redeem", { method: "POST", body: {
+    token: new URL(invite.value.inviteUrl).searchParams.get("invite"), username: "cultivation.member",
+    displayName: "Cultivation Member", password: "test-member-password",
+  } }), 201);
+  assert.equal(member.member.role, "member");
+  const login = await request("/auth/login", { method: "POST", body: { username: "cultivation.member", password: "test-member-password" } });
+  const memberAuth = { cookie: login.cookie, token: login.value.csrfToken };
+  const path = prefix + "/batches/" + transplant.id;
+  assertStatus(await send(path + "/events", { kind: "observation", occurredOn: "2025-04-03", note: "Synthetic member observation" }, "POST", memberAuth), 201);
+  assertStatus(await send(path + "/allocations", planned, "POST", memberAuth), 403);
+  app.db.prepare("update garden_areas set members_can_access = 0 where id = ?").run(areaId);
+  assertStatus(await request(path, { auth: memberAuth }), 404);
+  assertStatus(await send(path + "/events", { kind: "observation", occurredOn: "2025-04-04", note: "Denied" }, "POST", memberAuth), 404);
+
+  const backup = await createCompleteBackup({ db: app.db, dataDir: directory, uploadsDir: join(directory, "uploads"), appVersion: "1.4.2" });
+  const restoredDir = join(directory, "batch-restore");
+  await restoreBackup({ archivePath: backup.archivePath, targetDir: restoredDir });
+  const restored = createApp({ dataDir: restoredDir });
+  try {
+    assert.equal(restored.db.prepare("select count(*) as n from harvest_measurements").get().n, 2);
+    assert.equal(restored.db.prepare("select count(*) as n from batch_allocations").get().n, 5);
+    assert.deepEqual(restored.db.prepare("pragma foreign_key_check").all(), []);
+  } finally { restored.close(); }
+});
+
 async function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), "parcos-agriculture-"));
   const settings = { dataDir: directory, adminUsername: "admin", adminPassword: "test-admin-password", seedDemoData: true, notificationScheduler: false };
   let app = createApp(settings);
   const bed = app.db.prepare("select id, code, crop, variety from beds order by id limit 1").get();
+  app.db.exec("drop table harvest_measurements; drop table batch_events; drop table batch_allocations; drop table footprint_releases; drop table bed_footprints; drop table cultivation_combinations; drop table cultivation_batches");
   app.db.exec("drop table garden_resources; drop table bed_geometry; drop table bed_physical; drop table cultivation_profile_revisions; drop table cultivation_profiles; drop table agricultural_varieties; drop table agricultural_crops; drop table agricultural_taxa; delete from schema_migrations where version > 4");
   app.close();
   app = createApp(settings);
