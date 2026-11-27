@@ -1,7 +1,7 @@
 # ParcOS Recipe Integration Contract (M1 / M2 / M3)
 
-- **Status:** Proposed contract for coordination with Sol (`feature/m1-workspace-prototype` and `feature/m2-agricultural-foundations`).
-- **Scope:** Independent cookbook & contribution slice (`feature/recipe-catalogue`, base `0887a94`). No shared migrations, server routes, or navigation changes have been applied yet.
+- **Status:** Aligned with merged M2 contract [docs/agriculture-recipe-contract.md](../agriculture-recipe-contract.md) on `main` (`ede023a`, PR #14).
+- **Scope:** Independent cookbook & contribution slice (`feature/recipe-catalogue`, rebased on `ede023a`). No shared migrations, server routes, or navigation changes have been applied yet.
 
 ## 1. Stable identities & immutable revisions
 
@@ -10,16 +10,17 @@
 - Updating a recipe creates a new immutable revision row. Existing M3 weekly meal choices and approved demand snapshots continue pointing to the exact revision the member selected and are never mutated retroactively.
 - Moderation takedown marks a recipe `archived` to prevent new meal selections while preserving prior historical demand snapshots.
 
-## 2. Culinary ingredient ↔ M2 crop crosswalk
+## 2. Culinary ingredient ↔ M2 crop crosswalk (`docs/agriculture-recipe-contract.md`)
 
+- Consumes the authenticated `GET /api/agriculture/catalogue` endpoint (`crop` and `variety` arrays, `?q=` multilingual search, `?month=` typical availability filter; archived/draft entries excluded from member reads).
 - Recipe ingredients use canonical, non-localized culinary `ingredientKey` values (e.g. `tomato`, `courgette`, `green_bean`, `dry_bean`, `chard`, `celeriac`, `jerusalem_artichoke`) with explicit `ediblePart` (`fruit`, `fresh_pod`, `dried_seed`, `leaf_and_stalk`, `root`, `tuber`).
+- Crop IDs (`cropId` and elements of `cropKeys`) are opaque 1–80 character lowercase identifiers (`/^[a-z0-9][a-z0-9_-]{0,79}$/`) matching `crop.id` in `GET /api/agriculture/catalogue`.
 - Recipe ingredients NEVER couple to supplier SKUs or specific seed varieties; multiple M2 varieties of a crop can satisfy one culinary ingredient.
-- Crosswalk contract (`catalogues/recipes/crosswalk/crop-crosswalk.v1.json`):
-  - `ingredientKey`: stable culinary key
-  - `cropKeys`: array of M2 stable crop keys (owned by M2)
-  - `mappingStatus`: `reviewed` | `proposed` | `unresolved` | `not_applicable`
-  - `unitConversions`: optional explicit reviewed `{ factorToGrams, reviewed: true, evidence }` for non-mass units (`piece`, `clove`, `bunch`). Unreviewed or missing conversions are NEVER guessed.
-- Until M2 stabilizes final `cropKeys`, provisional crosswalk entries remain reviewable configuration; unmapped required garden ingredients remain explicitly `unresolved` and set `planningReady = false`.
+- Adapter in `src/domain/recipes/agriculture-adapter.mjs` enforces every rule in [docs/agriculture-recipe-contract.md](../agriculture-recipe-contract.md):
+  - `resolveIngredientAgainstCatalogue(ingredient, catalogue)`: persists confirmed `cropId` (or `cropId: null` when absent), checks `ediblePart` against `crop.edibleParts` when known (`ediblePart: null` when unknown), validates advertised `quantityUnits` (`g`, `kg`, `piece`, `bunch`, `ml`, `l`), and retains unresolved or archived crop links with an explicit `reviewFlag`.
+  - `toAgricultureIngredientMapping(ingredientId, resolved)`: projects to `{ ingredientId, cropId, ediblePart, quantity, unit }`.
+  - `evaluateRecipeTypicalAvailability(recipe, catalogue)`: intersects reviewed `crop.availability.months` (1–12) across required garden ingredients, returning `status: "unknown"` whenever any required crop has `availability: null` or is unresolved, while keeping typical local availability strictly separate from measured and forecast harvests.
+- Crosswalk fixture (`catalogues/recipes/crosswalk/crop-crosswalk.v1.json`) holds provisional candidate `cropKeys`; per M2 contract, **no provisional crosswalk key implies a corresponding installed crop**.
 
 ## 3. Deterministic scaling & demand boundary (M3 consumer API)
 
@@ -47,11 +48,11 @@ Pure domain functions in `src/domain/recipes/scaling.mjs`:
 - **Community workspace:** Recipe Browse (`renderRecipeBrowse`), Canonical Recipe Detail (`renderRecipeDetail`), and Member Contribution (`renderRecipeContribute`).
 - **Coordination workspace:** Coordinator Review Queue (`renderRecipeReviewQueue`) and editorial planning-readiness audit.
 - **Administration workspace:** Trusted catalogue dry-run/import/export and rights manifest audit.
-- Do not add a parallel top-level navigation shell; mount these components inside Sol's finalized M1 workspace router and canonical detail route pattern (e.g. `/recipes`, `/recipes/:recipeKey`, `/recipes/contribute`, `/coordination/recipes/review`).
+- Do not add a parallel top-level navigation shell; mount these components inside the workspace shell in `public/app.js` alongside agricultural route detection in `public/app/agriculture/workspaces.js` (matching `/#/crops/<id>` and `/#/batches/<id>` with canonical routes such as `/#/recipes`, `/#/recipes/<recipeKey>`, `/#/recipes/contribute`, `/#/coordination/recipes/review`).
 
-## 6. Proposed additive SQLite schema (allocate migration number AFTER baseline merge)
+## 6. Proposed additive SQLite schema (Migration 9+ in Slice C)
 
-Do **not** allocate migration version `5` on a stale branch. After merging with Sol's latest migrations, add one ordered migration with normalized tables:
+Migrations **5–8** are now owned by agriculture on `main` (`ede023a`). Recheck the migration ledger immediately before Slice C merge and allocate the next unused migration (expected **Migration 9**) with normalized tables:
 
 - `recipes` (`id`, `recipe_key UNIQUE`, `origin`, `upstream_id`, `source_url`, `archive_url`, `source_locale`, `collection`, `workflow_status`, `current_revision_id`, `owner_member_id`, `created_at`, `updated_at`)
 - `recipe_revisions` (`id`, `recipe_id`, `revision`, `parent_revision_id`, `base_servings`, `prep_minutes`, `cook_minutes`, `rest_minutes`, `seasons_json`, `category`, `tags_json`, `dietary_json`, `rights_status`, `license_id`, `license_url`, `attribution`, `source_evidence`, `modifications`, `public_export_opt_in_json`, `title`, `summary`, `steps_json`, `food_safety_note`, `cooked_verification`, `created_by`, `created_at`)

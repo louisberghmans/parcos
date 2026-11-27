@@ -20,6 +20,7 @@ import {
 
 const RECIPE_KEY_PATTERN = /^[a-z0-9]+:[a-z0-9][a-z0-9_-]{1,78}$/;
 const SIMPLE_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const CROP_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,79}$/;
 const REVISION_PATTERN = /^[a-zA-Z0-9._-]{1,40}$/;
 
 export function isPlainObject(value) {
@@ -258,12 +259,21 @@ export function validateIngredient(ingredient, path, errors) {
           message: `cropMapping.status must be one of: ${MAPPING_STATUSES.join(", ")}`,
         });
       }
+      if (ingredient.cropMapping.cropId !== undefined && ingredient.cropMapping.cropId !== null) {
+        if (typeof ingredient.cropMapping.cropId !== "string" || !CROP_ID_PATTERN.test(ingredient.cropMapping.cropId)) {
+          errors.push({
+            path: `${path}.cropMapping.cropId`,
+            code: "invalid_key",
+            message: `Invalid cropId "${ingredient.cropMapping.cropId}" (must match M2 1-80 char lowercase ID)`,
+          });
+        }
+      }
       if (ingredient.cropMapping.cropKeys !== undefined) {
         if (!Array.isArray(ingredient.cropMapping.cropKeys)) {
           errors.push({ path: `${path}.cropMapping.cropKeys`, code: "invalid_type", message: "cropKeys must be an array" });
         } else {
           for (const key of ingredient.cropMapping.cropKeys) {
-            if (typeof key !== "string" || !SIMPLE_KEY_PATTERN.test(key)) {
+            if (typeof key !== "string" || !CROP_ID_PATTERN.test(key)) {
               errors.push({ path: `${path}.cropMapping.cropKeys`, code: "invalid_key", message: `Invalid cropKey "${key}"` });
             }
           }

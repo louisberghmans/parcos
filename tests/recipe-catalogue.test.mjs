@@ -8,7 +8,10 @@ import {
   RECIPE_BUNDLE_SCHEMA_VERSION,
   evaluateLicense,
   evaluatePlanningReadiness,
+  evaluateRecipeTypicalAvailability,
+  resolveIngredientAgainstCatalogue,
   scaleRecipeQuantities,
+  toAgricultureIngredientMapping,
   validateRecipeBundle,
   validateRecipeRecord,
 } from "../src/domain/recipes/index.mjs";
@@ -426,4 +429,124 @@ test("CLI runs dry-run import, validate, scale, translate-export and rejects sym
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
+});
+
+test("agriculture adapter conforms to docs/agriculture-recipe-contract.md (crop.id 1-80 chars, edibleParts, archived flag, availability)", () => {
+  const longCropId = "brassica-oleracea-curly-kale-belgian-winter-selection-0123456789012345678901234"; // 79 chars
+  assert.equal(longCropId.length, 79);
+
+  const mockCatalogue = {
+    crop: [
+      {
+        id: longCropId,
+        taxonId: "brassica-oleracea",
+        names: { fr: "Chou frisé", nl: "Boerenkool", en: "Curly kale" },
+        synonyms: { fr: ["Kale"], nl: [], en: [] },
+        category: "leafy-vegetable",
+        edibleParts: ["leaf"],
+        availability: {
+          context: "Brussels/Belgium open field",
+          months: [10, 11, 12, 1, 2],
+          source: { title: "Local calendar", url: null, retrievedOn: "2026-11-27" },
+        },
+        review: "reviewed",
+        revision: 2,
+      },
+      {
+        id: "crop_courgette",
+        taxonId: "cucurbita-pepo",
+        names: { fr: "Courgette", nl: "Courgette", en: "Zucchini" },
+        edibleParts: ["fruit"],
+        availability: {
+          context: "Brussels/Belgium open field",
+          months: [7, 8, 9],
+          source: { title: "Local calendar", url: null, retrievedOn: "2026-11-27" },
+        },
+        review: "reviewed",
+        revision: 1,
+      },
+      {
+        id: "crop_potato",
+        taxonId: "solanum-tuberosum",
+        names: { fr: "Pomme de terre", nl: "Aardappel", en: "Potato" },
+        edibleParts: ["tuber"],
+        availability: {
+          context: "Brussels/Belgium open field",
+          months: [7, 8, 9, 10],
+          source: { title: "Local calendar", url: null, retrievedOn: "2026-11-27" },
+        },
+        review: "reviewed",
+        revision: 1,
+      },
+      {
+        id: "crop_onion",
+        taxonId: "allium-cepa",
+        names: { fr: "Oignon", nl: "Ajuin", en: "Onion" },
+        edibleParts: ["bulb"],
+        availability: null,
+        review: "reviewed",
+        revision: 1,
+      },
+    ],
+    variety: [],
+  };
+
+  // 1. 79-char M2 crop ID passes validator and resolves cleanly
+  const { bundle } = runSamplePipeline();
+  const sampleRecipe = structuredClone(bundle.recipes[0]);
+  sampleRecipe.ingredients[0].cropMapping.cropId = longCropId;
+  sampleRecipe.ingredients[0].cropMapping.cropKeys = [longCropId];
+  assert.equal(validateRecipeRecord(sampleRecipe).valid, true);
+
+  const kaleIng = {
+    ingredientKey: "kale",
+    originalText: "250 g chou frisé",
+    quantity: 250,
+    unit: "g",
+    ediblePart: "leaf",
+    role: "garden",
+    required: true,
+    cropMapping: { cropId: longCropId, cropKeys: [longCropId], status: "reviewed" },
+  };
+  const resolvedKale = resolveIngredientAgainstCatalogue(kaleIng, mockCatalogue);
+  assert.equal(resolvedKale.status, "resolved");
+  assert.equal(resolvedKale.reviewFlag, null);
+  assert.deepEqual(toAgricultureIngredientMapping("ingredient-112", resolvedKale), {
+    ingredientId: "ingredient-112",
+    cropId: longCropId,
+    ediblePart: "leaf",
+    quantity: 250,
+    unit: "g",
+  });
+
+  // 2. Invalid ediblePart against crop.edibleParts is flagged for human review
+  const badPart = resolveIngredientAgainstCatalogue({ ...kaleIng, ediblePart: "root" }, mockCatalogue);
+  assert.equal(badPart.status, "edible_part_mismatch");
+  assert.match(badPart.reviewFlag, /not in crop/);
+
+  // 3. Archived / missing crop retains declared cropId with a review flag
+  const archivedIng = {
+    ...kaleIng,
+    cropMapping: { cropId: "archived-crop-99", cropKeys: ["archived-crop-99"], status: "reviewed" },
+  };
+  const resolvedArchived = resolveIngredientAgainstCatalogue(archivedIng, mockCatalogue);
+  assert.equal(resolvedArchived.status, "archived_or_missing_crop");
+  assert.equal(resolvedArchived.cropId, "archived-crop-99");
+  assert.ok(resolvedArchived.reviewFlag);
+
+  // 4. Typical local availability: availability === null on required onion yields honest "unknown"
+  const courgetteSoup = bundle.recipes.find((r) => r.recipeKey === "synthetic:veloute-courgettes-potager");
+  const availUnknown = evaluateRecipeTypicalAvailability(courgetteSoup, mockCatalogue);
+  assert.equal(availUnknown.status, "unknown");
+  assert.ok(availUnknown.missingIngredients.some((m) => m.ingredientKey === "onion"));
+
+  // Once onion also has reviewed months [7, 8, 9, 10, 11], overlapping typical months = [7, 8, 9]
+  mockCatalogue.crop.find((c) => c.id === "crop_onion").availability = {
+    context: "Brussels/Belgium open field",
+    months: [7, 8, 9, 10, 11],
+    source: { title: "Local calendar", url: null, retrievedOn: "2026-11-27" },
+  };
+  const availReady = evaluateRecipeTypicalAvailability(courgetteSoup, mockCatalogue);
+  assert.equal(availReady.status, "available");
+  assert.deepEqual(availReady.months, [7, 8, 9]);
 });

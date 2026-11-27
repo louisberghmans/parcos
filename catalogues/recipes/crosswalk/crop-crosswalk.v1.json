@@ -1,6 +1,6 @@
 {
   "format": "parcos-recipe-crop-crosswalk-v1",
-  "note": "Maps canonical culinary ingredientKeys to provisional M2 cropKeys. Ingredient identity is culinary (not botanical variety or seed SKU). Entries marked 'unresolved' or 'proposed' must be reviewed with M2 before enabling production planning.",
+  "note": "Maps canonical culinary ingredientKeys to provisional M2 cropKeys (1-80 char opaque IDs per docs/agriculture-recipe-contract.md). Ingredient identity is culinary (not botanical variety or seed SKU). No provisional crosswalk key implies a corresponding installed crop in GET /api/agriculture/catalogue; resolve against installed reviewed crops before enabling production planning.",
   "entries": [
     {
       "ingredientKey": "courgette",
