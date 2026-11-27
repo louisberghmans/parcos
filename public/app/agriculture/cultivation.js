@@ -1,4 +1,5 @@
 import { agricultureForms, optionalNumber } from "./forms.js";
+import { mountLabels } from "./labels.js";
 
 const endpoint = "/api/agriculture";
 
@@ -313,7 +314,10 @@ export async function mountCultivation(root, { api, t, escapeHtml: h, locale, ma
       '<section class="ag-card"><h2 tabindex="-1">' + h(words.history) + "</h2>" +
       (events.length ? '<ol>' + events.map((event) => "<li>" + h(event.occurredOn + " · " + label(event.kind) +
         (event.plants == null ? "" : " · " + event.plants) + (event.note ? " · " + event.note : "")) + "</li>").join("") + "</ol>" : "<p>" + h(words.unknown) + "</p>") +
-      "</section>" + harvestPanel(detail);
+      "</section>" + harvestPanel(detail) + '<section data-batch-labels></section>';
+    mountLabels(root.querySelector("[data-batch-labels]"), {
+      t, h, batch, actual, allocations, resources: options.resources, cropName: name({ names: batch.cropNames }),
+    });
     if (focus) [...root.querySelectorAll("h1,h2")].find((heading) => heading.textContent === focus)?.focus();
     root.querySelectorAll("[data-release]").forEach((form) => formSubmit(form, async ({ freeOn }) => {
       await send(endpoint + "/footprints/" + form.dataset.release + "/release", { freeOn });
@@ -338,9 +342,17 @@ export async function mountCultivation(root, { api, t, escapeHtml: h, locale, ma
     }
     bindOperation(detail);
     const harvest = root.querySelector("[data-batch-harvest]");
+    let lastHarvest;
+    let requestId;
     if (harvest) formSubmit(harvest, async ({ bed, photo, amount, unit, harvestedOn, note }) => {
       const dataUrl = photo.size ? await compressPhoto(photo) : null;
-      await send("/api/beds/" + bed + "/harvests", { batchId: id, amount: optionalNumber(amount), unit, harvestedOn, note, dataUrl });
+      const payload = { batchId: id, amount: optionalNumber(amount), unit, harvestedOn, note, dataUrl };
+      const fingerprint = JSON.stringify([bed, payload]);
+      if (lastHarvest !== fingerprint) {
+        requestId = globalThis.crypto?.randomUUID?.();
+        lastHarvest = fingerprint;
+      }
+      await send("/api/beds/" + bed + "/harvests", { ...payload, requestId });
       await showDetail(words.harvest);
     });
   }
@@ -350,4 +362,3 @@ export function localDay() {
   const date = new Date();
   return [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((value) => String(value).padStart(2, "0")).join("-");
 }
-

@@ -1,7 +1,8 @@
-const CACHE = "parcos-shell-v15";
+const CACHE = "parcos-shell-v16";
 const SHELL = ["/", "/styles.css", "/app.js", "/app/tasks/task-group.js", "/icon.svg", "/manifest.webmanifest",
   "/app/agriculture/catalogue.js", "/app/agriculture/forms.js", "/app/agriculture/workspaces.js", "/app/agriculture/agriculture.css",
-  "/app/agriculture/garden.js", "/app/agriculture/cultivation.js"];
+  "/app/agriculture/garden.js", "/app/agriculture/cultivation.js", "/app/agriculture/labels.js",
+  "/app/agriculture/operations.js", "/app/agriculture/suppliers.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));

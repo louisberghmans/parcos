@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { getRecord, quantityUnits } from "./catalogue.mjs";
-import { today } from "./garden.mjs";
 import { AgricultureError, atomic, choice, day, invalid, key, list, number, object, source, string } from "./validation.mjs";
 
 export const cultivationMigration = {
@@ -29,9 +28,9 @@ const conflict = (field) => { throw new AgricultureError("conflict", field, 409)
 const count = (value, field, min = 0) => number(value, field, { min, integer: true });
 const safeId = (value, field) => value == null ? null : key(value, field);
 const idFor = (value) => value == null ? randomUUID() : key(value);
-const realDay = (value, field) => {
+const realDay = (value, field, localDay) => {
   const result = day(value, field, true);
-  if (result > today()) invalid(field);
+  if (result > localDay) invalid(field);
   return result;
 };
 
@@ -181,7 +180,7 @@ function releaseFootprint(db, id, input, context) {
   const target = footprint(db, id);
   if (!target) missing();
   context.bedAccess(target.bedId);
-  const freeOn = realDay(value.freeOn, "freeOn");
+  const freeOn = realDay(value.freeOn, "freeOn", context.localDay);
   if (target.releasedOn === freeOn) return target;
   if (target.releasedOn || freeOn <= target.startsOn || (target.endsBefore && freeOn > target.endsBefore)) invalid("freeOn");
   const laterEvent = db.prepare("select 1 from batch_events where footprint_id = ? and occurred_on >= ? limit 1").get(id, freeOn);
@@ -257,7 +256,7 @@ function storeEvent(db, batch, input, context, manage) {
   const value = object(input, "event");
   const kind = choice(value.kind, "kind", eventKinds);
   if (!manage && ["completed", "failed", "cancelled"].includes(kind)) throw new AgricultureError("missing", null, 403);
-  const occurredOn = realDay(value.occurredOn, "occurredOn");
+  const occurredOn = realDay(value.occurredOn, "occurredOn", context.localDay);
   const id = idFor(value.id);
   const fromResourceId = safeId(value.fromResourceId, "fromResourceId");
   let toResourceId = safeId(value.toResourceId, "toResourceId");
@@ -335,11 +334,11 @@ function storeEvent(db, batch, input, context, manage) {
   return event;
 }
 
-export function harvestInput(db, value, bedId, manage) {
+export function harvestInput(db, value, bedId, manage, localDay) {
   if (value.batchId == null && value.amount == null && value.unit == null && value.harvestedOn == null) return null;
   const batchId = key(value.batchId, "batchId");
   getBatch(db, batchId, manage);
-  const harvestedOn = realDay(value.harvestedOn, "harvestedOn");
+  const harvestedOn = realDay(value.harvestedOn, "harvestedOn", localDay);
   const amount = number(value.amount, "amount", { min: 0.000001 });
   const unit = choice(value.unit, "unit", quantityUnits);
   const allocation = allocationOn(db, batchId, bedId, harvestedOn);
@@ -414,4 +413,3 @@ export async function cultivationRoute(context, manage) {
   }
   missing();
 }
-

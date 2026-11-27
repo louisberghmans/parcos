@@ -138,7 +138,7 @@ export function getRecord(db, type, id) {
   return row ? JSON.parse(row.data) : null;
 }
 
-export function catalogue(db, { manage = false, query = "", includeArchived = manage } = {}) {
+export function catalogue(db, { manage = false, query = "", includeArchived = manage, month = null, localize = (crop) => crop } = {}) {
   const result = Object.fromEntries(catalogueTypes.map((type) => [
     type, db.prepare("select data from " + tables[type] + " order by id").all()
       .map(({ data }) => JSON.parse(data)).filter((item) => manage ? includeArchived || item.review !== "archived" : item.review === "reviewed"),
@@ -156,6 +156,13 @@ export function catalogue(db, { manage = false, query = "", includeArchived = ma
       overrides: Object.fromEntries(Object.entries(variety.overrides)
         .map(([name, claim]) => [name, claim?.review === "reviewed" ? claim : null])) }));
   }
+  if (month !== null) {
+    result.crop = result.crop.filter(({ availability }) => availability?.months.includes(month));
+    const crops = new Set(result.crop.map(({ id }) => id));
+    result.variety = result.variety.filter(({ cropId }) => crops.has(cropId));
+    result.profile = result.profile.filter(({ cropId }) => crops.has(cropId));
+  }
+  result.crop = result.crop.map(localize);
   const terms = fold(query).trim().split(/\s+/).filter(Boolean);
   if (!terms.length) return result;
   const taxonById = new Map(result.taxon.map((value) => [value.id, value]));
@@ -175,7 +182,7 @@ export function catalogue(db, { manage = false, query = "", includeArchived = ma
   return result;
 }
 
-function save(db, type, record, expectedRevision, { importing = false } = {}) {
+function save(db, type, record, expectedRevision, { importing = false, onCropSaved = () => {} } = {}) {
   const previous = getRecord(db, type, record.id);
   if (previous && importing) {
     const { revision, ...existing } = previous;
@@ -211,12 +218,13 @@ function save(db, type, record, expectedRevision, { importing = false } = {}) {
     throw error;
   }
   if (type === "profile") db.prepare("insert into cultivation_profile_revisions values (?, ?, ?, ?)").run(record.id, next.revision, columns.data, new Date().toISOString());
+  if (type === "crop") onCropSaved(next, previous);
   return next;
 }
 
-export function saveRecord(db, type, body) {
+export function saveRecord(db, type, body, onCropSaved) {
   const record = clean(type, body);
-  return atomic(db, () => save(db, type, record, body.revision));
+  return atomic(db, () => save(db, type, record, body.revision, { onCropSaved }));
 }
 
 export function profileHistory(db, id) {
@@ -228,7 +236,8 @@ export function parseCsv(file, width) {
   if (typeof file !== "string" || file.length > 850000) invalid("file");
   const rows = [];
   const cell = /(?:"((?:[^"]|"")*)"|([^",\r\n]*))(,|\r?\n|$)/gy;
-  const text = file.replace(/^\uFEFF/, "");
+  const content = file.replace(/^\uFEFF/, "");
+  const text = content && !content.endsWith("\n") ? content + "\n" : content;
   let row = [];
   for (let offset = 0; offset < text.length;) {
     cell.lastIndex = offset;
@@ -252,7 +261,7 @@ export function catalogueCsv(records) {
   return ["type,record", ...catalogueTypes.flatMap((type) => records[type].map((record) => type + "," + quote(JSON.stringify(record))))].join("\r\n") + "\r\n";
 }
 
-export function importCatalogue(db, body) {
+export function importCatalogue(db, body, onCropSaved) {
   object(body, "import");
   let records = body.records;
   if (body.csv !== undefined) {
@@ -279,7 +288,7 @@ export function importCatalogue(db, body) {
   if (body.preview !== undefined && typeof body.preview !== "boolean") invalid("preview");
   db.exec("begin immediate");
   try {
-    const result = entries.map(({ type, record }) => ({ type, record: save(db, type, record, null, { importing: true }) }));
+    const result = entries.map(({ type, record }) => ({ type, record: save(db, type, record, null, { importing: true, onCropSaved }) }));
     db.exec(body.preview ? "rollback" : "commit");
     return result;
   } catch (error) {
@@ -287,4 +296,3 @@ export function importCatalogue(db, body) {
     throw error;
   }
 }
-

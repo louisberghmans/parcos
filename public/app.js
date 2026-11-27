@@ -2,6 +2,8 @@ import { renderTaskGroup } from "./app/tasks/task-group.js";
 import { mountCatalogue } from "./app/agriculture/catalogue.js";
 import { mountGarden } from "./app/agriculture/garden.js";
 import { mountCultivation } from "./app/agriculture/cultivation.js";
+import { mountOccupancy, mountOperations } from "./app/agriculture/operations.js";
+import { mountSuppliers } from "./app/agriculture/suppliers.js";
 import { agriculturePage, availableWorkspaces } from "./app/agriculture/workspaces.js";
 
 const app = document.querySelector("#app");
@@ -740,7 +742,8 @@ function isCoordinator() {
 }
 
 async function api(path, options = {}) {
-  const headers = { "X-Parcos-Locale": currentLocale(), ...(options.headers || {}) };
+  const headers = { "X-Parcos-Locale": currentLocale(), "X-Parcos-Time-Zone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+    ...(options.headers || {}) };
   if (options.body && !(options.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (state.csrfToken && !["GET", "HEAD"].includes(options.method || "GET")) headers["X-CSRF-Token"] = state.csrfToken;
   const response = await fetch(path, { ...options, headers, credentials: "same-origin" });
@@ -1042,10 +1045,15 @@ function shell(content) {
     administration: t("Administration", "Administration", "Beheer"),
   };
   const destinations = {
-    community: '<a href="#/crops">' + t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus") + "</a>",
+    community: '<a href="#/crops">' + t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus") + '</a><a href="#/occupancy">' + t("Cultures et récoltes", "Crops and harvests", "Gewassen en oogst") + "</a>",
     contributor: '<a href="#/garden-plan">' + t("Plan du jardin", "Garden plan", "Tuinplan") + '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") + "</a>",
-    coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") + '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") + "</a>",
-    administration: '<button type="button" data-page="profile">' + t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") + "</button>",
+    coordinator: '<a href="#/coordinator/catalogue">' + t("Gérer le catalogue", "Manage catalogue", "Catalogus beheren") +
+      '</a><a href="#/batches">' + t("Lots de culture", "Cultivation batches", "Teeltpartijen") +
+      '</a><a href="#/occupancy">' + t("Occupation", "Occupancy", "Bezetting") +
+      '</a><a href="#/coordinator/operations">' + t("Opérations", "Operations", "Handelingen") +
+      '</a><a href="#/coordinator/suppliers">' + t("Fournisseurs", "Suppliers", "Leveranciers") +
+      '</a><button type="button" data-page="management">' + t("Comptes membres", "Member accounts", "Ledenaccounts") + "</button>",
+    administration: '<button type="button" data-page="management">' + t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") + "</button>",
   };
   return `<div class="app-shell">
     <header class="topbar">
@@ -1070,22 +1078,30 @@ function renderApp() {
   if (state.setupRequired) return renderSetup();
   const route = agriculturePage(location.hash);
   const page = route ? '<section id="agriculture-page" class="page agriculture-page"></section>' :
-    state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() : renderToday();
+    state.page === "agenda" ? renderAgenda() : state.page === "garden" ? renderGarden() : state.page === "profile" ? renderProfile() :
+      state.page === "management" ? renderManagement() : renderToday();
   app.innerHTML = shell(page);
   bindShell();
   applyTranslations(app);
-  if (route === "garden-plan") {
-    mountGarden(document.querySelector("#agriculture-page"), {
+  const agricultureRoot = document.querySelector("#agriculture-page");
+  if (route === "occupancy") {
+    mountOccupancy(agricultureRoot, { api, t, escapeHtml, locale: currentLocale(), areas: state.areas });
+  } else if (route === "operations") {
+    mountOperations(agricultureRoot, { api, t, escapeHtml, locale: currentLocale(), refreshTasks: loadTasks });
+  } else if (route === "suppliers") {
+    mountSuppliers(agricultureRoot, { api, t, escapeHtml, locale: currentLocale() });
+  } else if (route === "garden-plan") {
+    mountGarden(agricultureRoot, {
       api, t, escapeHtml, manage: isCoordinator(), areas: state.areas, beds: state.beds,
-      bedId: Number(location.hash.split("/")[3]) || null,
+      bedId: Number(location.hash.split("/")[3]) || null, openBed,
     });
   } else if (route === "batches") {
-    mountCultivation(document.querySelector("#agriculture-page"), {
+    mountCultivation(agricultureRoot, {
       api, t, escapeHtml, locale: currentLocale(), manage: isCoordinator(), beds: state.beds,
       id: location.hash.split("/")[2] ?? null, compressPhoto,
     });
   } else if (route) {
-    mountCatalogue(document.querySelector("#agriculture-page"), {
+    mountCatalogue(agricultureRoot, {
       api, t, escapeHtml, locale: currentLocale(), manage: route === "catalogue-admin",
       cropId: route === "catalogue" ? location.hash.split("/")[2] : null,
     });
@@ -1199,7 +1215,8 @@ function taskCard(task) {
     action = `<span class="task-owner">${escapeHtml(task.claimedBy.name)}</span>`;
   }
   return `<article class="task-card ${task.priority === "urgent" ? "urgent" : ""}">
-    <div class="task-card-copy"><div class="task-meta">${task.priority === "urgent" ? `<span class="urgent-pill">${t("Urgent", "Urgent", "Dringend")}</span>` : ""}${due}${location}</div><strong>${escapeHtml(task.title)}</strong>${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}</div>${action}
+    <div class="task-card-copy"><div class="task-meta">${task.priority === "urgent" ? `<span class="urgent-pill">${t("Urgent", "Urgent", "Dringend")}</span>` : ""}${due}${location}</div><strong>${escapeHtml(task.title)}</strong>${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+      ${task.cultivationBatchId ? `<a class="task-batch-link" href="#/batches/${escapeHtml(task.cultivationBatchId)}">${t("Voir le lot", "View batch", "Partij bekijken")}</a>` : ""}</div>${action}
   </article>`;
 }
 
@@ -1469,6 +1486,15 @@ function renderProfile() {
       </form>
     </section>
     ${applicationSettingsPanel()}
+    <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
+  </section>`;
+}
+
+function renderManagement() {
+  if (!isCoordinator()) return renderProfile();
+  return `<section class="page profile-page">
+    <h1>${state.member.role === "admin" ? t("Comptes et paramètres", "Accounts and settings", "Accounts en instellingen") :
+      t("Comptes membres", "Member accounts", "Ledenaccounts")}</h1>
     ${isCoordinator() ? `<section class="panel coordinator-panel"><div class="section-heading compact"><div><p class="eyebrow">Coordination</p><h2>Inviter un membre</h2></div></div><p class="muted">Créez un lien valable 7 jours et partagez-le par votre canal habituel.</p><form id="invite-create-form" class="inline-form"><select name="role"><option value="member">Membre</option>${state.member.role === "admin" ? '<option value="coordinator">Coordinateur</option>' : ""}</select><button class="button secondary" type="submit">Créer une invitation</button></form><div id="invite-result"></div></section>
     <section class="panel member-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Profils", "Profiles", "Profielen")}</p><h2>${t("Les membres", "Members", "Leden")}</h2></div><span class="count-pill">${state.members.length}</span></div><div class="member-list">${state.members.map((member) => `<div class="member-row"><span class="avatar-button">${avatarContent(member)}</span><span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(roleLabel(member.role))} · @${escapeHtml(member.username)}</small></span><div class="member-admin-actions">${state.member.role === "admin" && member.role !== "admin" ? `<form class="member-role-form" data-member-role-form="${member.id}"><label class="sr-only" for="member-role-${member.id}">${t("Type de membre", "Member type", "Ledentype")}</label><select id="member-role-${member.id}" name="role"><option value="member" ${member.role === "member" ? "selected" : ""}>${t("Membre", "Member", "Lid")}</option><option value="coordinator" ${member.role === "coordinator" ? "selected" : ""}>${t("Coordinateur", "Coordinator", "Coördinator")}</option></select><button class="reset-link-button" type="submit">${t("Enregistrer", "Save", "Opslaan")}</button></form>` : ""}${member.id !== state.member.id && (member.role === "member" || state.member.role === "admin") ? `<button class="reset-link-button" data-reset-member="${member.id}">${t("Nouvel accès", "New access", "Nieuwe toegang")}</button>` : ""}</div></div>`).join("")}</div><div id="reset-result"></div></section>` : ""}
     ${state.member.role === "admin" ? publicSiteAdminSettings() : ""}
@@ -1476,7 +1502,6 @@ function renderProfile() {
     ${state.member.role === "admin" ? `<section class="panel backup-panel"><div class="section-heading compact"><div><p class="eyebrow">${t("Administration", "Administration", "Beheer")}</p><h2>${t("Sauvegarde complète", "Complete backup", "Volledige back-up")}</h2></div></div><p class="muted">${t("Cette exportation contient toutes les données privées de ParcOS, les mots de passe hachés et les médias téléversés. Conservez-la dans un emplacement sûr.", "This export contains all private ParcOS data, password hashes, and uploaded media. Store it securely.", "Deze export bevat alle privégegevens van ParcOS, wachtwoord-hashes en geüploade media. Bewaar hem veilig.")}</p><form id="complete-backup-form" class="form-stack compact-form"><label>${t("Mot de passe actuel", "Current password", "Huidig wachtwoord")}<input name="currentPassword" type="password" autocomplete="current-password" required></label><button class="button secondary" type="submit">${t("Télécharger la sauvegarde complète", "Download complete backup", "Volledige back-up downloaden")}</button></form><div id="backup-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel translation-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Traductions du contenu</h2></div></div><p class="muted">Téléchargez un fichier horodaté avec uniquement les textes manquants ou devenus obsolètes. Faites remplir le champ <code>translation</code> dans ChatGPT sans modifier les autres champs, puis réimportez le même fichier.</p><div class="translation-actions"><button class="button secondary" type="button" id="translation-export">Télécharger le fichier horodaté</button><form id="translation-import-form" class="form-stack compact-form"><label>Fichier JSON traduit<input id="translation-file" type="file" accept=".json,application/json" required></label><button class="button secondary" type="submit">Réimporter les traductions</button></form></div><div id="translation-result"></div></section>` : ""}
     ${state.member.role === "admin" ? `<section class="panel import-panel"><div class="section-heading compact"><div><p class="eyebrow">Administration</p><h2>Importer des données</h2></div></div><p class="muted">Import CSV exporté depuis Excel. Les lignes acceptées utilisent la colonne entity: area, bed, event ou member.</p><form id="import-form" class="form-stack compact-form"><label>Fichier CSV<input id="import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" required></label><button class="button secondary" type="submit">Importer le fichier</button></form><div id="import-result"></div></section>` : ""}
-    <button class="button ghost logout-button" id="logout-button">Se déconnecter</button>
   </section>`;
 }
 
@@ -1524,7 +1549,7 @@ function bindShell() {
   document.querySelector("#workspace-select")?.addEventListener("change", (event) => {
     const workspace = event.target.value;
     localStorage.setItem("parcos_workspace", workspace);
-    state.page = { community: "today", contributor: "garden", coordinator: "garden", administration: "profile" }[workspace];
+    state.page = { community: "today", contributor: "garden", coordinator: "garden", administration: "management" }[workspace];
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     renderApp();
     document.querySelector("#workspace-select")?.focus();

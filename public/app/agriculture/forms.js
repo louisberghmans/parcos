@@ -51,4 +51,3 @@ export function agricultureForms(t, escapeHtml) {
 
 export const splitList = (value) => value?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
 export const optionalNumber = (value) => value == null || value === "" ? null : Number(value);
-

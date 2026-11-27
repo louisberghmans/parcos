@@ -4,7 +4,8 @@ Use the private, authenticated `GET /api/agriculture/catalogue` endpoint. Its
 `crop` array contains the current reviewed crops and `variety` contains their
 reviewed cultivars. A valid member session is sufficient. Search with `?q=`
 matches scientific names, common names, localized synonyms and cultivar aliases
-across French, Belgian Dutch and English. Archived or draft entries are absent
+across French, Belgian Dutch and English. Optional `?month=5` matches crops with
+reviewed typical availability that includes May. Archived or draft entries are absent
 from the member response. Persist the stable crop ID when a link is confirmed,
 and retain unresolved and archived links with a review flag.
 
@@ -49,6 +50,10 @@ are examples and the response omits no missing-data state for the shown values.
   volume and count without a reviewed conversion for the ingredient.
 - A crop link can be satisfied by multiple varieties belonging to that crop.
   Recipes have no dependency on seed suppliers or cultivation batches.
+- The recipe workstream’s `cropKeys` array can contain the IDs returned as
+  `crop.id`. Keep alternative crop choices in that crosswalk and select an
+  individual `cropId` when resolving a specific mapping. No provisional
+  crosswalk key implies a corresponding installed crop.
 - `availability: null` means unknown. When supplied it contains `months`
   (unique integers 1–12), `context` (region/climate) and `source`. It describes
   typical local availability and is separate from measured and forecast
@@ -59,9 +64,10 @@ are examples and the response omits no missing-data state for the shown values.
   Import the taxon and crop together or use an existing taxon ID. Existing IDs
   must be identical on import. Use the revision-aware editor for changes.
 
-Migration 5 is reserved for the agricultural catalogue. Agricultural HTTP
-routes live under `/api/agriculture/`, and member crop details use
-`/#/crops/<id>`. Refresh integration against the migration ledger before
-assigning recipe migration numbers. This file is the contract to share with
-the recipe workstream.
-
+Migrations 5–8 are reserved for agriculture. Agricultural HTTP routes live
+under `/api/agriculture/`. Member crop and batch details use
+`/#/crops/<id>` and `/#/batches/<id>`. Exported crop descriptions use
+`agricultural_crop` in the existing translation exchange. Workspace links
+are in `public/app.js`, with agricultural route detection in
+`public/app/agriculture/workspaces.js`. Recheck the migration ledger before
+assigning the first recipe migration or merging shared shell changes.

@@ -25,4 +25,18 @@
 .ag-definitions dt { font-weight: 600; }
 .ag-definitions dd { margin: 0; }
 .agriculture-page [hidden] { display: none !important; }
-
+.task-batch-link { display: inline-flex; min-height: 44px; align-items: center; }
+.ag-print-sheet { display: grid; gap: 3mm; margin-block: .75rem; }
+.ag-print-sheet article { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 2mm; padding: 3mm; border: 1px solid #777; color: #111; background: #fff; break-inside: avoid; }
+.ag-print-sheet p { margin: 0 0 1mm; }
+.ag-print-sheet img { width: 18mm; height: auto; image-rendering: pixelated; }
+@media print {
+  body.ag-printing :is(.topbar, .bottom-nav, .workspace-bar, #modal-root, #toast-root),
+  body.ag-printing #agriculture-page > :not([data-batch-labels]),
+  body.ag-printing [data-batch-labels] :is(summary, form) { display: none !important; }
+  body.ag-printing :is(.app-shell, .main-content, .agriculture-page, [data-batch-labels] .ag-card) {
+    display: block; margin: 0; padding: 0; border: 0; width: auto; max-width: none; background: #fff;
+  }
+  body.ag-printing .ag-print-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; font-size: 9pt; }
+  body.ag-printing .ag-print-sheet[data-layout="compact"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

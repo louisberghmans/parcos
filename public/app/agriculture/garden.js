@@ -2,7 +2,7 @@ import { agricultureForms, optionalNumber } from "./forms.js";
 
 const endpoint = "/api/agriculture";
 
-export async function mountGarden(root, { api, t, escapeHtml: h, manage, areas, beds, bedId }) {
+export async function mountGarden(root, { api, t, escapeHtml: h, manage, areas, beds, bedId, openBed }) {
   const f = agricultureForms(t, h);
   const label = {
     title: t("Plan du jardin", "Garden plan", "Tuinplan"),
@@ -56,7 +56,9 @@ export async function mountGarden(root, { api, t, escapeHtml: h, manage, areas, 
     try {
       const data = await api(endpoint + "/beds/" + bedId + "/physical");
       root.innerHTML = '<div class="page-title"><h1>' + h(label.bed + " " + (bed?.code ?? bedId)) + '</h1></div>' +
-        '<div><a class="button secondary" href="#/garden-plan' + (bed?.areaId ? "/" + bed.areaId : "") + '">' + h(label.title) + "</a></div>" +
+        '<div class="ag-actions"><a class="button secondary" href="#/garden-plan' + (bed?.areaId ? "/" + bed.areaId : "") + '">' + h(label.title) +
+        '</a><button type="button" class="button secondary" data-bed-summary>' +
+        h(t("Voir le journal et les photos", "View log and photos", "Logboek en foto’s bekijken")) + "</button></div>" +
         (bed?.crop || bed?.variety ? '<p>' + h(label.legacy + " · " + [bed.crop, bed.variety].filter(Boolean).join(" · ")) + "</p>" : "") +
         '<div data-ag-physical></div>' +
         '<article class="ag-card"><h2>' + h(t("Historique du plan", "Map history", "Kaartgeschiedenis")) + "</h2>" +
@@ -64,6 +66,7 @@ export async function mountGarden(root, { api, t, escapeHtml: h, manage, areas, 
           '<li>' + h(shape.validFrom + (shape.validTo ? " – " + shape.validTo : "") + " · " + shape.source.title +
           (shape.sourceRevision ? " · " + shape.sourceRevision : "")) + "</li>").join("") + "</ul>" : "<p>" + h(label.unmapped) + "</p>") + "</article>";
       displayPhysical(root.querySelector("[data-ag-physical]"), data.physical);
+      root.querySelector("[data-bed-summary]").addEventListener("click", () => openBed(bedId));
     } catch (error) {
       root.replaceChildren(feedback(error));
     }
@@ -225,4 +228,3 @@ function localDate() {
   const date = new Date();
   return [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((value) => String(value).padStart(2, "0")).join("-");
 }
-

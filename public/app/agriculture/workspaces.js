@@ -9,6 +9,8 @@ export function agriculturePage(hash) {
   if (hash === "#/coordinator/catalogue") return "catalogue-admin";
   if (/^#\/garden-plan(?:\/(?:beds\/)?\d+)?$/.test(hash)) return "garden-plan";
   if (/^#\/batches(?:\/[a-z0-9_-]{1,80})?$/.test(hash)) return "batches";
+  if (hash === "#/occupancy") return "occupancy";
+  if (hash === "#/coordinator/operations") return "operations";
+  if (hash === "#/coordinator/suppliers") return "suppliers";
   return null;
 }
-

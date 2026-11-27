@@ -74,7 +74,9 @@ export async function mountCatalogue(root, { api, t, escapeHtml: h, locale, mana
   const display = (item) => item.names?.[locale] ?? Object.values(item.names ?? {}).find(Boolean) ?? item.name ?? item.scientificName;
   const choices = (ids) => ids.map((id) => [id, tr[id]]);
   const listItem = (heading, value) => value ? "<p><strong>" + h(heading) + "</strong> " + h(value) + "</p>" : "";
-  const fetchRecords = (query = "") => api(endpoint + "?" + new URLSearchParams({ q: query, ...(manage ? { manage: "1" } : {}) }));
+  const fetchRecords = (query = "", month = "") => api(endpoint + "?" + new URLSearchParams({
+    q: query, ...(month ? { month } : {}), ...(manage ? { manage: "1" } : {}),
+  }));
   const searchLabel = t("Rechercher un légume ou une variété", "Search for a vegetable or variety", "Zoek een groente of ras");
   const title = manage ? t("Gérer le catalogue", "Manage the catalogue", "Catalogus beheren") :
     t("Catalogue des cultures", "Crop catalogue", "Gewassencatalogus");
@@ -132,9 +134,12 @@ export async function mountCatalogue(root, { api, t, escapeHtml: h, locale, mana
   }
   if (!manage) {
     container.innerHTML = '<form data-ag-search class="ag-search">' + f.field("q", searchLabel, "", { type: "search" }) +
+      f.select("month", t("Disponibilité habituelle", "Typical availability", "Gebruikelijke beschikbaarheid"), null,
+        Array.from({ length: 12 }, (_, i) => [i + 1, monthName(locale, i + 1)])) +
       '<button class="button secondary">' + h(t("Rechercher", "Search", "Zoeken")) + '</button></form><div aria-live="polite" data-ag-results></div>';
     const results = container.querySelector("[data-ag-results]");
     const form = container.querySelector("[data-ag-search]");
+    form.elements.month.options[0].textContent = t("Tous les mois", "All months", "Alle maanden");
     results.innerHTML = cropCards(data);
     let sequence = 0;
     form.addEventListener("submit", async (event) => {
@@ -142,7 +147,7 @@ export async function mountCatalogue(root, { api, t, escapeHtml: h, locale, mana
       const request = ++sequence;
       results.setAttribute("aria-busy", "true");
       try {
-        const found = await fetchRecords(form.elements.q.value);
+        const found = await fetchRecords(form.elements.q.value, form.elements.month.value);
         if (request === sequence) results.innerHTML = cropCards(found);
       } catch (error) {
         if (request === sequence) results.textContent = f.errorLabel(error);
@@ -325,4 +330,3 @@ export async function mountCatalogue(root, { api, t, escapeHtml: h, locale, mana
 function monthName(locale, month) {
   return new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2024, month - 1, 1)));
 }
-

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { createApp } from "../server.mjs";
 import { createCompleteBackup, restoreBackup } from "../backup.mjs";
+import { today } from "../src/domain/agriculture/garden.mjs";
 
 const provenance = { title: "Synthetic test fixture" };
 const records = [
@@ -15,6 +16,38 @@ const records = [
     context: "Synthetic Brussels fixture", review: "reviewed", sources: [provenance],
     parameters: { sowingDepth: { unit: "cm", min: 1, max: 2, constraint: "estimate", review: "reviewed", source: provenance }, yield: null } } },
 ];
+
+test("agricultural civil dates follow the browser time zone at midnight", () => {
+  const at = new Date("2026-11-27T23:30:00.000Z");
+  assert.equal(today("Europe/Brussels", at), "2026-11-28");
+  assert.equal(today("UTC", at), "2026-11-27");
+  assert.match(today("invalid/time-zone", at), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("catalogue descriptions use the existing revision-aware translation exchange", async (t) => {
+  const { request, auth } = await fixture(t);
+  const root = "/agriculture/catalogue";
+  const transaction = await request(root + "/import", { method: "POST", auth, body: { records: records.map((entry) =>
+    entry.type === "crop" ? { ...entry, record: { ...entry.record, description: { fr: "Texte source" },
+      availability: { context: "Synthetic fixture", months: [5, 6], source: provenance } } } : entry) } });
+  assert.equal(transaction.status, 200);
+  const crop = (await request(root + "?month=5", { auth })).value.crop[0];
+  assert.equal(crop.id, "test-crop");
+  assert.equal((await request(root + "?month=7", { auth })).value.crop.length, 0);
+  const exported = (await request("/translations/export", { auth })).value;
+  const item = exported.items.find((row) => row.entityType === "agricultural_crop" && row.targetLocale === "nl");
+  assert.equal(item.sourceText, "Texte source");
+  const translation = { format: exported.format, items: [{ ...item, translation: "Brontest" }] };
+  const importer = () => request("/translations/import", { method: "POST", auth, body: translation });
+  assert.equal((await importer()).value.imported, 1);
+  const localized = (await request(root, { auth })).value.crop[0];
+  assert.equal(localized.description.nl, "Brontest");
+  const saved = await request(root + "/crop", { method: "PUT", auth,
+    body: { ...localized, description: { ...localized.description, fr: "Source révisée" } } });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.value.record.description.nl, null);
+  assert.equal((await importer()).value.stale, 1);
+});
 
 test("cultivation traces partial transfers, shared and successive footprints, and actual harvests", async (t) => {
   const { app, request, auth, bed, directory } = await fixture(t);
@@ -30,6 +63,9 @@ test("cultivation traces partial transfers, shared and successive footprints, an
   const secondProfile = { ...records[3].record, id: "other-profile", cropId: secondCrop.id, varietyId: null };
   await add("/catalogue/import", { records: [...records, { type: "profile", record: nurseryProfile },
     { type: "crop", record: secondCrop }, { type: "profile", record: secondProfile }] }, 200);
+  assertStatus(await send(prefix + "/beds/" + bed.id + "/physical", { lengthM: 20, usableM2: 12 }, "PUT"), 200);
+  await add("/areas/" + areaId + "/geometry", { validFrom: "2025-01-01", source: provenance,
+    features: [{ bedCode: bed.code, points: [[0, 0], [1, 0], [1, 1], [0, 1]] }] }, 200);
   const resource = async (code, capacity) => assertStatus(await send(prefix + "/areas/" + areaId + "/resources",
     { type: "tray", code, name: code, capacity, capacityUnit: "plant" }, "PUT"), 200).resource;
   const tray1 = await resource("tray-a", 100);
@@ -50,7 +86,7 @@ test("cultivation traces partial transfers, shared and successive footprints, an
   await allocate(other, planned, 409);
   const shared = (await allocate(other, { footprintId: first.id })).allocation;
   assert.equal(shared.id, first.id);
-  await allocate(other, { ...planned, startM: 5, endM: 8 });
+  await allocate(other, { ...planned, startM: 5, endM: 8, occupiedM2: 3 });
   await allocate(succession, { ...planned, startsOn: "2025-06-01", endsBefore: null });
   assert.equal(app.db.prepare("select count(*) as n from bed_footprints where bed_id = ?").get(bed.id).n, 3);
   assert.equal((await get("/batches/" + transplant.id)).actual.status, "planned");
@@ -69,7 +105,9 @@ test("cultivation traces partial transfers, shared and successive footprints, an
     { batchId: transplant.id, amount: 0.45, unit: "kg", harvestedOn: "2025-04-01", ...value });
   assertStatus(await getHarvest(bed.id, { harvestedOn: "2025-01-10" }), 400);
   assertStatus(await getHarvest(bed.id, { unit: "buckets" }), 400);
-  assertStatus(await getHarvest(bed.id), 201);
+  assertStatus(await getHarvest(bed.id, { requestId: "harvest-once" }), 201);
+  assertStatus(await getHarvest(bed.id, { requestId: "harvest-once" }), 200);
+  assertStatus(await getHarvest(bed.id, { requestId: "harvest-once", amount: 9 }), 409);
   assertStatus(await getHarvest(otherBed.id, { amount: 7, unit: "piece" }), 201);
   assertStatus(await send(prefix + "/footprints/" + first.id + "/release", { freeOn: "2025-03-31" }), 409);
   assertStatus(await send(prefix + "/footprints/" + first.id + "/release", { freeOn: "2025-04-10" }), 200);
@@ -83,6 +121,30 @@ test("cultivation traces partial transfers, shared and successive footprints, an
   assert.deepEqual(detail.harvests.map(({ amount, unit }) => [amount, unit]), [[7, "piece"], [0.45, "kg"]]);
   assert.equal(app.db.prepare("select crop from beds where id = ?").get(bed.id).crop, bed.crop);
   assert.equal(app.db.prepare("select count(*) as n from activities where activity_type = 'cultivation_transplant'").get().n, 2);
+  const production = await get("/occupancy?date=2025-04-02&from=2025-04-01&to=2025-04-01");
+  const measuredBed = production.beds.find((item) => item.id === bed.id);
+  assert.equal(measuredBed.footprints[0].batches.length, 2);
+  assert.equal(production.reserved.occupiedKnownArea, 8);
+  assert.equal(production.actual.occupiedKnownArea, 5);
+  assert.equal(production.harvests.length, 2);
+  const putTemplate = async (value, status = 200) => assertStatus(await send(prefix + "/operations", value, "PUT"), status);
+  const firstStep = (await putTemplate({ kind: "prepare", title: "Prepare fixture", status: "ready", setupMinutes: 4 })).template;
+  const template = (await putTemplate({
+    kind: "water", title: "Water fixture", status: "ready", dependencies: [firstStep.id], cropId: transplant.cropId,
+    anchor: "transplant", startOffsetDays: 0, endOffsetDays: 4, instructions: "Check soil first",
+    completion: "Watered the fixture", safety: "Keep the path clear",
+  })).template;
+  await putTemplate({ ...firstStep, dependencies: [template.id] }, 400);
+  const taskInput = { templateId: template.id, templateRevision: template.revision, batchId: transplant.id, bedId: bed.id, scheduledOn: "2025-04-02" };
+  const task = await add("/operations/tasks", taskInput);
+  assert.equal((await add("/operations/tasks", taskInput, 200)).taskId, task.taskId);
+  const existingTasks = (await request("/tasks", { auth })).value.tasks;
+  const linkedTask = existingTasks.find(({ id }) => id === task.taskId);
+  assert.equal(linkedTask.cultivationBatchId, transplant.id);
+  assert.match(linkedTask.description, /Keep the path clear/);
+  const qr = await request(prefix + "/labels/" + transplant.id + ".gif", { auth });
+  assert.equal(qr.status, 200);
+  assert.match(qr.value, /^GIF8[79]a/);
 
   const invite = await request("/invites", { method: "POST", auth, body: { role: "member" } });
   const member = assertStatus(await request("/invites/redeem", { method: "POST", body: {
@@ -95,8 +157,11 @@ test("cultivation traces partial transfers, shared and successive footprints, an
   const path = prefix + "/batches/" + transplant.id;
   assertStatus(await send(path + "/events", { kind: "observation", occurredOn: "2025-04-03", note: "Synthetic member observation" }, "POST", memberAuth), 201);
   assertStatus(await send(path + "/allocations", planned, "POST", memberAuth), 403);
+  assertStatus(await request(prefix + "/suppliers", { auth: memberAuth }), 403);
   app.db.prepare("update garden_areas set members_can_access = 0 where id = ?").run(areaId);
   assertStatus(await request(path, { auth: memberAuth }), 404);
+  assertStatus(await request(prefix + "/labels/" + transplant.id + ".gif", { auth: memberAuth }), 404);
+  assert.ok(!(await request("/tasks", { auth: memberAuth })).value.tasks.some(({ id }) => id === task.taskId));
   assertStatus(await send(path + "/events", { kind: "observation", occurredOn: "2025-04-04", note: "Denied" }, "POST", memberAuth), 404);
 
   const backup = await createCompleteBackup({ db: app.db, dataDir: directory, uploadsDir: join(directory, "uploads"), appVersion: "1.4.2" });
@@ -106,8 +171,48 @@ test("cultivation traces partial transfers, shared and successive footprints, an
   try {
     assert.equal(restored.db.prepare("select count(*) as n from harvest_measurements").get().n, 2);
     assert.equal(restored.db.prepare("select count(*) as n from batch_allocations").get().n, 5);
+    assert.equal(restored.db.prepare("select count(*) as n from cultivation_task_links").get().n, 1);
     assert.deepEqual(restored.db.prepare("pragma foreign_key_check").all(), []);
   } finally { restored.close(); }
+});
+
+test("supplier imports stage, suggest cultivar matches and preserve reviewed revisions", async (t) => {
+  const { app, request, auth } = await fixture(t);
+  const path = "/agriculture/suppliers";
+  const send = (route, body) => request(route, { method: "POST", body, auth });
+  assert.equal((await send("/agriculture/catalogue/import", { records })).status, 200);
+  const product = { supplier: "Synthetic Seeds", sku: "TEST-1", name: "Garden variety",
+    sourceUrl: "https://example.test/seed", retrievedOn: "2025-03-01", seedCount: 45,
+    availability: "available", cropHint: "Testgroente", varietyHint: "Test cultivar" };
+  const upload = (products, preview = false) => send(path + "/import", { products, preview });
+  assert.equal((await upload([{ ...product, sourceUrl: "javascript:alert(1)" }])).status, 400);
+  assert.equal((await upload([product, product])).status, 409);
+  assert.equal((await upload([product], true)).value.staged[0].matches.varieties[0].id, "test-variety");
+  assert.equal((await request(path, { auth })).value.pending.length, 0);
+  const initial = (await upload([product])).value.staged[0];
+  const repeated = (await upload([product])).value.staged[0];
+  assert.equal(repeated.id, initial.id);
+  assert.equal(repeated.duplicate, true);
+  assert.equal((await request(path, { auth })).value.products.length, 0);
+  const approve = (id, expectedRevision, fields = {}) => send(path + "/review/" + id, {
+    state: "approved", expectedRevision, cropId: "test-crop", varietyId: "test-variety", ...fields,
+  });
+  assert.equal((await approve(initial.id, null, { cropId: null })).status, 400);
+  const published = (await approve(initial.id, null)).value.product;
+  assert.equal(published.revision, 1);
+  assert.equal((await approve(initial.id, null)).value.product.revision, 1);
+  const header = (await request(path, { auth })).value.csvColumns.join(",");
+  const csv = header + "\r\nSynthetic Seeds,TEST-1,\"New, factual name\",https://example.test/seed,2025-04-01,unavailable,40,,,";
+  const next = (await send(path + "/import", { csv })).value.staged[0];
+  assert.equal(next.current.id, published.id);
+  assert.equal((await request(path, { auth })).value.products[0].availability, "available");
+  assert.equal((await approve(next.id, null)).status, 409);
+  const updated = (await approve(next.id, 1)).value.product;
+  assert.equal(updated.id, published.id);
+  assert.equal(updated.revision, 2);
+  assert.equal(updated.name, "New, factual name");
+  assert.equal(app.db.prepare("select count(*) as n from supplier_product_revisions where product_id = ?").get(updated.id).n, 2);
+  assert.equal((await request(path, { auth })).value.pending.length, 0);
 });
 
 async function fixture(t) {
@@ -115,6 +220,7 @@ async function fixture(t) {
   const settings = { dataDir: directory, adminUsername: "admin", adminPassword: "test-admin-password", seedDemoData: true, notificationScheduler: false };
   let app = createApp(settings);
   const bed = app.db.prepare("select id, code, crop, variety from beds order by id limit 1").get();
+  app.db.exec("drop table harvest_submission_keys; drop table agricultural_crop_text; drop table cultivation_task_links; drop table cultivation_operation_revisions; drop table cultivation_operation_templates; drop table supplier_import_reviews; drop table supplier_product_revisions; drop table supplier_products");
   app.db.exec("drop table harvest_measurements; drop table batch_events; drop table batch_allocations; drop table footprint_releases; drop table bed_footprints; drop table cultivation_combinations; drop table cultivation_batches");
   app.db.exec("drop table garden_resources; drop table bed_geometry; drop table bed_physical; drop table cultivation_profile_revisions; drop table cultivation_profiles; drop table agricultural_varieties; drop table agricultural_crops; drop table agricultural_taxa; delete from schema_migrations where version > 4");
   app.close();
@@ -241,4 +347,3 @@ test("physical data and geometry history retain bed identity and enforce area ac
   assert.equal((await request(areaPath + "/plan", { auth })).status, 200);
   assert.deepEqual(app.db.prepare("pragma foreign_key_check").all(), []);
 });
-

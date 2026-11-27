@@ -13,7 +13,17 @@ export const gardenMigration = {
   },
 };
 
-export const today = () => new Date().toISOString().slice(0, 10);
+export function today(timeZone, date = new Date()) {
+  const options = { year: "numeric", month: "2-digit", day: "2-digit" };
+  if (typeof timeZone === "string" && timeZone.length <= 80) {
+    try {
+      return new Intl.DateTimeFormat("en-CA", { ...options, timeZone }).format(date);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+    }
+  }
+  return new Intl.DateTimeFormat("en-CA", options).format(date);
+}
 const parse = (row) => row ? JSON.parse(row.data) : null;
 
 export function physical(db, bedId) {
@@ -171,7 +181,7 @@ function requireArea(db, areaId, manage) {
   return area;
 }
 
-export async function gardenRoute({ db, req, path, url, json, readJson, authorize, bedAccess }, manage) {
+export async function gardenRoute({ db, req, path, url, json, readJson, authorize, bedAccess, localDay }, manage) {
   const match = /^\/api\/agriculture\/(areas|beds)\/(\d+)\/(plan|geometry|physical|resources)$/.exec(path);
   if (!match) throw new AgricultureError("missing", null, 404);
   const [, kind, idText, action] = match;
@@ -193,7 +203,7 @@ export async function gardenRoute({ db, req, path, url, json, readJson, authoriz
   if (kind === "areas") {
     const area = requireArea(db, id, manage);
     if (method === "GET" && action === "plan") {
-      const date = day(url.searchParams.get("date"), "date") ?? today();
+      const date = day(url.searchParams.get("date"), "date") ?? localDay;
       return json(200, { area: { id, name: area.name }, date, beds: gardenPlan(db, id, date), resources: resources(db, id).filter((row) => manage || !row.archived) });
     }
     if (method === "POST" && action === "geometry") {
@@ -211,4 +221,3 @@ export async function gardenRoute({ db, req, path, url, json, readJson, authoriz
   }
   throw new AgricultureError("missing", null, 404);
 }
-
