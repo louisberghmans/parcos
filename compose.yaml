@@ -1,6 +1,6 @@
 services:
   parcos:
-    image: "${PARCOS_IMAGE:-ghcr.io/louisberghmans/parcos:1.4.2}"
+    image: "${PARCOS_IMAGE:-ghcr.io/louisberghmans/parcos:1.5.0}"
     build:
       context: .
     restart: unless-stopped

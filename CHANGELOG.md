@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.5.0 - 2026-11-28
+
+### Agricultural catalogue
+- Added multilingual botanical species, crop and variety catalogues, searchable in French, Dutch and English.
+- Introduced versioned cultivation profiles with structured agronomic parameters, source provenance and review status.
+- Added CSV and JSON catalogue import/export with validation and duplicate detection.
+- Added seed supplier catalogue staging, matching, review and publication workflows.
+
+### Garden and spatial management
+- Added physical bed measurements, soil characteristics, sun exposure and infrastructure properties.
+- Introduced versioned garden geometry while preserving existing bed identities and historical records.
+- Added interactive garden maps with keyboard-accessible navigation and list alternatives.
+- Introduced nursery, greenhouse, bench and tray resource management.
+
+### Cultivation and harvest
+- Added cultivation batches with seed-to-harvest traceability.
+- Supported direct sowing, nursery cultivation, partial transfers and transplanting into multiple beds.
+- Introduced spatial subdivisions, succession planting and reviewed intercropping combinations.
+- Added structured harvest quantities and units while preserving historical free-text harvest records.
+- Added cultivation occupancy reporting without double-counting shared growing space.
+
+### Operational workflows
+- Introduced reusable cultivation operation templates with dependencies, timing, labour estimates, materials and instructions.
+- Integrated agricultural operations with the existing task-management system.
+- Added printable cultivation batch and nursery labels with locally generated QR codes.
+- Introduced agricultural navigation within the existing application.
+
+### Architecture and integration
+- Established the agricultural integration contract for the forthcoming recipe catalogue and seasonal production planning engine.
+- Extended existing revision-aware translation infrastructure to agricultural content.
+- Added database migrations 5–8, preserving existing members, beds, events, tasks, activities, photographs and harvest history.
+- Added a pinned QR-code generation dependency without requiring an external service.
+
+### Validation
+- Passed 19 automated tests, including migration, authorization, translation, nursery count conservation, spatial allocation, supplier review and backup/restore coverage.
+- Validated mobile and desktop workflows in French, Dutch and English.
+
+### Upgrade and rollback
+- A complete pre-upgrade backup is required before deploying this release.
+- Rolling back to 1.4.2 requires restoring a compatible pre-upgrade database backup as well as the previous container image.
+
+### Remaining work
+- Populate the agricultural catalogue with reviewed crop, variety and supplier data.
+- Survey the physical garden and nursery resources.
+- Validate printed labels using the intended printer and label stock.
+- Integrate the recipe catalogue, weekly food preferences and annual production planning engine.
+
 ## 1.4.2 - 2026-11-26
 
 - Updated the Node.js baseline, CI and pinned container to security release
